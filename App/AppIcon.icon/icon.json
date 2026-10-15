@@ -1,0 +1,94 @@
+{
+  "fill-specializations": [
+    {
+      "value": {
+        "automatic-gradient": "srgb:1.00000,0.84000,0.38000,1.00000"
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "automatic-gradient": "srgb:0.10000,0.14000,0.30000,1.00000"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "name": "note",
+      "layers": [
+        {
+          "name": "note",
+          "image-name-specializations": [
+            {
+              "value": "note.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "note-dark.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "note-dark.svg"
+            }
+          ],
+          "glass": true
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "name": "face",
+      "layers": [
+        {
+          "name": "eyes",
+          "image-name": "eyes.svg",
+          "glass": true
+        },
+        {
+          "name": "mouth",
+          "image-name": "mouth.svg",
+          "glass": true
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.4
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "name": "body",
+      "layers": [
+        {
+          "name": "body",
+          "image-name": "body.svg",
+          "glass": true
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}
