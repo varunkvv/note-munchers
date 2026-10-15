@@ -92,7 +92,8 @@ func engine(inUnit unit: Int, config: NoteCoreConfig = .default) -> MasteryEngin
 
     @Test func newItemGetsAnIntroAndDoesNotCount() {
         var bench = Bench(MasteryEngine())
-        #expect(bench.start() == [.showItem, .say(.newNote)])
+        // i do: the app plays it, lights the key, says its name
+        #expect(bench.start() == [.showItem, .playPitches([.middleC]), .say(.meetNote(.c))])
         #expect(bench.session.isIntro)
         #expect(bench.session.item!.id == "treble:C4")
         #expect(bench.session.keyboardHint == [.middleC], "keyboard picture is up from the start")
@@ -100,7 +101,7 @@ func engine(inUnit unit: Int, config: NoteCoreConfig = .default) -> MasteryEngin
         #expect(bench.session.phase == .success)
         #expect(bench.session.summary.attempts[0].wasIntro)
         #expect(bench.session.engine.stats(for: "treble:C4").attempts == 0)
-        #expect(bench.next() == [.showItem, .say(.newNote)], "G4 is next, also new")
+        #expect(bench.next() == [.showItem, .playPitches([Pitch(.g, 4)]), .say(.meetNote(.g))], "G4 is next, also new")
         #expect(bench.session.item!.id == "treble:G4")
     }
 
@@ -150,7 +151,7 @@ func engine(inUnit unit: Int, config: NoteCoreConfig = .default) -> MasteryEngin
         #expect(abs(deadline - (bench.now + 0.15)) < 1e-9)
         #expect(bench.tick(at: deadline - 0.01).isEmpty)
         #expect(bench.tick(at: deadline) == [.wobble(note: 0)])
-        #expect(bench.session.nextDeadline == nil)
+        #expect(bench.session.nextDeadline! > bench.now + 10, "only the stuck timer is left")
 
         // both keys inside the window: right away
         let cues = bench.playCurrent()
@@ -281,10 +282,10 @@ func engine(inUnit unit: Int, config: NoteCoreConfig = .default) -> MasteryEngin
         config.sessionMaxDuration = 10
         var bench = Bench(engine(inUnit: 1, config: config))
         _ = bench.start()
-        // he takes ages on this one. the session waits for him
-        #expect(bench.tick(at: 30).isEmpty)
+        // time is up while he's on this one. the session waits for him
+        #expect(bench.tick(at: 11).isEmpty)
         #expect(bench.session.phase == .prompt)
-        _ = bench.playCurrent()
+        _ = bench.playCurrent(after: 1)
         #expect(bench.session.phase == .success)
         #expect(bench.next() == [.done, .say(.sessionDone)])
         #expect(bench.session.summary.endedBy == .timeLimit)

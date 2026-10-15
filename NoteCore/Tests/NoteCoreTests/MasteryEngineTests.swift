@@ -174,9 +174,9 @@ func maxRun(_ ids: [ItemID]) -> Int {
         var picks: [ItemID] = []
         for _ in 0..<3000 { picks.append(engine.pickNext(using: &rng).id) }
         #expect(maxRun(picks) <= 2)
-        // newest still gets close to its 40% even with the cap on runs
+        // newest still gets close to its 25% even with the cap on runs
         let share = Double(picks.filter { $0 == e4 }.count) / Double(picks.count)
-        #expect(share > 0.3 && share < 0.45, "newest share \(share)")
+        #expect(share > 0.2 && share < 0.3, "newest share \(share)")
     }
 
     @Test func lowBoxesGetShownMore() {

@@ -25,6 +25,9 @@ public struct AttemptResult: Hashable, Codable, Sendable {
     public var firstTry: Bool
     public var wrongPresses: Int
     public var almostPresses: Int
+    /// Steps up the hint ladder from being stuck (no key for `stuckAfter` seconds).
+    /// Not a wrong press, but it means it wasn't right first try.
+    public var stuckSteps: Int
     public var hints: HintLevel
     /// Seconds to find it, not counting time the piano was disconnected.
     /// Single notes and chords: prompt to the right key(s). Groups: per note, averaged.
@@ -36,7 +39,8 @@ public struct AttemptResult: Hashable, Codable, Sendable {
 
     public init(
         itemID: ItemID, unit: Int, wasIntro: Bool = false, firstTry: Bool, wrongPresses: Int = 0,
-        almostPresses: Int = 0, hints: HintLevel = .none, responseTime: Double, rhythm: RhythmResult? = nil
+        almostPresses: Int = 0, stuckSteps: Int = 0, hints: HintLevel = .none, responseTime: Double,
+        rhythm: RhythmResult? = nil
     ) {
         self.itemID = itemID
         self.unit = unit
@@ -44,8 +48,26 @@ public struct AttemptResult: Hashable, Codable, Sendable {
         self.firstTry = firstTry
         self.wrongPresses = wrongPresses
         self.almostPresses = almostPresses
+        self.stuckSteps = stuckSteps
         self.hints = hints
         self.responseTime = responseTime
         self.rhythm = rhythm
+    }
+}
+
+// see LenientDecoding.swift. the app keeps every attempt as JSON
+extension AttemptResult {
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        itemID = try c.decode(ItemID.self, forKey: .itemID)
+        unit = try c.value(.unit, or: 1)
+        wasIntro = try c.value(.wasIntro, or: false)
+        firstTry = try c.value(.firstTry, or: false)
+        wrongPresses = try c.value(.wrongPresses, or: 0)
+        almostPresses = try c.value(.almostPresses, or: 0)
+        stuckSteps = try c.value(.stuckSteps, or: 0)
+        hints = try c.value(.hints, or: .none)
+        responseTime = try c.value(.responseTime, or: 0)
+        rhythm = try c.decodeIfPresent(RhythmResult.self, forKey: .rhythm)
     }
 }

@@ -66,6 +66,17 @@ public struct MasteryUpdate: Hashable, Codable, Sendable {
     public init() {}
 }
 
+/// How to pick the next item.
+public enum PickStyle: String, Codable, Hashable, Sendable {
+    /// Intros first, then the newest share and low boxes.
+    case normal
+    /// His strongest items: highest box among items he has already played, a different
+    /// one from the last pick when there's a choice. Used for the warm-up, easing after
+    /// misses, and the easy items at the end. No intros. Falls back to `normal` when he
+    /// hasn't played anything in this pool yet.
+    case strongest
+}
+
 public enum UnitStatus: String, Codable, Hashable, Sendable {
     case completed, current, skipped, upcoming
 }
@@ -281,14 +292,21 @@ public struct MasteryEngine: Sendable {
         return unit.newItems[before..<after].map(\.id)
     }
 
+    /// Pool items he has played at least once (intros don't count). These are what a
+    /// `.strongest` pick chooses from.
+    public var playedPool: [PracticeItem] {
+        pool.filter { stats(for: $0.id).attempts > 0 && !needsIntro($0) }
+    }
+
     /// Picks the next item to show.
     ///
     /// - a new item that hasn't had its intro goes first, in curriculum order
-    /// - otherwise the newest batch shares `newestShare` (40%), the rest share what's
+    /// - otherwise the newest batch shares `newestShare` (25%), the rest share what's
     ///   left, weighted toward low boxes (weight 6 - box, so box 1 is 5x box 5)
+    /// - `.strongest` skips both and takes one of his highest-box items instead
     /// - an item picked `maxRepeats` (2) times in a row is never picked a third time
     ///   while the pool has 2+ items
-    public mutating func pickNext(using rng: inout some RandomNumberGenerator) -> PracticeItem {
+    public mutating func pickNext(_ style: PickStyle = .normal, using rng: inout some RandomNumberGenerator) -> PracticeItem {
         let pool = self.pool
         precondition(!pool.isEmpty, "unit \(unit.number) has an empty pool")
         let recent = state.recentPicks.suffix(config.maxRepeats)
@@ -297,7 +315,9 @@ public struct MasteryEngine: Sendable {
             blocked = recent.first
         }
         let picked: PracticeItem
-        if let intro = pool.first(where: { $0.id != blocked && needsIntro($0) }) {
+        if style == .strongest, let strong = strongestPick(blocked: blocked, using: &rng) {
+            picked = strong
+        } else if let intro = pool.first(where: { $0.id != blocked && needsIntro($0) }) {
             picked = intro
         } else {
             // weigh the whole pool, then drop the blocked item, so blocking one item
@@ -319,10 +339,24 @@ public struct MasteryEngine: Sendable {
         return picked
     }
 
-    private func boxWeight(_ item: PracticeItem) -> Double {
+    private func strongestPick(blocked: ItemID?, using rng: inout some RandomNumberGenerator) -> PracticeItem? {
+        var eligible = playedPool.filter { $0.id != blocked }
+        if eligible.count > 1, let last = state.recentPicks.last {
+            eligible.removeAll { $0.id == last }
+        }
+        guard let top = eligible.map(effectiveBox).max() else { return nil }
+        let tier = eligible.filter { effectiveBox($0) == top }
+        return tier[min(tier.count - 1, Int(unitInterval(&rng) * Double(tier.count)))]
+    }
+
+    /// The pitch box, or the lower of pitch and rhythm boxes for rhythm items.
+    private func effectiveBox(_ item: PracticeItem) -> Int {
         let s = stats(for: item.id)
-        let box = item.isRhythm ? min(s.box, s.rhythmBox) : s.box
-        return Double(config.boxCount + 1 - box)
+        return item.isRhythm ? min(s.box, s.rhythmBox) : s.box
+    }
+
+    private func boxWeight(_ item: PracticeItem) -> Double {
+        Double(config.boxCount + 1 - effectiveBox(item))
     }
 
     private func weightedPick(_ weighted: [(PracticeItem, Double)], using rng: inout some RandomNumberGenerator) -> PracticeItem {
