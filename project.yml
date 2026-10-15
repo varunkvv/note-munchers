@@ -1,0 +1,52 @@
+name: NoteMunchers
+options:
+  bundleIdPrefix: com.varunv
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "18.0"
+    macOS: "15.0"
+
+packages:
+  NoteCore:
+    path: NoteCore
+
+targets:
+  NoteMunchers:
+    type: application
+    platform: auto
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - path: App
+    dependencies:
+      - package: NoteCore
+    settings:
+      base:
+        PRODUCT_NAME: NoteMunchers
+        PRODUCT_BUNDLE_IDENTIFIER: com.varunv.notemunchers
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        # empty on purpose. pick your team in signing & capabilities before installing on the iPad
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        # mac builds sign to run locally, no apple ID needed
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
+        # swift 5 mode on purpose: CoreMIDI and audio callbacks run off the main thread,
+        # and swift 6 mode adds runtime isolation checks that can trap there
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+        MACOSX_DEPLOYMENT_TARGET: "15.0"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Note Munchers
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: >-
+          UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
+          UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: >-
+          UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft
+          UIInterfaceOrientationLandscapeRight
+        ENABLE_PREVIEWS: YES
+    scheme:
+      testTargets: []

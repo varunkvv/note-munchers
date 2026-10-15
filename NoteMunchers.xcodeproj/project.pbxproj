@@ -1,0 +1,530 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0570A901E47684B8B0A2002E /* NoteMunchersApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40A9FAADACC73984A6937F4 /* NoteMunchersApp.swift */; };
+		10CE762EB870434791DA6EC8 /* InputHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32AE2696EDC3917E40F1D23A /* InputHub.swift */; };
+		128D32BD861385A7B39347F2 /* PracticeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE8D594DCE24B32A4C800E6 /* PracticeController.swift */; };
+		12C47B9BF900D032E9EBC506 /* MIDIInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349A99AF7DACB9AA0D8A5841 /* MIDIInput.swift */; };
+		15BD4B1A27C02CA7CBAED8EE /* DemoRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3FA7A978845FA1A0F672B9 /* DemoRunner.swift */; };
+		1D18E789A82B14A62FB8604A /* HostClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FC4B9745E680C6A880B2EE2 /* HostClock.swift */; };
+		2F410D1BFBE7FDBFD541494E /* Sounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 950F8DF3C16D42AB1A4C1E0D /* Sounds.swift */; };
+		3874071E905F91A711F4DF3E /* MIDIMonitorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA4CED4BA58D70AA2A1AC029 /* MIDIMonitorView.swift */; };
+		3F08083D1388D997BE5B59FC /* Bravura.otf in Resources */ = {isa = PBXBuildFile; fileRef = B12E9A5BA79CCB56BE556C81 /* Bravura.otf */; };
+		488A5B8D0F14F471CF08A5AA /* Voice.swift in Sources */ = {isa = PBXBuildFile; fileRef = E47541625E6FAE6530DBE8EC /* Voice.swift */; };
+		4B882430E3957683C6512345 /* ParentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E760DE8B2E82409E4414E48B /* ParentView.swift */; };
+		5D92844BD2311C209801D421 /* TurnOnPianoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 318DCBD3514202F91421554B /* TurnOnPianoView.swift */; };
+		6CCEB49262ECFE01DA0CEC1C /* StaffEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF398496C6FC25696D1CA8E /* StaffEffects.swift */; };
+		8D061F6EE67C6DE5FAD1A204 /* Bravura-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = F9338F512C1757517B46A5ED /* Bravura-OFL.txt */; };
+		8FAEB7674BE31A627DAED064 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0D16CFDCBDE056B0F9D55 /* AppModel.swift */; };
+		9E9561E73505D31DC1776AE1 /* StaffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10B83CFBA29DED421136D54 /* StaffView.swift */; };
+		B9232846A6FD0172A9B7957B /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5410B640125C9BDC3D366429 /* HomeView.swift */; };
+		BA6C04055B8A4A3A7A90165B /* PracticeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 759D1542CEFCE31BBA18F2E1 /* PracticeView.swift */; };
+		C3DE55AEC892319C51E95D78 /* ParentGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163B3C9FE320D400F434DF0A /* ParentGate.swift */; };
+		CBD785B337F924A797CC2C73 /* MuncherLane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A84F809154A8D319B98CA9 /* MuncherLane.swift */; };
+		CF4FF968119EB4F6FA51460C /* NoteCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1B80BBC65D71EDC5F0C175EF /* NoteCore */; };
+		D640DE55302AF8138B43BFA4 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCABD1188F2EE2766D0A1028 /* Theme.swift */; };
+		E059A2D8690CB4E26E8CB3E0 /* StaffGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48C29779F0D7D5DA09BC58E /* StaffGeometry.swift */; };
+		F79252E6EF19B482742C8010 /* KeyboardPicture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E2F63D22C871D71A27449B /* KeyboardPicture.swift */; };
+		FD056F4636F31DB9E6D9904A /* Bravura.swift in Sources */ = {isa = PBXBuildFile; fileRef = E257BD7A33D1C30BC8BE454F /* Bravura.swift */; };
+		FD274E95E77EFDA843D45DA6 /* DebugKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301C004A0414316B6A535D88 /* DebugKeyboard.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		03A84F809154A8D319B98CA9 /* MuncherLane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuncherLane.swift; sourceTree = "<group>"; };
+		163B3C9FE320D400F434DF0A /* ParentGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParentGate.swift; sourceTree = "<group>"; };
+		2EF398496C6FC25696D1CA8E /* StaffEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffEffects.swift; sourceTree = "<group>"; };
+		301C004A0414316B6A535D88 /* DebugKeyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugKeyboard.swift; sourceTree = "<group>"; };
+		318DCBD3514202F91421554B /* TurnOnPianoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnOnPianoView.swift; sourceTree = "<group>"; };
+		32AE2696EDC3917E40F1D23A /* InputHub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHub.swift; sourceTree = "<group>"; };
+		349A99AF7DACB9AA0D8A5841 /* MIDIInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIInput.swift; sourceTree = "<group>"; };
+		36F2A602E8D5C4D245583757 /* NoteCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NoteCore; path = NoteCore; sourceTree = SOURCE_ROOT; };
+		4BA41529561D15F67CC19B19 /* NoteMunchers.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = NoteMunchers.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4D3FA7A978845FA1A0F672B9 /* DemoRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoRunner.swift; sourceTree = "<group>"; };
+		5410B640125C9BDC3D366429 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		5FC4B9745E680C6A880B2EE2 /* HostClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostClock.swift; sourceTree = "<group>"; };
+		759D1542CEFCE31BBA18F2E1 /* PracticeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeView.swift; sourceTree = "<group>"; };
+		950F8DF3C16D42AB1A4C1E0D /* Sounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sounds.swift; sourceTree = "<group>"; };
+		A48C29779F0D7D5DA09BC58E /* StaffGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffGeometry.swift; sourceTree = "<group>"; };
+		B12E9A5BA79CCB56BE556C81 /* Bravura.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Bravura.otf; sourceTree = "<group>"; };
+		B1A0D16CFDCBDE056B0F9D55 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		C5E2F63D22C871D71A27449B /* KeyboardPicture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardPicture.swift; sourceTree = "<group>"; };
+		CAE8D594DCE24B32A4C800E6 /* PracticeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeController.swift; sourceTree = "<group>"; };
+		CCABD1188F2EE2766D0A1028 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		E257BD7A33D1C30BC8BE454F /* Bravura.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bravura.swift; sourceTree = "<group>"; };
+		E40A9FAADACC73984A6937F4 /* NoteMunchersApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteMunchersApp.swift; sourceTree = "<group>"; };
+		E47541625E6FAE6530DBE8EC /* Voice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Voice.swift; sourceTree = "<group>"; };
+		E760DE8B2E82409E4414E48B /* ParentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParentView.swift; sourceTree = "<group>"; };
+		F10B83CFBA29DED421136D54 /* StaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffView.swift; sourceTree = "<group>"; };
+		F9338F512C1757517B46A5ED /* Bravura-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Bravura-OFL.txt"; sourceTree = "<group>"; };
+		FA4CED4BA58D70AA2A1AC029 /* MIDIMonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIMonitorView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		66DDFDD56EA7E858DDC7809D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CF4FF968119EB4F6FA51460C /* NoteCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		11A0959F1DC4B2A168A76900 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F9338F512C1757517B46A5ED /* Bravura-OFL.txt */,
+				B12E9A5BA79CCB56BE556C81 /* Bravura.otf */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		72A395AD7E3C4FE265BB2A99 /* Debug */ = {
+			isa = PBXGroup;
+			children = (
+				301C004A0414316B6A535D88 /* DebugKeyboard.swift */,
+				4D3FA7A978845FA1A0F672B9 /* DemoRunner.swift */,
+			);
+			path = Debug;
+			sourceTree = "<group>";
+		};
+		7B54A118E1D3D279E3A239AD /* Staff */ = {
+			isa = PBXGroup;
+			children = (
+				E257BD7A33D1C30BC8BE454F /* Bravura.swift */,
+				2EF398496C6FC25696D1CA8E /* StaffEffects.swift */,
+				A48C29779F0D7D5DA09BC58E /* StaffGeometry.swift */,
+				F10B83CFBA29DED421136D54 /* StaffView.swift */,
+			);
+			path = Staff;
+			sourceTree = "<group>";
+		};
+		85DF76F5927C696F7244C2D6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4BA41529561D15F67CC19B19 /* NoteMunchers.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8781E05AC48C5A1B856EF890 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				B1A0D16CFDCBDE056B0F9D55 /* AppModel.swift */,
+				E40A9FAADACC73984A6937F4 /* NoteMunchersApp.swift */,
+				CCABD1188F2EE2766D0A1028 /* Theme.swift */,
+				E3DFB51E99409C8390A56E1C /* Audio */,
+				72A395AD7E3C4FE265BB2A99 /* Debug */,
+				ECAA09998988B3A010575AA4 /* Input */,
+				CA8B7EEF829F6BD0FC1B671C /* Kid */,
+				A47FF7D2422102560B37A253 /* Parent */,
+				11A0959F1DC4B2A168A76900 /* Resources */,
+				7B54A118E1D3D279E3A239AD /* Staff */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A47FF7D2422102560B37A253 /* Parent */ = {
+			isa = PBXGroup;
+			children = (
+				FA4CED4BA58D70AA2A1AC029 /* MIDIMonitorView.swift */,
+				163B3C9FE320D400F434DF0A /* ParentGate.swift */,
+				E760DE8B2E82409E4414E48B /* ParentView.swift */,
+			);
+			path = Parent;
+			sourceTree = "<group>";
+		};
+		B5390114BD55E660C6A6F698 = {
+			isa = PBXGroup;
+			children = (
+				8781E05AC48C5A1B856EF890 /* App */,
+				DAEB25598F7B14EEAC67B6C7 /* Packages */,
+				85DF76F5927C696F7244C2D6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		CA8B7EEF829F6BD0FC1B671C /* Kid */ = {
+			isa = PBXGroup;
+			children = (
+				5410B640125C9BDC3D366429 /* HomeView.swift */,
+				C5E2F63D22C871D71A27449B /* KeyboardPicture.swift */,
+				03A84F809154A8D319B98CA9 /* MuncherLane.swift */,
+				CAE8D594DCE24B32A4C800E6 /* PracticeController.swift */,
+				759D1542CEFCE31BBA18F2E1 /* PracticeView.swift */,
+				318DCBD3514202F91421554B /* TurnOnPianoView.swift */,
+			);
+			path = Kid;
+			sourceTree = "<group>";
+		};
+		DAEB25598F7B14EEAC67B6C7 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				36F2A602E8D5C4D245583757 /* NoteCore */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		E3DFB51E99409C8390A56E1C /* Audio */ = {
+			isa = PBXGroup;
+			children = (
+				950F8DF3C16D42AB1A4C1E0D /* Sounds.swift */,
+				E47541625E6FAE6530DBE8EC /* Voice.swift */,
+			);
+			path = Audio;
+			sourceTree = "<group>";
+		};
+		ECAA09998988B3A010575AA4 /* Input */ = {
+			isa = PBXGroup;
+			children = (
+				5FC4B9745E680C6A880B2EE2 /* HostClock.swift */,
+				32AE2696EDC3917E40F1D23A /* InputHub.swift */,
+				349A99AF7DACB9AA0D8A5841 /* MIDIInput.swift */,
+			);
+			path = Input;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C3130BB4ECB8D7815F6E8275 /* NoteMunchers */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 877AC98AE4A5EA1E5D08412D /* Build configuration list for PBXNativeTarget "NoteMunchers" */;
+			buildPhases = (
+				9BE1A58C40E075398EAE79D3 /* Sources */,
+				C020FC160BFA2B3BA83B17CF /* Resources */,
+				66DDFDD56EA7E858DDC7809D /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NoteMunchers;
+			packageProductDependencies = (
+				1B80BBC65D71EDC5F0C175EF /* NoteCore */,
+			);
+			productName = NoteMunchers;
+			productReference = 4BA41529561D15F67CC19B19 /* NoteMunchers.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C45FE688D47F1EA5D1D91C08 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					C3130BB4ECB8D7815F6E8275 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 61D774365D57F35738D5503D /* Build configuration list for PBXProject "NoteMunchers" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = B5390114BD55E660C6A6F698;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A26129782AACA45037A5F450 /* XCLocalSwiftPackageReference "NoteCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 85DF76F5927C696F7244C2D6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C3130BB4ECB8D7815F6E8275 /* NoteMunchers */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C020FC160BFA2B3BA83B17CF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8D061F6EE67C6DE5FAD1A204 /* Bravura-OFL.txt in Resources */,
+				3F08083D1388D997BE5B59FC /* Bravura.otf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		9BE1A58C40E075398EAE79D3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8FAEB7674BE31A627DAED064 /* AppModel.swift in Sources */,
+				FD056F4636F31DB9E6D9904A /* Bravura.swift in Sources */,
+				FD274E95E77EFDA843D45DA6 /* DebugKeyboard.swift in Sources */,
+				15BD4B1A27C02CA7CBAED8EE /* DemoRunner.swift in Sources */,
+				B9232846A6FD0172A9B7957B /* HomeView.swift in Sources */,
+				1D18E789A82B14A62FB8604A /* HostClock.swift in Sources */,
+				10CE762EB870434791DA6EC8 /* InputHub.swift in Sources */,
+				F79252E6EF19B482742C8010 /* KeyboardPicture.swift in Sources */,
+				12C47B9BF900D032E9EBC506 /* MIDIInput.swift in Sources */,
+				3874071E905F91A711F4DF3E /* MIDIMonitorView.swift in Sources */,
+				CBD785B337F924A797CC2C73 /* MuncherLane.swift in Sources */,
+				0570A901E47684B8B0A2002E /* NoteMunchersApp.swift in Sources */,
+				C3DE55AEC892319C51E95D78 /* ParentGate.swift in Sources */,
+				4B882430E3957683C6512345 /* ParentView.swift in Sources */,
+				128D32BD861385A7B39347F2 /* PracticeController.swift in Sources */,
+				BA6C04055B8A4A3A7A90165B /* PracticeView.swift in Sources */,
+				2F410D1BFBE7FDBFD541494E /* Sounds.swift in Sources */,
+				6CCEB49262ECFE01DA0CEC1C /* StaffEffects.swift in Sources */,
+				E059A2D8690CB4E26E8CB3E0 /* StaffGeometry.swift in Sources */,
+				9E9561E73505D31DC1776AE1 /* StaffView.swift in Sources */,
+				D640DE55302AF8138B43BFA4 /* Theme.swift in Sources */,
+				5D92844BD2311C209801D421 /* TurnOnPianoView.swift in Sources */,
+				488A5B8D0F14F471CF08A5AA /* Voice.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		475A30FB80940158CF7CAE73 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Note Munchers";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.varunv.notemunchers;
+				PRODUCT_NAME = NoteMunchers;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5BF95981F76F3D75F63261B3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Note Munchers";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.varunv.notemunchers;
+				PRODUCT_NAME = NoteMunchers;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		8AC2274F7D457A91BF524528 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A88B8652C85F548BB0D9118E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		61D774365D57F35738D5503D /* Build configuration list for PBXProject "NoteMunchers" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A88B8652C85F548BB0D9118E /* Debug */,
+				8AC2274F7D457A91BF524528 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		877AC98AE4A5EA1E5D08412D /* Build configuration list for PBXNativeTarget "NoteMunchers" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				475A30FB80940158CF7CAE73 /* Debug */,
+				5BF95981F76F3D75F63261B3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A26129782AACA45037A5F450 /* XCLocalSwiftPackageReference "NoteCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = NoteCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1B80BBC65D71EDC5F0C175EF /* NoteCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NoteCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = C45FE688D47F1EA5D1D91C08 /* Project object */;
+}

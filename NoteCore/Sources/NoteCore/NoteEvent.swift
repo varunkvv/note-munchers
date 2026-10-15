@@ -56,4 +56,33 @@ public struct NoteEvent: Hashable, Codable, Sendable {
             at: time
         )
     }
+
+    /// Every note event in one UMP packet's words (`MIDIEventPacket.words()`).
+    ///
+    /// Walks message by message using each message's size, so the second word of a
+    /// two-word message (e.g. a sysex chunk, type 0x3) is never misread as a note.
+    /// Only MIDI 1.0 channel voice notes come out, everything else is skipped.
+    public static func events(inUMPWords words: some Collection<UInt32>, at time: Double) -> [NoteEvent] {
+        var events: [NoteEvent] = []
+        var index = words.startIndex
+        while index != words.endIndex {
+            let word = words[index]
+            if let event = NoteEvent(umpWord: word, at: time) {
+                events.append(event)
+            }
+            let size = umpMessageWordCount(type: UInt8(word >> 28))
+            index = words.index(index, offsetBy: size, limitedBy: words.endIndex) ?? words.endIndex
+        }
+        return events
+    }
+
+    /// Words per UMP message, by message type (the top 4 bits of the first word).
+    static func umpMessageWordCount(type: UInt8) -> Int {
+        switch type {
+        case 0x0, 0x1, 0x2, 0x6, 0x7: 1
+        case 0x3, 0x4, 0x8, 0x9, 0xA: 2
+        case 0xB, 0xC: 3
+        default: 4
+        }
+    }
 }

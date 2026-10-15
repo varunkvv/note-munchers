@@ -55,6 +55,19 @@ import Testing
         #expect(NoteEvent(umpWord: 0x2090_3C00, at: 1)?.kind == .off)
         #expect(NoteEvent(umpWord: 0x4090_3C00, at: 1) == nil, "MIDI 2.0 words are not parsed")
     }
+
+    @Test func umpPacketWalksByMessageSize() {
+        // note on C4, a 2-word sysex whose second word looks like a note on (0x2...),
+        // active sensing (type 1), then note off C4
+        let words: [UInt32] = [0x2090_3C64, 0x3002_7E7F, 0x2090_4040, 0x10FE_0000, 0x2080_3C00]
+        let events = NoteEvent.events(inUMPWords: words, at: 2)
+        #expect(events == [.on(.middleC, velocity: 100, at: 2), .off(.middleC, at: 2)])
+    }
+
+    @Test func umpPacketWithTruncatedMessageStops() {
+        // a 4-word message type with only one word left must not run past the end
+        #expect(NoteEvent.events(inUMPWords: [0x2090_3C64, 0xF000_0000], at: 0).count == 1)
+    }
 }
 
 @Suite struct StaffPositionTests {
