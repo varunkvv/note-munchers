@@ -66,7 +66,8 @@ struct MuncherLane: View {
             }
         }
 
-        guard let id = shownID else { return }
+        // the current item's muncher, or the last one shown (paused, session over)
+        guard let id = controller.item?.id ?? shownID else { return }
         let side = min(muncherRect.width, muncherRect.height * 0.8)
         let square = CGRect(x: muncherRect.midX - side / 2, y: muncherRect.midY - side / 2, width: side, height: side)
         var pose = MuncherPose(fluency: controller.session.engine.stats(for: id).peakFluency)

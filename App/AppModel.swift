@@ -19,6 +19,8 @@ final class AppModel {
     var showParent = false
     /// DEBUG demo: open the parent area on this page.
     var parentPage: String?
+    /// DEBUG demo: show the staff gallery for this unit instead of the app.
+    var galleryUnit: Int?
 
     let input = InputHub()
     let sounds = Sounds()

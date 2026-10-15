@@ -31,6 +31,7 @@
 		B0D08207ADDB5FAD09648181 /* SessionEndView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A16A64520891B807314A5B7 /* SessionEndView.swift */; };
 		B9232846A6FD0172A9B7957B /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5410B640125C9BDC3D366429 /* HomeView.swift */; };
 		BA6C04055B8A4A3A7A90165B /* PracticeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 759D1542CEFCE31BBA18F2E1 /* PracticeView.swift */; };
+		C2FF651E0D489E86ACD6EC6C /* StaffGallery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C1713511455EDBBE5B7E7D2 /* StaffGallery.swift */; };
 		C3DE55AEC892319C51E95D78 /* ParentGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163B3C9FE320D400F434DF0A /* ParentGate.swift */; };
 		CBD785B337F924A797CC2C73 /* MuncherLane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A84F809154A8D319B98CA9 /* MuncherLane.swift */; };
 		CF4FF968119EB4F6FA51460C /* NoteCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1B80BBC65D71EDC5F0C175EF /* NoteCore */; };
@@ -52,6 +53,7 @@
 		32AE2696EDC3917E40F1D23A /* InputHub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHub.swift; sourceTree = "<group>"; };
 		349A99AF7DACB9AA0D8A5841 /* MIDIInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIInput.swift; sourceTree = "<group>"; };
 		36F2A602E8D5C4D245583757 /* NoteCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NoteCore; path = NoteCore; sourceTree = SOURCE_ROOT; };
+		3C1713511455EDBBE5B7E7D2 /* StaffGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffGallery.swift; sourceTree = "<group>"; };
 		4A16A64520891B807314A5B7 /* SessionEndView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEndView.swift; sourceTree = "<group>"; };
 		4BA41529561D15F67CC19B19 /* NoteMunchers.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = NoteMunchers.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4D3FA7A978845FA1A0F672B9 /* DemoRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoRunner.swift; sourceTree = "<group>"; };
@@ -113,6 +115,7 @@
 				301C004A0414316B6A535D88 /* DebugKeyboard.swift */,
 				11EAAF95DF861F7DF9CC9E1F /* DemoHistory.swift */,
 				4D3FA7A978845FA1A0F672B9 /* DemoRunner.swift */,
+				3C1713511455EDBBE5B7E7D2 /* StaffGallery.swift */,
 			);
 			path = Debug;
 			sourceTree = "<group>";
@@ -323,6 +326,7 @@
 				B0D08207ADDB5FAD09648181 /* SessionEndView.swift in Sources */,
 				2F410D1BFBE7FDBFD541494E /* Sounds.swift in Sources */,
 				6CCEB49262ECFE01DA0CEC1C /* StaffEffects.swift in Sources */,
+				C2FF651E0D489E86ACD6EC6C /* StaffGallery.swift in Sources */,
 				E059A2D8690CB4E26E8CB3E0 /* StaffGeometry.swift in Sources */,
 				9E9561E73505D31DC1776AE1 /* StaffView.swift in Sources */,
 				3B8A5E6D4074AE44F93A7C54 /* Store.swift in Sources */,

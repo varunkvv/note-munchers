@@ -5,7 +5,8 @@ import NoteCore
 /// DEBUG launch arguments for driving the app without a piano (simulator, agents).
 ///
 ///     -demoScript <name>   play a scripted sequence through InputHub.emit (see DemoRunner.run)
-///     -demoScreen <name>   open a screen directly: parent, monitor, gallery, end, munchers
+///     -demoScreen <name>   open a screen directly: home, parent, parent#units, parent#staff,
+///                          parent#history, monitor, gallery (with -demoGalleryUnit <n>)
 ///     -demoUnit <n>        start in unit n
 ///     -demoSeed <n>        fixed picker seed, for repeatable screenshots
 ///     -demoSlow <x>        stretch animations and delays x times
@@ -91,6 +92,8 @@ final class DemoRunner {
         if let screen = options.screen {
             log("screen \(screen)")
             switch screen {
+            case "gallery":
+                model.galleryUnit = options.galleryUnit ?? options.unit ?? 1
             case "parent":
                 model.showParent = true
             case let page where page.hasPrefix("parent#"):
@@ -143,6 +146,14 @@ final class DemoRunner {
             await wrong(c)
             await wrong(c)
             await wrong(c)
+        case "partial":
+            // first note of a group or line right, then wait: played notes go grey
+            await skipIntros(c)
+            await right(c)
+        case "chord":
+            await skipIntros(c)
+            c.holdAfterSuccess = true
+            await playItem(c)
         case "almost":
             await skipIntros(c)
             await wrongOctave(c)

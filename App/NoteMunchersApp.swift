@@ -22,20 +22,15 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            switch model.screen {
-            case .home:
-                HomeView(model: model)
-            case .practice:
-                if let practice = model.practice {
-                    PracticeView(controller: practice, input: model.input, onLeave: model.leavePractice)
-                }
-            case .sessionEnd:
-                if let summary = model.lastSummary {
-                    SessionEndView(summary: summary, onHome: model.goHome)
-                } else {
-                    HomeView(model: model)
-                }
+            #if DEBUG
+            if let number = model.galleryUnit, let unit = Curriculum.standard.unit(number) {
+                StaffGallery(unit: unit)
+            } else {
+                screens
             }
+            #else
+            screens
+            #endif
         }
         #if DEBUG
         .modifier(DemoLandscape(enabled: model.demo.landscape))
@@ -57,6 +52,23 @@ struct RootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { model.sounds.resume() }
+        }
+    }
+
+    @ViewBuilder private var screens: some View {
+        switch model.screen {
+        case .home:
+            HomeView(model: model)
+        case .practice:
+            if let practice = model.practice {
+                PracticeView(controller: practice, input: model.input, onLeave: model.leavePractice)
+            }
+        case .sessionEnd:
+            if let summary = model.lastSummary {
+                SessionEndView(summary: summary, onHome: model.goHome)
+            } else {
+                HomeView(model: model)
+            }
         }
     }
 }

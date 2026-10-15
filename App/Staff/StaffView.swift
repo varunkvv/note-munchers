@@ -180,6 +180,28 @@ struct StaffPainter {
         for (center, _) in heads {
             drawHead(&context, at: center, filled: true, color: color.opacity(headAlpha))
         }
+        drawChordGaps(&context, heads: heads, alpha: headAlpha)
+    }
+
+    /// Heads a third apart touch. A thin paper-colored gap between them keeps a chord
+    /// from blurring into one blob. Clipped to the two heads, so it never cuts a staff line.
+    private func drawChordGaps(_ context: inout GraphicsContext, heads: [(CGPoint, StaffPosition)], alpha: Double) {
+        guard heads.count > 1, alpha > 0 else { return }
+        for (lower, upper) in zip(heads, heads.dropFirst()) where upper.1.step - lower.1.step == 2 && upper.0.x == lower.0.x {
+            // along the heads' tilt, through the middle of where they touch
+            let mid = CGPoint(x: lower.0.x, y: (lower.0.y + upper.0.y) / 2)
+            let angle = Metrics.headTilt * .pi / 180
+            let dx = cos(angle) * g, dy = sin(angle) * g
+            var gap = Path()
+            gap.move(to: CGPoint(x: mid.x - dx, y: mid.y - dy))
+            gap.addLine(to: CGPoint(x: mid.x + dx, y: mid.y + dy))
+            var both = headPath(at: lower.0)
+            both.addPath(headPath(at: upper.0))
+            context.drawLayer { layer in
+                layer.clip(to: both)
+                layer.stroke(gap, with: .color(style.paper.opacity(alpha)), lineWidth: max(1.5, g * 0.09))
+            }
+        }
     }
 
     func headPath(at center: CGPoint, rx: Double = Metrics.headRX, ry: Double = Metrics.headRY, tilt: Double = Metrics.headTilt) -> Path {
