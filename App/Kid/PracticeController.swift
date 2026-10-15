@@ -30,6 +30,8 @@ final class PracticeController {
 
     /// DEBUG demo: stay on the success state instead of moving on.
     var holdAfterSuccess = false
+    /// DEBUG demo: stay on the success state when something unlocked.
+    var holdOnUnlock = false
     /// DEBUG demo: stretch every delay.
     var timeScale = 1.0 {
         didSet { effects.timeScale = timeScale }
@@ -186,7 +188,7 @@ final class PracticeController {
 
     private func scheduleNext(after delay: Double) {
         nextTask?.cancel()
-        guard !holdAfterSuccess else { return }
+        guard !holdAfterSuccess, !(holdOnUnlock && !hatching.isEmpty) else { return }
         nextTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(delay * (self?.timeScale ?? 1)))
             guard !Task.isCancelled, let self, self.session.phase == .success else { return }

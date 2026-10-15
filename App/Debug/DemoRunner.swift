@@ -74,9 +74,9 @@ final class DemoRunner {
         model.input.demoConnected = true
         if options.debugKeyboard { model.input.debugKeyboardOn = true }
 
-        var config = NoteCoreConfig()
-        if let maxItems = options.maxItems { config.sessionMaxItems = maxItems }
-        var engine = MasteryEngine(config: config)
+        // in-memory store: start fresh. -demoPersist: keep what the real store loaded
+        var engine = options.persist ? model.engine : MasteryEngine()
+        if let maxItems = options.maxItems { engine.config.sessionMaxItems = maxItems }
         if let unit = options.unit { engine.moveToUnit(unit) }
         model.demoReplaceEngine(engine)
 
@@ -166,6 +166,22 @@ final class DemoRunner {
             log("after resume", c)
         case "tour":
             await tour(c)
+        case "learn", "hatch":
+            // right first try, quickly, until something unlocks (hatch holds there)
+            c.holdOnUnlock = script == "hatch"
+            var rounds = 0
+            while c.phase.isPlaying, rounds < 200 {
+                rounds += 1
+                let shown = c.itemsShown
+                await playItem(c)
+                if script == "hatch", !c.hatching.isEmpty {
+                    c.timeScale = options.slow
+                    log("unlocked \(c.hatching)", c)
+                    return
+                }
+                await waitForNext(c, after: shown)
+            }
+            log("learn finished after \(rounds) rounds", c)
         default:
             log("unknown script \(script)")
         }
@@ -223,8 +239,9 @@ final class DemoRunner {
     private func right(_ c: PracticeController) async {
         guard let item = c.item, c.phase.isPlaying else { return }
         let pitches = item.notes[c.session.noteIndex].pitches
+        let label = "\(item.id)\(c.session.isIntro ? " (intro)" : "")"
         await press(pitches)
-        log("right \(pitches.map(\.name))", c)
+        log("right \(pitches.map(\.name)) on \(label)", c)
     }
 
     private func wrong(_ c: PracticeController) async {
@@ -319,7 +336,7 @@ final class DemoRunner {
             return
         }
         let hint = c.session.keyboardHint.map(\.name).joined(separator: ",")
-        print("demo: \(message) | phase=\(c.phase.rawValue) unit=\(c.session.engine.unit.number) item=\(c.item?.id ?? "-") note=\(c.session.noteIndex) intro=\(c.session.isIntro) keyboard=[\(hint)] played=\(c.session.summary.itemsPlayed)")
+        print("demo: \(message) | phase=\(c.phase.rawValue) unit=\(c.session.engine.unit.number) item=\(c.item?.id ?? "-") note=\(c.session.noteIndex) intro=\(c.session.isIntro) keyboard=[\(hint)] played=\(c.session.summary.itemsPlayed) unlocked=\(c.session.summary.unlocked)")
     }
 }
 #endif

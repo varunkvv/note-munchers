@@ -23,6 +23,9 @@ final class AppModel {
     let input = InputHub()
     let sounds = Sounds()
     let voice = Voice()
+    let store: Store
+    /// When the running session started, for its history row.
+    @ObservationIgnored private var sessionStartedAt = Date()
 
     /// Progress between sessions. A session works on its own copy and hands back the
     /// state after every item.
@@ -34,9 +37,19 @@ final class AppModel {
     #endif
 
     init() {
-        let config = NoteCoreConfig()
+        var inMemory = false
+        #if DEBUG
+        // demo runs never touch his real progress unless asked to
+        inMemory = demo.isActive && !demo.persist
+        #endif
+        store = Store(inMemory: inMemory)
+        let (state, config) = store.loadMastery() ?? (MasteryState(), NoteCoreConfig())
         self.config = config
-        engine = MasteryEngine(config: config)
+        engine = MasteryEngine(config: config, state: state)
+        #if DEBUG
+        let counts = store.counts()
+        print("store: loaded unit \(engine.unit.number), \(engine.allProgress.count) items played, \(counts.attempts) attempts, \(counts.sessions) sessions\(store.isTemporary ? " (temporary)" : "")")
+        #endif
     }
 
     /// Called once when the first window appears.
@@ -74,12 +87,19 @@ final class AppModel {
         }
         practice = controller
         screen = .practice
+        sessionStartedAt = Date()
         controller.start()
     }
 
-    /// Parent ends the session early. Every finished item is already saved.
+    /// Parent ends the session early. Every finished item is already saved; the
+    /// session still gets a history row if he played anything.
     func leavePractice() {
-        practice?.stop()
+        if let practice {
+            practice.stop()
+            if practice.session.summary.itemsPlayed > 0 {
+                store.addSession(practice.session.summary, startedAt: sessionStartedAt)
+            }
+        }
         practice = nil
         screen = .home
     }
@@ -90,10 +110,14 @@ final class AppModel {
 
     private func itemDone(_ attempt: AttemptResult, state: MasteryState) {
         engine = MasteryEngine(config: config, state: state)
+        store.saveMastery(state, config: config)
+        store.addAttempt(attempt)
     }
 
     private func sessionDone(_ summary: SessionSummary, state: MasteryState) {
         engine = MasteryEngine(config: config, state: state)
+        store.saveMastery(state, config: config)
+        store.addSession(summary, startedAt: sessionStartedAt)
         lastSummary = summary
         practice = nil
         screen = .home
@@ -104,11 +128,13 @@ final class AppModel {
     func updateConfig(_ change: (inout NoteCoreConfig) -> Void) {
         change(&config)
         engine = MasteryEngine(config: config, state: engine.state)
+        store.saveMastery(engine.state, config: config)
     }
 
     func moveToUnit(_ number: Int) {
         guard practice == nil else { return }
         engine.moveToUnit(number)
+        store.saveMastery(engine.state, config: config)
     }
 
     #if DEBUG

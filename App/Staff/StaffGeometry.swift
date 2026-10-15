@@ -72,7 +72,7 @@ enum Metrics {
     /// space between treble and bass on the grand staff, in steps
     static let grandGap = 1.0
     /// room around the highest / lowest notehead, in steps
-    static let notePad = 1.5
+    static let notePad = 2.0
 
     /// SMuFL clef extents in steps (from Bravura's bounding boxes), plus the staff itself
     static func clefSteps(_ clef: Clef) -> ClosedRange<Double> {
