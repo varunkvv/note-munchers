@@ -13,7 +13,7 @@ needs a mac with Xcode and a free apple ID. xcodegen is not needed, the project 
 
 1. `git clone https://github.com/varunkvv/note-munchers.git` and open `NoteMunchers.xcodeproj`
 2. Xcode > settings > accounts: add your apple ID
-3. pick the NoteMunchers target > signing & capabilities > team: your personal team. if the bundle id is taken, change `com.varunv.notemunchers` to something of your own
+3. pick the NoteMunchers target > signing & capabilities > team: your personal team. if the bundle id is taken, change `com.varunkvv.notemunchers` to something of your own
 4. plug the iPad in with the cable, pick it as the run destination and press run
 5. first time only: on the iPad, settings > privacy & security > developer mode on (it asks for a restart), then trust the developer under settings > general > VPN & device management
 

@@ -368,7 +368,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.varunv.notemunchers;
+				PRODUCT_BUNDLE_IDENTIFIER = com.varunkvv.notemunchers;
 				PRODUCT_NAME = NoteMunchers;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
@@ -404,7 +404,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.varunv.notemunchers;
+				PRODUCT_BUNDLE_IDENTIFIER = com.varunkvv.notemunchers;
 				PRODUCT_NAME = NoteMunchers;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";

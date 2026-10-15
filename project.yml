@@ -1,6 +1,6 @@
 name: NoteMunchers
 options:
-  bundleIdPrefix: com.varunv
+  bundleIdPrefix: com.varunkvv
   createIntermediateGroups: true
   deploymentTarget:
     iOS: "18.0"
@@ -22,7 +22,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: NoteMunchers
-        PRODUCT_BUNDLE_IDENTIFIER: com.varunv.notemunchers
+        PRODUCT_BUNDLE_IDENTIFIER: com.varunkvv.notemunchers
         MARKETING_VERSION: "0.1"
         CURRENT_PROJECT_VERSION: "1"
         # empty on purpose. pick your team in signing & capabilities before installing on the iPad
