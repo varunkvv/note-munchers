@@ -30,7 +30,11 @@ struct RootView: View {
                     PracticeView(controller: practice, input: model.input, onLeave: model.leavePractice)
                 }
             case .sessionEnd:
-                HomeView(model: model)
+                if let summary = model.lastSummary {
+                    SessionEndView(summary: summary, onHome: model.goHome)
+                } else {
+                    HomeView(model: model)
+                }
             }
         }
         #if DEBUG

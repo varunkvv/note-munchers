@@ -120,7 +120,7 @@ final class AppModel {
         store.addSession(summary, startedAt: sessionStartedAt)
         lastSummary = summary
         practice = nil
-        screen = .home
+        screen = .sessionEnd
     }
 
     // MARK: parent changes (never during a session)

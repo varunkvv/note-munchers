@@ -117,6 +117,8 @@ final class PracticeController {
                 effects.add(.sparkle, column: note, duration: 0.7)
                 sounds.chime()
                 gobbleCount += 1
+                // the chomp lands when the note reaches the mouth
+                later(MuncherLane.gobbleLength * 0.5) { $0.sounds.chomp() }
             case .say(let speech):
                 voice.say(speech)
                 if speech == .holdLonger { celebrate += 1.2 }
@@ -130,7 +132,8 @@ final class PracticeController {
                 }
             case .unlocked(let ids):
                 hatching += ids
-                celebrate += 2.0
+                celebrate += MuncherLane.hatchDelay + MuncherLane.hatchLength
+                later(MuncherLane.hatchDelay + MuncherLane.hatchLength * 0.55) { $0.sounds.pop() }
             case .paused, .resumed:
                 break // the view reads `isPaused`
             case .done:
@@ -156,6 +159,15 @@ final class PracticeController {
         guard let item = session.item, let value = item.notes[note].value else { return 1 }
         let beat = session.summary.attempts.last?.rhythm?.beat ?? session.engine.config.demoBeat
         return max(0.6, min(4, value.beats * (beat > 0 ? beat : 0.75)))
+    }
+
+    /// Runs `action` after `delay` seconds (stretched in demo runs).
+    private func later(_ delay: Double, _ action: @escaping @MainActor (PracticeController) -> Void) {
+        let scaled = delay * timeScale
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(scaled))
+            if let self { action(self) }
+        }
     }
 
     func hatched(_ id: ItemID) {
@@ -212,6 +224,10 @@ final class PracticeController {
             gobbleCount += 1
         case .glow: effects.add(.glow, column: column, duration: glowLength(column))
         }
+    }
+
+    func demoHatch(_ id: ItemID) {
+        hatching.append(id)
     }
 
     func demoRepeatSoundHint() {

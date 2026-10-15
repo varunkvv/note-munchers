@@ -65,14 +65,14 @@ final class Store {
 
     // MARK: history
 
-    func addAttempt(_ attempt: AttemptResult, at date: Date = Date()) {
+    func addAttempt(_ attempt: AttemptResult, at date: Date = Date(), commit: Bool = true) {
         context.insert(AttemptRecord(
             date: date, itemID: attempt.itemID, unit: attempt.unit, wasIntro: attempt.wasIntro,
             firstTry: attempt.firstTry, responseTime: attempt.responseTime, hints: attempt.hints.rawValue,
             wrongPresses: attempt.wrongPresses, almostPresses: attempt.almostPresses,
             rhythmOK: attempt.rhythm?.isOK, resultData: (try? encoder.encode(attempt)) ?? Data()
         ))
-        save()
+        if commit { save() }
     }
 
     func addSession(_ summary: SessionSummary, startedAt: Date, endedAt: Date = Date()) {

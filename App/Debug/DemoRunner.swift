@@ -76,6 +76,7 @@ final class DemoRunner {
 
         // in-memory store: start fresh. -demoPersist: keep what the real store loaded
         var engine = options.persist ? model.engine : MasteryEngine()
+        if options.progress { engine = DemoHistory.seed(into: model.store) }
         if let maxItems = options.maxItems { engine.config.sessionMaxItems = maxItems }
         if let unit = options.unit { engine.moveToUnit(unit) }
         model.demoReplaceEngine(engine)
@@ -91,6 +92,9 @@ final class DemoRunner {
             log("screen \(screen)")
             switch screen {
             case "parent":
+                model.showParent = true
+            case let page where page.hasPrefix("parent#"):
+                model.parentPage = String(page.dropFirst("parent".count))
                 model.showParent = true
             case "monitor":
                 model.parentPage = "monitor"
@@ -174,10 +178,18 @@ final class DemoRunner {
                 rounds += 1
                 let shown = c.itemsShown
                 await playItem(c)
-                if script == "hatch", !c.hatching.isEmpty {
+                if script == "hatch", let id = c.hatching.first {
                     c.timeScale = options.slow
                     log("unlocked \(c.hatching)", c)
-                    return
+                    // hatch it again and again for the screenshots
+                    while true {
+                        await sleep(0.3)
+                        if c.hatching.isEmpty {
+                            await sleep(0.5)
+                            log("hatching again")
+                            c.demoHatch(id)
+                        }
+                    }
                 }
                 await waitForNext(c, after: shown)
             }
