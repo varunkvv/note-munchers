@@ -231,7 +231,12 @@ public struct MasteryEngine: Sendable {
 
         let sample = AttemptSample(firstTry: attempt.firstTry, responseTime: max(0, attempt.responseTime))
         s.recent = Array((s.recent + [sample]).suffix(config.solidWindow))
-        s.box = attempt.firstTry ? min(config.boxCount, s.box + 1) : max(1, s.box - 1)
+        // stuck isn't wrong: a hint from being stuck alone holds the box where it is
+        if attempt.firstTry {
+            s.box = min(config.boxCount, s.box + 1)
+        } else if attempt.wrongPresses > 0 {
+            s.box = max(1, s.box - 1)
+        }
         s.attempts += 1
         s.firstTryCount += attempt.firstTry ? 1 : 0
         if item.isRhythm, let rhythm = attempt.rhythm {

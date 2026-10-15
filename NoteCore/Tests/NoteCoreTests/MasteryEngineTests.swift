@@ -69,6 +69,15 @@ func maxRun(_ ids: [ItemID]) -> Int {
         #expect(engine.stats(for: c4).recent.count == 8, "only the last 8 are kept")
     }
 
+    @Test func stuckWithoutAWrongKeyHoldsTheBox() {
+        var engine = MasteryEngine()
+        for _ in 0..<3 { engine.play(c4) }
+        #expect(engine.stats(for: c4).box == 4)
+        engine.record(AttemptResult(itemID: c4, unit: 1, firstTry: false, stuckSteps: 1, hints: .wobble, responseTime: 16))
+        #expect(engine.stats(for: c4).box == 4, "stuck is not a miss")
+        #expect(engine.stats(for: c4).recent.last?.firstTry == false, "but it isn't first try either")
+    }
+
     @Test func solidIsSevenOfEightWithMedianUnderFourSeconds() {
         var engine = MasteryEngine()
         // slow enough to stay off the fast track
