@@ -84,6 +84,17 @@ struct HintBand: View {
                     .padding(.vertical, 14)
                     .transition(.opacity)
             }
+            if controller.item?.isRhythm == true {
+                // sound before symbol: he can hear the line again whenever he wants
+                Button(action: controller.playPhrase) {
+                    Image(systemName: "speaker.wave.2.circle.fill")
+                        .font(.system(size: 64))
+                        .foregroundStyle(Theme.button)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                .padding(.trailing, 28)
+            }
             if showEar {
                 Image(systemName: "ear.fill")
                     .font(.system(size: 54, weight: .semibold))

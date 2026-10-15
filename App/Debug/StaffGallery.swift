@@ -10,12 +10,13 @@ struct StaffGallery: View {
     var body: some View {
         let spec = StaffSpec(unit: unit)
         let items = unit.newItems.isEmpty ? unit.reviews.flatMap { Curriculum.standard.unit($0)?.newItems ?? [] } : unit.newItems
-        let columns = items.count > 6 ? 3 : 2
+        let longest = items.map(\.notes.count).max() ?? 1
+        let columns = longest >= 6 ? 1 : items.count > 6 ? 3 : 2
         ScrollView {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: columns), spacing: 12) {
                 ForEach(items, id: \.id) { item in
                     StaffView(spec: spec, item: item)
-                        .frame(height: spec.layout == .grand ? 330 : 230)
+                        .frame(height: spec.layout == .grand ? 330 : columns == 1 ? 200 : 230)
                         .background(Theme.paper)
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
                 }

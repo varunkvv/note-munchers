@@ -263,6 +263,9 @@ struct NoteRow: View {
                     if let median = progress.medianResponse {
                         Text(String(format: "%.1f s", median))
                     }
+                    if let rhythmBox = progress.rhythmBox {
+                        Text("rhythm box \(rhythmBox)")
+                    }
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)

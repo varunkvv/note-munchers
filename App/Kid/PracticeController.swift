@@ -161,6 +161,14 @@ final class PracticeController {
         return max(0.6, min(4, value.beats * (beat > 0 ? beat : 0.75)))
     }
 
+    /// Kid taps the speaker on a rhythm line: hear it at his own last tempo (or the demo tempo).
+    func playPhrase() {
+        guard let item = session.item, item.isRhythm else { return }
+        let lastBeat = session.summary.attempts.last { $0.itemID == item.id }?.rhythm?.beat
+        let beat = lastBeat.flatMap { $0 > 0 ? min(1.5, max(0.35, $0)) : nil } ?? session.engine.config.demoBeat
+        sounds.play(item.playback(beat: beat))
+    }
+
     /// Runs `action` after `delay` seconds (stretched in demo runs).
     private func later(_ delay: Double, _ action: @escaping @MainActor (PracticeController) -> Void) {
         let scaled = delay * timeScale

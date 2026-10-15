@@ -154,6 +154,21 @@ final class DemoRunner {
             await skipIntros(c)
             c.holdAfterSuccess = true
             await playItem(c)
+        case "rhythm":
+            // play the line in time, then hold on the success
+            await skipIntros(c)
+            c.holdAfterSuccess = true
+            await playItem(c)
+        case "rhythmShort":
+            // every half note cut to under half its length: "hold this one longer" + glow
+            await skipIntros(c)
+            c.holdAfterSuccess = true
+            if let item = c.item {
+                await playItem(c, stretch: item.notes.map { $0.value == .half ? 0.4 : 1 })
+            }
+            await sleep(1.0)
+            log("rhythm result \(c.session.summary.attempts.last?.rhythm.map { "\($0.verdicts)" } ?? "none")", c)
+            await repeatEffect(.glow, c)
         case "almost":
             await skipIntros(c)
             await wrongOctave(c)
@@ -332,7 +347,10 @@ final class DemoRunner {
     }
 
     private func repeatEffect(_ kind: StaffEffects.Kind, _ c: PracticeController) async {
-        let column = max(0, c.doneCount - (kind == .sparkle ? 1 : 0))
+        var column = max(0, c.doneCount - (kind == .sparkle ? 1 : 0))
+        if kind == .glow, let nudge = c.session.summary.attempts.last?.rhythm?.nudgeIndex {
+            column = nudge
+        }
         while true {
             await sleep(1.6 * options.slow)
             c.demoReplay(kind, column: column)

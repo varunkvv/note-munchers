@@ -94,11 +94,111 @@ struct StaffPainter {
 
     private func drawItem(_ context: inout GraphicsContext, _ item: PracticeItem, doneCount: Int) {
         let centers = geo.columnCenters(item)
+        // bar lines between measures (rhythm items), under everything else
+        if !Metrics.barLinesAfter(item).isEmpty {
+            var bars = Path()
+            for i in Metrics.barLinesAfter(item) {
+                let x = (centers[i] + centers[i + 1]) / 2
+                bars.move(to: CGPoint(x: x, y: geo.y(8, on: item.clef) - geo.lineWidth / 2))
+                bars.addLine(to: CGPoint(x: x, y: geo.y(0, on: item.clef) + geo.lineWidth / 2))
+            }
+            context.stroke(bars, with: .color(style.ink), lineWidth: geo.lineWidth)
+        }
+        var xs: [CGFloat] = []
         for (index, center) in centers.enumerated() {
             let wobble = effects.last { $0.kind == .wobble && $0.column == index }
             let dx = reduceMotion ? 0 : wobbleOffset(wobble)
+            xs.append(center + dx)
             drawColumn(&context, item: item, index: index, x: center + dx, done: index < doneCount, wobble: wobble)
         }
+        if item.isRhythm {
+            drawStems(&context, item: item, xs: xs, doneCount: doneCount)
+        }
+    }
+
+    // MARK: stems, flags, beams
+
+    struct Stem {
+        var x: CGFloat
+        /// where it leaves the head
+        var attachY: CGFloat
+        /// the free end (or where the beam is)
+        var tipY: CGFloat
+        var up: Bool
+    }
+
+    /// A stem on the head's right edge going up, or its left edge going down. The
+    /// tilted head's edge point sits a little off center, so the stem starts there.
+    func stem(item: PracticeItem, index: Int, x: CGFloat, up: Bool) -> Stem {
+        let ys = item.positions(ofNote: index).map { geo.y($0.step, on: item.clef) }
+        let lowest = ys.max() ?? 0, highest = ys.min() ?? 0
+        let width = CGFloat(Metrics.stemWidth) * g
+        let edge = CGFloat(Metrics.headHalfWidth) * g - width / 2
+        let length = CGFloat(Metrics.stemLength) * g
+        if up {
+            return Stem(x: x + edge, attachY: lowest - 0.12 * g, tipY: highest - length, up: true)
+        }
+        return Stem(x: x - edge, attachY: highest + 0.12 * g, tipY: lowest + length, up: false)
+    }
+
+    private func drawStems(_ context: inout GraphicsContext, item: PracticeItem, xs: [CGFloat], doneCount: Int) {
+        let ups = Metrics.stemsUp(item)
+        var stems = item.notes.indices.map { stem(item: item, index: $0, x: xs[$0], up: ups[$0]) }
+        let width = CGFloat(Metrics.stemWidth) * g
+        let thickness = CGFloat(Metrics.beamThickness) * g
+        func color(_ i: Int) -> Color { i < doneCount ? Theme.doneInk : style.ink }
+
+        // beams: one per eighth pair. sloped a little with the notes, never steeply,
+        // and moved out so neither stem gets shorter than the normal length
+        let pairs = item.beamedPairStarts
+        for i in pairs {
+            let j = i + 1
+            let maxSlope = 0.5 * g
+            let delta = max(-maxSlope, min(maxSlope, stems[j].tipY - stems[i].tipY))
+            let start = stems[i].up ? min(stems[i].tipY, stems[j].tipY - delta) : max(stems[i].tipY, stems[j].tipY - delta)
+            stems[i].tipY = start
+            stems[j].tipY = start + delta
+            let inward: CGFloat = stems[i].up ? thickness : -thickness
+            var beam = Path()
+            beam.move(to: CGPoint(x: stems[i].x - width / 2, y: stems[i].tipY))
+            beam.addLine(to: CGPoint(x: stems[j].x + width / 2, y: stems[j].tipY))
+            beam.addLine(to: CGPoint(x: stems[j].x + width / 2, y: stems[j].tipY + inward))
+            beam.addLine(to: CGPoint(x: stems[i].x - width / 2, y: stems[i].tipY + inward))
+            beam.closeSubpath()
+            context.fill(beam, with: .color(j < doneCount ? Theme.doneInk : style.ink))
+        }
+
+        let beamed = Set(pairs + pairs.map { $0 + 1 })
+        for (i, stem) in stems.enumerated() {
+            var line = Path()
+            line.move(to: CGPoint(x: stem.x, y: stem.attachY))
+            line.addLine(to: CGPoint(x: stem.x, y: stem.tipY))
+            context.stroke(line, with: .color(color(i)), style: StrokeStyle(lineWidth: width, lineCap: .butt))
+            if item.notes[i].value == .eighth, !beamed.contains(i) {
+                context.fill(flagPath(stem), with: .color(color(i)))
+            }
+        }
+    }
+
+    /// An eighth-note flag: a thick curl off the stem's free end.
+    private func flagPath(_ stem: Stem) -> Path {
+        let s: CGFloat = stem.up ? 1 : -1 // flags hang down from an up stem, up from a down stem
+        let x = stem.x - CGFloat(Metrics.stemWidth) * g / 2
+        let y = stem.tipY
+        var path = Path()
+        path.move(to: CGPoint(x: x, y: y))
+        path.addCurve(
+            to: CGPoint(x: x + 0.95 * g, y: y + s * 2.2 * g),
+            control1: CGPoint(x: x + 0.1 * g, y: y + s * 0.9 * g),
+            control2: CGPoint(x: x + 1.25 * g, y: y + s * 1.2 * g)
+        )
+        path.addCurve(
+            to: CGPoint(x: x, y: y + s * 1.0 * g),
+            control1: CGPoint(x: x + 0.85 * g, y: y + s * 1.55 * g),
+            control2: CGPoint(x: x + 0.25 * g, y: y + s * 1.2 * g)
+        )
+        path.closeSubpath()
+        return path
     }
 
     private func wobbleOffset(_ effect: StaffEffects.Effect?) -> CGFloat {
@@ -166,7 +266,8 @@ struct StaffPainter {
             }
         }
 
-        var color = done ? Theme.doneInk : style.ink
+        // a glowing (rhythm nudge) note stays in full ink so it stands out from the played ones
+        var color = done && glow == nil ? Theme.doneInk : style.ink
         var headAlpha = 1.0
         if let sparkle {
             // the head turns into a little sparkle
@@ -177,8 +278,9 @@ struct StaffPainter {
                 drawSparkle(&context, at: heads.map(\.0), progress: p)
             }
         }
+        let filled = !(item.notes[index].value?.hasOpenHead ?? false)
         for (center, _) in heads {
-            drawHead(&context, at: center, filled: true, color: color.opacity(headAlpha))
+            drawHead(&context, at: center, filled: filled, color: color.opacity(headAlpha))
         }
         drawChordGaps(&context, heads: heads, alpha: headAlpha)
     }
@@ -216,7 +318,7 @@ struct StaffPainter {
         } else {
             // open head (half note): same size, thick outline, small tilted hole
             var path = headPath(at: center)
-            path.addPath(headPath(at: center, rx: 0.42, ry: 0.2, tilt: -35))
+            path.addPath(headPath(at: center, rx: 0.4, ry: 0.19, tilt: -35))
             context.fill(path, with: .color(color), style: FillStyle(eoFill: true))
         }
     }

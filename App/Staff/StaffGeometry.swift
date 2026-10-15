@@ -82,17 +82,58 @@ enum Metrics {
         }
     }
 
-    /// Lowest and highest step the item draws on, padding included.
+    // stems, flags and beams (rhythm items), in line gaps
+    static let stemLength = 3.5
+    static let stemWidth = 0.16
+    static let beamThickness = 0.5
+
+    /// Lowest and highest step the item draws on, padding included. Stems count.
     static func stepExtent(of item: PracticeItem) -> (Double, Double) {
         var low = Double.infinity
         var high = -Double.infinity
+        let up = stemsUp(item)
         for i in item.notes.indices {
             for position in item.positions(ofNote: i) {
                 low = min(low, Double(position.step) - notePad)
                 high = max(high, Double(position.step) + notePad)
+                guard item.notes[i].value != nil else { continue }
+                let reach = stemLength * 2 + 1 // steps, plus a little for a sloped beam
+                if up[i] {
+                    high = max(high, Double(position.step) + reach)
+                } else {
+                    low = min(low, Double(position.step) - reach)
+                }
             }
         }
         return (low, high)
+    }
+
+    /// Stem direction per column. Single notes: below the middle line stems go up.
+    /// A beamed pair shares one direction, set by the note farther from the middle line.
+    static func stemsUp(_ item: PracticeItem) -> [Bool] {
+        var up = item.notes.indices.map { item.positions(ofNote: $0).first.map(\.stemUp) ?? true }
+        for start in item.beamedPairStarts {
+            let steps = [start, start + 1].map { item.positions(ofNote: $0)[0].step }
+            let farthest = steps.max { abs($0 - StaffPosition.middleLineStep) < abs($1 - StaffPosition.middleLineStep) }!
+            let pairUp = farthest < StaffPosition.middleLineStep
+            up[start] = pairUp
+            up[start + 1] = pairUp
+        }
+        return up
+    }
+
+    /// Columns after which a bar line goes (every 4 beats, not after the last note).
+    static func barLinesAfter(_ item: PracticeItem) -> [Int] {
+        guard item.isRhythm else { return [] }
+        var beats = 0.0
+        var result: [Int] = []
+        for (i, note) in item.notes.enumerated() {
+            beats += note.value?.beats ?? 1
+            if i < item.notes.count - 1, beats.truncatingRemainder(dividingBy: 4) == 0 {
+                result.append(i)
+            }
+        }
+        return result
     }
 
     /// Width of each column in line gaps, before stretching to fill the staff.
