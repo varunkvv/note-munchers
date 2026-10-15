@@ -26,18 +26,40 @@ struct MuncherLook: Hashable {
         (0.95, 0.47, 0.42), // coral
     ]
 
-    init(id: ItemID) {
+    /// Colours offered as big swatches when a muncher hatches (he picks one).
+    static let pickable = [1, 2, 3, 4, 5, 6]
+
+    /// `colorIndex`: the colour he picked at hatch. nil = the hashed one (munchers
+    /// from before colour picking, and eggs).
+    init(id: ItemID, colorIndex: Int? = nil) {
         // fnv1a alone barely changes its high bits between "treble:C4" and "treble:G4",
         // so it only seeds SplitMix64, which mixes well
         var rng = SeededRandom(seed: Self.fnv1a(id))
         func next(_ n: Int) -> Int { Int(rng.next() % UInt64(n)) }
-        let (r, g, b) = Self.palette[next(Self.palette.count)]
+        let hashed = next(Self.palette.count)
+        let rgb = Self.palette[colorIndex.map { min(max(0, $0), Self.palette.count - 1) } ?? hashed]
+        self.init(rgb: rgb, eyes: [2, 2, 2, 1, 3][next(5)], topper: Topper.allCases[next(Topper.allCases.count)], eyesOnTop: next(3) == 0)
+    }
+
+    /// A just-hatched muncher before he picks its colour: pale and waiting.
+    static func uncolored(id: ItemID) -> MuncherLook {
+        let look = MuncherLook(id: id)
+        return MuncherLook(rgb: (0.86, 0.84, 0.8), eyes: look.eyes, topper: look.topper, eyesOnTop: look.eyesOnTop)
+    }
+
+    private init(rgb: (Double, Double, Double), eyes: Int, topper: Topper, eyesOnTop: Bool) {
+        let (r, g, b) = rgb
         body = Color(red: r, green: g, blue: b)
         belly = Color(red: r + (1 - r) * 0.55, green: g + (1 - g) * 0.55, blue: b + (1 - b) * 0.55)
         dark = Color(red: r * 0.55, green: g * 0.55, blue: b * 0.55)
-        eyes = [2, 2, 2, 1, 3][next(5)]
-        topper = Topper.allCases[next(Topper.allCases.count)]
-        eyesOnTop = next(3) == 0
+        self.eyes = eyes
+        self.topper = topper
+        self.eyesOnTop = eyesOnTop
+    }
+
+    static func swatch(_ index: Int) -> Color {
+        let (r, g, b) = palette[index]
+        return Color(red: r, green: g, blue: b)
     }
 
     /// FNV-1a. `String.hashValue` changes every launch, this doesn't.
@@ -54,6 +76,8 @@ struct MuncherLook: Hashable {
 /// One frame of a muncher.
 struct MuncherPose {
     /// 0...1 peak fluency: bigger, rounder and sillier as it grows. Never shrinks.
+    /// Only its own body changes (size, spots, tongue). No hats or gear: those would
+    /// read as prizes, and munchers inform, they never pay.
     var fluency = 0.0
     /// 0 closed (smiling) ... 1 wide open
     var mouthOpen = 0.0
@@ -92,7 +116,6 @@ struct MuncherPainter {
 
         // topper (horns, antennae, tuft) once it's grown a little
         if f >= 0.2 { drawTopper(&context, cx: cx, top: top, bodyW: bodyW, s: s) }
-        if f >= 0.85 { drawHat(&context, cx: cx, top: top, s: s) }
 
         // body and belly
         let bodyRect = CGRect(x: cx - bodyW / 2, y: top, width: bodyW, height: bodyH)
@@ -220,26 +243,6 @@ struct MuncherPainter {
         }
     }
 
-    private func drawHat(_ context: inout GraphicsContext, cx: CGFloat, top: CGFloat, s: CGFloat) {
-        // a little party hat for the munchers he really knows
-        let base = top + s * 0.04
-        var hat = Path()
-        hat.move(to: CGPoint(x: cx - s * 0.11, y: base))
-        hat.addLine(to: CGPoint(x: cx + s * 0.03, y: base - s * 0.26))
-        hat.addLine(to: CGPoint(x: cx + s * 0.13, y: base))
-        hat.closeSubpath()
-        context.fill(hat, with: .color(Color(red: 0.99, green: 0.83, blue: 0.3)))
-        context.drawLayer { layer in
-            layer.clip(to: hat)
-            for i in 0..<4 {
-                let y = base - s * (0.04 + 0.07 * CGFloat(i))
-                layer.fill(Path(CGRect(x: cx - s * 0.2, y: y, width: s * 0.4, height: s * 0.025)), with: .color(Color(red: 0.95, green: 0.4, blue: 0.5)))
-            }
-        }
-        let r = s * 0.035
-        context.fill(Path(ellipseIn: CGRect(x: cx + s * 0.03 - r, y: base - s * 0.26 - r, width: r * 2, height: r * 2)), with: .color(Color(red: 0.95, green: 0.4, blue: 0.5)))
-    }
-
     private func drawFlyingNote(_ context: inout GraphicsContext, rect: CGRect, to target: CGPoint, progress p: Double, s: CGFloat) {
         // comes in from the left (the staff side) at mouth height, with a small hop
         let start = CGPoint(x: rect.minX - s * 0.05, y: target.y - s * 0.05)
@@ -257,11 +260,33 @@ struct MuncherPainter {
 struct MuncherView: View {
     let id: ItemID
     var pose = MuncherPose()
+    @Environment(MuncherColors.self) private var colors
 
     var body: some View {
+        let look = colors.look(id)
         Canvas { context, size in
-            MuncherPainter(look: MuncherLook(id: id), pose: pose).draw(in: &context, rect: CGRect(origin: .zero, size: size))
+            MuncherPainter(look: look, pose: pose).draw(in: &context, rect: CGRect(origin: .zero, size: size))
         }
+    }
+}
+
+/// The colours he picked, by item. Read by every view that draws a muncher.
+@MainActor @Observable
+final class MuncherColors {
+    private(set) var picked: [ItemID: Int]
+
+    init(picked: [ItemID: Int] = [:]) {
+        self.picked = picked
+    }
+
+    func look(_ id: ItemID) -> MuncherLook {
+        MuncherLook(id: id, colorIndex: picked[id])
+    }
+
+    func hasColor(_ id: ItemID) -> Bool { picked[id] != nil }
+
+    func set(_ index: Int, for id: ItemID) {
+        picked[id] = index
     }
 }
 

@@ -16,6 +16,8 @@ final class AppModel {
     private(set) var practice: PracticeController?
     /// The last finished session, for the end screen.
     private(set) var lastSummary: SessionSummary?
+    /// He tapped the "done for now" door (vs the session ending by itself).
+    private(set) var lastEndedByKid = false
     var showParent = false
     /// DEBUG demo: open the parent area on this page.
     var parentPage: String?
@@ -26,6 +28,7 @@ final class AppModel {
     let sounds = Sounds()
     let voice = Voice()
     let store: Store
+    let muncherColors: MuncherColors
     /// When the running session started, for its history row.
     @ObservationIgnored private var sessionStartedAt = Date()
 
@@ -45,12 +48,14 @@ final class AppModel {
         inMemory = demo.isActive && !demo.persist
         #endif
         store = Store(inMemory: inMemory)
-        let (state, config) = store.loadMastery() ?? (MasteryState(), NoteCoreConfig())
+        muncherColors = MuncherColors(picked: store.muncherColors())
+        let (state, settings) = store.loadMastery() ?? (MasteryState(), ParentSettings())
+        let config = settings.config
         self.config = config
         engine = MasteryEngine(config: config, state: state)
         #if DEBUG
         let counts = store.counts()
-        print("store: loaded unit \(engine.unit.number), \(engine.allProgress.count) items played, \(counts.attempts) attempts, \(counts.sessions) sessions\(store.isTemporary ? " (temporary)" : "")")
+        print("store: loaded unit \(engine.unit.number), \(engine.allProgress.count) items played, \(counts.attempts) attempts, \(counts.sessions) sessions, colours \(muncherColors.picked.sorted { $0.key < $1.key })\(store.isTemporary ? " (temporary)" : "")")
         #endif
     }
 
@@ -87,40 +92,60 @@ final class AppModel {
         controller.onSessionDone = { [weak self] summary, state in
             self?.sessionDone(summary, state: state)
         }
+        controller.needsColor = { [weak self] id in
+            !(self?.muncherColors.hasColor(id) ?? true)
+        }
+        controller.onColorChosen = { [weak self] id, index in
+            self?.muncherColors.set(index, for: id)
+            self?.store.saveMuncherColor(index, for: id)
+        }
+        #if DEBUG
+        // the hatch script screenshots a mid-session hatch: eggs at the start pick quickly
+        if demo.isActive { controller.demoAutoPick = demo.script == "hatch" ? 0.8 : demo.autoPick }
+        #endif
         practice = controller
         screen = .practice
         sessionStartedAt = Date()
         controller.start()
     }
 
-    /// Parent ends the session early. Every finished item is already saved; the
-    /// session still gets a history row if he played anything.
-    func leavePractice() {
-        if let practice {
-            practice.stop()
-            if practice.session.summary.itemsPlayed > 0 {
-                store.addSession(practice.session.summary, startedAt: sessionStartedAt)
-            }
+    /// The "done for now" door. Every finished item is already saved; the session
+    /// still gets a history row if he played anything. Ends kindly on the end screen.
+    func doneForNow() {
+        guard let practice else { return }
+        practice.stop()
+        let summary = practice.session.summary
+        if summary.itemsPlayed > 0 {
+            store.addSession(summary, startedAt: sessionStartedAt)
         }
-        practice = nil
-        screen = .home
+        lastSummary = summary
+        lastEndedByKid = true
+        self.practice = nil
+        screen = .sessionEnd
     }
 
-    func goHome() {
+    /// End screen: "one more round".
+    func oneMoreRound() {
+        startPractice()
+    }
+
+    /// End screen: "all done".
+    func allDone() {
         screen = .home
     }
 
     private func itemDone(_ attempt: AttemptResult, state: MasteryState) {
         engine = MasteryEngine(config: config, state: state)
-        store.saveMastery(state, config: config)
+        store.saveMastery(state, settings: ParentSettings(config))
         store.addAttempt(attempt)
     }
 
     private func sessionDone(_ summary: SessionSummary, state: MasteryState) {
         engine = MasteryEngine(config: config, state: state)
-        store.saveMastery(state, config: config)
+        store.saveMastery(state, settings: ParentSettings(config))
         store.addSession(summary, startedAt: sessionStartedAt)
         lastSummary = summary
+        lastEndedByKid = false
         practice = nil
         screen = .sessionEnd
     }
@@ -130,13 +155,13 @@ final class AppModel {
     func updateConfig(_ change: (inout NoteCoreConfig) -> Void) {
         change(&config)
         engine = MasteryEngine(config: config, state: engine.state)
-        store.saveMastery(engine.state, config: config)
+        store.saveMastery(engine.state, settings: ParentSettings(config))
     }
 
     func moveToUnit(_ number: Int) {
         guard practice == nil else { return }
         engine.moveToUnit(number)
-        store.saveMastery(engine.state, config: config)
+        store.saveMastery(engine.state, settings: ParentSettings(config))
     }
 
     #if DEBUG

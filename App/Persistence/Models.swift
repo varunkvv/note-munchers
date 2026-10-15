@@ -80,3 +80,19 @@ final class SessionRecord {
         self.summaryData = summaryData
     }
 }
+
+/// The colour he picked for a muncher when it hatched. Munchers he met before colour
+/// picking existed have no row and keep their hashed colour.
+@Model
+final class MuncherColorRecord {
+    var itemID: String
+    /// index into `MuncherLook.palette`
+    var colorIndex: Int
+    var pickedAt: Date
+
+    init(itemID: String, colorIndex: Int, pickedAt: Date = Date()) {
+        self.itemID = itemID
+        self.colorIndex = colorIndex
+        self.pickedAt = pickedAt
+    }
+}

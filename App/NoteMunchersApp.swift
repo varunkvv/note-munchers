@@ -35,6 +35,7 @@ struct RootView: View {
         #if DEBUG
         .modifier(DemoLandscape(enabled: model.demo.landscape))
         #endif
+        .environment(model.muncherColors)
         .sheet(isPresented: $model.showParent) {
             ParentView(model: model)
                 .presentationSizing(.page)
@@ -61,11 +62,11 @@ struct RootView: View {
             HomeView(model: model)
         case .practice:
             if let practice = model.practice {
-                PracticeView(controller: practice, input: model.input, onLeave: model.leavePractice)
+                PracticeView(controller: practice, input: model.input, onDone: model.doneForNow)
             }
         case .sessionEnd:
             if let summary = model.lastSummary {
-                SessionEndView(summary: summary, onHome: model.goHome)
+                SessionEndView(summary: summary, model: model)
             } else {
                 HomeView(model: model)
             }

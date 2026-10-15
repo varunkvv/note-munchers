@@ -7,7 +7,8 @@ import SwiftUI
 struct PracticeView: View {
     let controller: PracticeController
     let input: InputHub
-    let onLeave: () -> Void
+    /// The "done for now" door: he can always stop, and it ends kindly.
+    let onDone: () -> Void
 
     @AppStorage(StaffStyle.Key.size) private var staffSize = StaffStyle().size
     @AppStorage(StaffStyle.Key.lineThickness) private var lineThickness = StaffStyle().lineThickness
@@ -39,13 +40,21 @@ struct PracticeView: View {
             }
         }
         .overlay {
+            if let id = controller.hatchQueue.first {
+                HatchView(controller: controller, id: id)
+                    .id(id)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: controller.hatchQueue.first)
+        .overlay {
             if controller.isPaused {
                 TurnOnPianoView().transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: 0.3), value: controller.isPaused)
         .overlay(alignment: .topTrailing) {
-            ParentGate(symbol: "house.fill", action: onLeave)
+            DoneForNowButton(action: onDone)
         }
         #if DEBUG
         .overlay(alignment: .bottom) {
@@ -112,5 +121,27 @@ struct HintBand: View {
             try? await Task.sleep(for: .seconds(1.6 * controller.timeScale))
             showEar = false
         }
+    }
+}
+
+/// Always on the practice screen, in the munchers' corner away from the staff.
+/// Big enough for a 6 year old. One tap ends the session kindly (end screen).
+struct DoneForNowButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle()
+                    .fill(Color(red: 0.62, green: 0.48, blue: 0.85))
+                    .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+                Image(systemName: "door.left.hand.open")
+                    .font(.system(size: 34, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 78, height: 78)
+        }
+        .buttonStyle(.plain)
+        .padding(20)
     }
 }

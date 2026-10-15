@@ -13,7 +13,7 @@ final class Store {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
-    static let schema = Schema([MasteryRecord.self, AttemptRecord.self, SessionRecord.self])
+    static let schema = Schema([MasteryRecord.self, AttemptRecord.self, SessionRecord.self, MuncherColorRecord.self])
 
     init(inMemory: Bool = false) {
         if !inMemory, let container = try? Self.openFile() {
@@ -38,16 +38,18 @@ final class Store {
 
     // MARK: mastery
 
-    /// The newest saved state that still decodes.
-    func loadMastery() -> (MasteryState, NoteCoreConfig)? {
+    /// The newest saved state that still decodes, and the parent's settings.
+    func loadMastery() -> (MasteryState, ParentSettings)? {
         guard let record = newestReadableMastery() else { return nil }
         guard let state = try? decoder.decode(MasteryState.self, from: record.stateData) else { return nil }
-        let config = (try? decoder.decode(NoteCoreConfig.self, from: record.configData)) ?? NoteCoreConfig()
-        return (state, config)
+        // older rows hold a whole NoteCoreConfig. its session-length keys decode fine
+        // and the rest (NoteCore's tuning) is ignored on purpose
+        let settings = (try? decoder.decode(ParentSettings.self, from: record.configData)) ?? ParentSettings()
+        return (state, settings)
     }
 
-    func saveMastery(_ state: MasteryState, config: NoteCoreConfig) {
-        guard let stateData = try? encoder.encode(state), let configData = try? encoder.encode(config) else { return }
+    func saveMastery(_ state: MasteryState, settings: ParentSettings) {
+        guard let stateData = try? encoder.encode(state), let configData = try? encoder.encode(settings) else { return }
         if let record = newestReadableMastery() {
             record.stateData = stateData
             record.configData = configData
@@ -103,6 +105,18 @@ final class Store {
         return (try? context.fetch(descriptor)) ?? []
     }
 
+    // MARK: muncher colours
+
+    func muncherColors() -> [String: Int] {
+        let rows = (try? context.fetch(FetchDescriptor<MuncherColorRecord>(sortBy: [SortDescriptor(\.pickedAt)]))) ?? []
+        return Dictionary(rows.map { ($0.itemID, $0.colorIndex) }, uniquingKeysWith: { _, newer in newer })
+    }
+
+    func saveMuncherColor(_ index: Int, for itemID: String) {
+        context.insert(MuncherColorRecord(itemID: itemID, colorIndex: index))
+        save()
+    }
+
     func counts() -> (attempts: Int, sessions: Int) {
         let attempts = (try? context.fetchCount(FetchDescriptor<AttemptRecord>())) ?? 0
         let sessions = (try? context.fetchCount(FetchDescriptor<SessionRecord>())) ?? 0
@@ -115,5 +129,30 @@ final class Store {
         } catch {
             print("store: save failed: \(error)")
         }
+    }
+}
+
+/// What the parent sets: session length. Everything else in `NoteCoreConfig` is
+/// NoteCore's tuning and always comes from `NoteCoreConfig.default`, so a tuning change
+/// in a new build reaches an install that already saved settings.
+struct ParentSettings: Codable, Equatable {
+    var sessionMaxItems: Int?
+    var sessionMaxDuration: Double?
+
+    init(sessionMaxItems: Int? = nil, sessionMaxDuration: Double? = nil) {
+        self.sessionMaxItems = sessionMaxItems
+        self.sessionMaxDuration = sessionMaxDuration
+    }
+
+    init(_ config: NoteCoreConfig) {
+        self.init(sessionMaxItems: config.sessionMaxItems, sessionMaxDuration: config.sessionMaxDuration)
+    }
+
+    /// NoteCore's defaults with the parent's choices on top.
+    var config: NoteCoreConfig {
+        var config = NoteCoreConfig.default
+        if let sessionMaxItems { config.sessionMaxItems = sessionMaxItems }
+        if let sessionMaxDuration { config.sessionMaxDuration = sessionMaxDuration }
+        return config
     }
 }

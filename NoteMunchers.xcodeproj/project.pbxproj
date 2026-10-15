@@ -31,6 +31,7 @@
 		B0D08207ADDB5FAD09648181 /* SessionEndView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A16A64520891B807314A5B7 /* SessionEndView.swift */; };
 		B9232846A6FD0172A9B7957B /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5410B640125C9BDC3D366429 /* HomeView.swift */; };
 		BA6C04055B8A4A3A7A90165B /* PracticeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 759D1542CEFCE31BBA18F2E1 /* PracticeView.swift */; };
+		BE384935CA6018436BBDF697 /* HatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB028C9FB43E9C0EE09972D9 /* HatchView.swift */; };
 		C2FF651E0D489E86ACD6EC6C /* StaffGallery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C1713511455EDBBE5B7E7D2 /* StaffGallery.swift */; };
 		C3DE55AEC892319C51E95D78 /* ParentGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163B3C9FE320D400F434DF0A /* ParentGate.swift */; };
 		CBD785B337F924A797CC2C73 /* MuncherLane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A84F809154A8D319B98CA9 /* MuncherLane.swift */; };
@@ -77,6 +78,7 @@
 		F10B83CFBA29DED421136D54 /* StaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffView.swift; sourceTree = "<group>"; };
 		F9338F512C1757517B46A5ED /* Bravura-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Bravura-OFL.txt"; sourceTree = "<group>"; };
 		FA4CED4BA58D70AA2A1AC029 /* MIDIMonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIMonitorView.swift; sourceTree = "<group>"; };
+		FB028C9FB43E9C0EE09972D9 /* HatchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HatchView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -181,6 +183,7 @@
 		CA8B7EEF829F6BD0FC1B671C /* Kid */ = {
 			isa = PBXGroup;
 			children = (
+				FB028C9FB43E9C0EE09972D9 /* HatchView.swift */,
 				5410B640125C9BDC3D366429 /* HomeView.swift */,
 				C5E2F63D22C871D71A27449B /* KeyboardPicture.swift */,
 				03A84F809154A8D319B98CA9 /* MuncherLane.swift */,
@@ -309,6 +312,7 @@
 				FD274E95E77EFDA843D45DA6 /* DebugKeyboard.swift in Sources */,
 				46612270B256AE1430A94762 /* DemoHistory.swift in Sources */,
 				15BD4B1A27C02CA7CBAED8EE /* DemoRunner.swift in Sources */,
+				BE384935CA6018436BBDF697 /* HatchView.swift in Sources */,
 				B9232846A6FD0172A9B7957B /* HomeView.swift in Sources */,
 				1D18E789A82B14A62FB8604A /* HostClock.swift in Sources */,
 				10CE762EB870434791DA6EC8 /* InputHub.swift in Sources */,

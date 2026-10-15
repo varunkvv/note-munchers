@@ -19,6 +19,7 @@ import NoteCore
 ///     -demoSound YES       make sound (demo runs are silent by default)
 ///     -debugKeyboard YES   show the on-screen keyboard (not a demo, works with MIDI too)
 ///     -logMIDI YES         print every input event and MIDI source change (not a demo)
+///     -demoAutoPick <s>    pick a hatching muncher's colour after s seconds (default 0.8)
 struct DemoOptions {
     var script: String?
     var screen: String?
@@ -33,6 +34,8 @@ struct DemoOptions {
     var debugKeyboard = false
     var galleryUnit: Int?
     var logMIDI = false
+    /// seconds before a demo picks a muncher colour by itself
+    var autoPick = 0.8
 
     init(defaults: UserDefaults = .standard) {
         script = defaults.string(forKey: "demoScript")
@@ -48,6 +51,7 @@ struct DemoOptions {
         debugKeyboard = defaults.bool(forKey: "debugKeyboard")
         galleryUnit = defaults.string(forKey: "demoGalleryUnit").flatMap(Int.init)
         logMIDI = defaults.bool(forKey: "logMIDI")
+        autoPick = defaults.string(forKey: "demoAutoPick").flatMap(Double.init) ?? 0.8
     }
 
     var isActive: Bool { script != nil || screen != nil }
@@ -121,6 +125,8 @@ final class DemoRunner {
         guard let c = model.practice else { return }
         // setup steps run fast. the slow factor is for the state being screenshotted
         c.timeScale = 0.3
+        // notes he hasn't met hatch first (he picks their colours), then the session starts
+        await waitUntil(seconds: 40) { c.phase != .notStarted }
         log("start", c)
         await sleep(0.6)
 
@@ -146,6 +152,15 @@ final class DemoRunner {
             await wrong(c)
             await wrong(c)
             await wrong(c)
+        case "door":
+            // a few right notes, then he taps "done for now"
+            for _ in 0..<3 {
+                let shown = c.itemsShown
+                await playItem(c)
+                await waitForNext(c, after: shown)
+            }
+            log("done for now", c)
+            model.doneForNow()
         case "partial":
             // first note of a group or line right, then wait: played notes go grey
             await skipIntros(c)
@@ -197,24 +212,20 @@ final class DemoRunner {
         case "tour":
             await tour(c)
         case "learn", "hatch":
-            // right first try, quickly, until something unlocks (hatch holds there)
-            c.holdOnUnlock = script == "hatch"
+            // right first try, quickly. "hatch" stops when a new muncher hatches, so
+            // the colour picker can be screenshotted (use -demoAutoPick 60)
             var rounds = 0
+            c.demoAutoPick = options.autoPick
             while c.phase.isPlaying, rounds < 200 {
                 rounds += 1
                 let shown = c.itemsShown
                 await playItem(c)
-                if script == "hatch", let id = c.hatching.first {
-                    c.timeScale = options.slow
-                    log("unlocked \(c.hatching)", c)
-                    // hatch it again and again for the screenshots
-                    while true {
-                        await sleep(0.3)
-                        if c.hatching.isEmpty {
-                            await sleep(0.5)
-                            log("hatching again")
-                            c.demoHatch(id)
-                        }
+                if script == "hatch" {
+                    await sleep(1.5)
+                    if !c.hatchQueue.isEmpty {
+                        c.timeScale = options.slow
+                        log("hatching \(c.hatchQueue)", c)
+                        return
                     }
                 }
                 await waitForNext(c, after: shown)
@@ -340,8 +351,8 @@ final class DemoRunner {
         log("waitForNext timed out", c)
     }
 
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<200 where !condition() {
+    private func waitUntil(seconds: Double = 10, _ condition: () -> Bool) async {
+        for _ in 0..<Int(seconds / 0.05) where !condition() {
             await sleep(0.05)
         }
     }

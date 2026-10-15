@@ -111,3 +111,50 @@ enum ItemLabel {
         }
     }
 }
+
+/// One specific thing for the parent to celebrate with him this week (relatedness:
+/// noticing together). Picks the most concrete one: a finished unit, notes he met,
+/// a note he finds a lot faster, more right first try, then simply showing up.
+enum Celebration {
+    static func suggest(engine: MasteryEngine, trends: Trends, records: [AttemptRecord], sessions: [SessionRecord], now: Date = Date()) -> String {
+        let weekAgo = now.addingTimeInterval(-7 * 86_400)
+        let decoder = JSONDecoder()
+        let weekSessions = sessions.filter { $0.startedAt > weekAgo }
+        let finished = weekSessions
+            .compactMap { try? decoder.decode(SessionSummary.self, from: $0.summaryData) }
+            .flatMap(\.completedUnits)
+        if let unit = finished.max(), let title = engine.curriculum.unit(unit)?.title {
+            return "He finished unit \(unit) (\(title.lowercased())) this week. Ask him to play you his favourite note from it."
+        }
+
+        // notes whose first counted try was this week
+        var firstSeen: [ItemID: Date] = [:]
+        for record in records where firstSeen[record.itemID] == nil {
+            firstSeen[record.itemID] = record.date
+        }
+        let met = engine.curriculum.allItems.map(\.id).filter { (firstSeen[$0] ?? .distantPast) > weekAgo }
+        if !met.isEmpty {
+            let names = met.prefix(3).map(ItemLabel.text)
+            let list = names.count == 1 ? names[0] : names.dropLast().joined(separator: ", ") + " and " + names.last!
+            return "He learned \(list) this week. Ask him to show you where \(met.count == 1 ? "it lives" : "they live") on the piano."
+        }
+
+        let faster = trends.items.values.compactMap { item -> (ItemID, Double)? in
+            guard let now = item.thisWeek.median, let before = item.lastWeek.median, before - now >= 0.4 else { return nil }
+            return (item.id, before - now)
+        }.max { $0.1 < $1.1 }
+        if let (id, gain) = faster {
+            return "He finds \(ItemLabel.text(id)) \(String(format: "%.1f", gain)) s faster than last week. Ask him to show you how quickly he can find it."
+        }
+
+        if let rate = trends.thisWeek.firstTryRate, let before = trends.lastWeek.firstTryRate, rate - before >= 0.1 {
+            return "He got more notes right on the first try this week (\(ParentView.percent(rate)), up from \(ParentView.percent(before))). Tell him you noticed how carefully he reads."
+        }
+
+        let days = Set(weekSessions.map { Calendar.current.startOfDay(for: $0.startedAt) }).count
+        if days > 0 {
+            return "He came back to the piano on \(days) \(days == 1 ? "day" : "days") this week. Tell him you noticed."
+        }
+        return "No practice this week, and that's fine. Nothing in the app shows a missed day."
+    }
+}

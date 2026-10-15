@@ -9,6 +9,7 @@ struct ParentView: View {
     @State private var path: [String] = []
     @State private var trends = Trends(samples: [])
     @State private var sessions: [SessionRecord] = []
+    @State private var celebrate = ""
     @State private var pendingUnit: Int?
 
     @AppStorage(StaffStyle.Key.size) private var staffSize = StaffStyle().size
@@ -26,6 +27,10 @@ struct ParentView: View {
                         Label("Progress can't be saved on this device right now. It will be lost when the app closes.", systemImage: "exclamationmark.triangle")
                             .foregroundStyle(.orange)
                     }
+                }
+                Section("Celebrate together") {
+                    Label(celebrate, systemImage: "hands.clap.fill")
+                        .foregroundStyle(.primary)
                 }
                 progressSection
                 notesSection
@@ -95,8 +100,10 @@ struct ParentView: View {
     }
 
     private func reload() {
-        trends = Trends(records: model.store.attempts(since: Date().addingTimeInterval(-60 * 86_400)))
-        sessions = model.store.sessions(limit: 12)
+        let records = model.store.attempts(since: Date().addingTimeInterval(-60 * 86_400))
+        trends = Trends(records: records)
+        sessions = model.store.sessions(limit: 30)
+        celebrate = Celebration.suggest(engine: engine, trends: trends, records: model.store.attempts(), sessions: sessions)
     }
 
     private func emptyItem(_ id: ItemID) -> Trends.Item? {
@@ -223,7 +230,7 @@ struct ParentView: View {
             if sessions.isEmpty {
                 Text("No sessions yet.").foregroundStyle(.secondary)
             }
-            ForEach(sessions) { session in
+            ForEach(sessions.prefix(12)) { session in
                 HStack {
                     Text(session.startedAt, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute())
                     Spacer()

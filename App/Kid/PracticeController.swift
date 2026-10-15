@@ -18,8 +18,9 @@ final class PracticeController {
     private(set) var soundHintAt: Date?
     /// Bumped on every gobble, the muncher lane animates on change.
     private(set) var gobbleCount = 0
-    /// Eggs waiting to hatch in the lane.
-    private(set) var hatching: [ItemID] = []
+    /// New munchers hatching, oldest first. While this isn't empty the hatch screen
+    /// is up and he picks a colour for the first one. The session waits for him.
+    private(set) var hatchQueue: [ItemID] = []
     /// Items shown so far this session.
     private(set) var itemsShown = 0
 
@@ -27,11 +28,15 @@ final class PracticeController {
     var onItemDone: ((AttemptResult, MasteryState) -> Void)?
     /// Called once at the end of the session.
     var onSessionDone: ((SessionSummary, MasteryState) -> Void)?
+    /// Does this item still need a colour (a muncher that hasn't hatched yet)?
+    var needsColor: (ItemID) -> Bool = { _ in false }
+    /// He picked a colour for a new muncher.
+    var onColorChosen: ((ItemID, Int) -> Void)?
 
     /// DEBUG demo: stay on the success state instead of moving on.
     var holdAfterSuccess = false
-    /// DEBUG demo: stay on the success state when something unlocked.
-    var holdOnUnlock = false
+    /// DEBUG demo: pick a colour by itself after this many seconds (nil = wait for a tap).
+    var demoAutoPick: Double?
     /// DEBUG demo: stretch every delay.
     var timeScale = 1.0 {
         didSet { effects.timeScale = timeScale }
@@ -45,6 +50,10 @@ final class PracticeController {
     @ObservationIgnored private var nextTask: Task<Void, Never>?
     @ObservationIgnored private var savedItems = 0
     @ObservationIgnored private var finished = false
+    /// The session starts once the eggs waiting at the start have hatched.
+    @ObservationIgnored private var startAfterHatching = false
+    /// Next item waits until the eggs from this success have hatched.
+    @ObservationIgnored private var nextAfterHatching = false
 
     init(engine: MasteryEngine, input: InputHub, sounds: Sounds, voice: Voice, seed: UInt64) {
         self.input = input
@@ -75,10 +84,44 @@ final class PracticeController {
                 self?.handle(signal)
             }
         }
-        play(session.start(at: HostClock.now))
+        // notes already unlocked that he hasn't met (first launch, a new unit's starting
+        // pair) hatch before the first item
+        let engine = session.engine
+        let waiting = engine.pool.map(\.id).filter { id in
+            engine.unit.newItems.contains { $0.id == id } && !engine.state.introduced.contains(id) && needsColor(id)
+        }
+        if waiting.isEmpty {
+            play(session.start(at: HostClock.now))
+        } else {
+            startAfterHatching = true
+            hatchQueue = waiting
+        }
     }
 
-    /// Leaves early (parent hold). Whatever he finished is already saved.
+    /// He picked a colour on the hatch screen.
+    func chooseColor(_ index: Int, for id: ItemID) {
+        guard hatchQueue.first == id else { return }
+        onColorChosen?(id, index)
+        hatchQueue.removeFirst()
+        guard hatchQueue.isEmpty else { return }
+        if startAfterHatching {
+            startAfterHatching = false
+            play(session.start(at: HostClock.now))
+        } else if nextAfterHatching {
+            nextAfterHatching = false
+            scheduleNext(after: 0.4)
+        }
+    }
+
+    func playHatchPop() {
+        sounds.pop()
+    }
+
+    func sayPickColor() {
+        voice.say(.pickColor)
+    }
+
+    /// Leaves early (the "done for now" door). Whatever he finished is already saved.
     func stop() {
         listenTask?.cancel()
         tickTask?.cancel()
@@ -101,6 +144,22 @@ final class PracticeController {
 
     private func play(_ cues: [Cue]) {
         var celebrate = 1.2
+        // intros: let the sound finish before the voice talks over it.
+        // note/chord: pitch, then "this is D". group: the phrase, then "these are ...".
+        // rhythm: "here's a new one! listen", then the phrase
+        let meets = cues.contains { if case .say(.meetNote) = $0 { true } else if case .say(.meetNotes) = $0 { true } else { false } }
+        let pitchDemo = cues.contains { if case .playPitches = $0 { true } else { false } }
+        let phraseBeat = cues.lazy.compactMap { if case .playPhrase(let beat) = $0 { beat } else { nil } }.first
+        var speechDelay = 0.0
+        var phraseDelay = 0.0
+        if meets, let beat = phraseBeat, let item = session.item {
+            speechDelay = (item.playback(beat: beat).map { $0.start + $0.duration }.max() ?? 0) + 0.3
+        } else if meets, pitchDemo {
+            speechDelay = 0.9
+        }
+        if cues.contains(.say(.newNote)), phraseBeat != nil {
+            phraseDelay = 1.7
+        }
         for cue in cues {
             switch cue {
             case .showItem:
@@ -120,27 +179,44 @@ final class PracticeController {
                 // the chomp lands when the note reaches the mouth
                 later(MuncherLane.gobbleLength * 0.5) { $0.sounds.chomp() }
             case .say(let speech):
-                voice.say(speech)
+                var isMeet = false
+                if case .meetNote = speech { isMeet = true }
+                if case .meetNotes = speech { isMeet = true }
+                if isMeet, speechDelay > 0 {
+                    later(speechDelay) { $0.voice.say(speech) }
+                } else {
+                    voice.say(speech)
+                }
                 if speech == .holdLonger { celebrate += 1.2 }
+                if speech == .keptTrying { celebrate += 0.8 }
             case .rhythmGlow(let note):
                 let length = glowLength(note)
                 effects.add(.glow, column: note, duration: length)
                 celebrate = max(celebrate, length + 0.8)
             case .playPhrase(let beat):
                 if let item = session.item {
-                    sounds.play(item.playback(beat: beat))
+                    let notes = item.playback(beat: beat)
+                    if phraseDelay > 0 {
+                        later(phraseDelay) { $0.sounds.play(notes) }
+                    } else {
+                        sounds.play(notes)
+                    }
                 }
             case .unlocked(let ids):
-                hatching += ids
-                celebrate += MuncherLane.hatchDelay + MuncherLane.hatchLength
-                later(MuncherLane.hatchDelay + MuncherLane.hatchLength * 0.55) { $0.sounds.pop() }
+                // after the gobble, each new muncher hatches and he picks its colour.
+                // the next item waits for him, not for a timer
+                let new = ids.filter(needsColor)
+                if !new.isEmpty {
+                    nextAfterHatching = true
+                    later(MuncherLane.gobbleLength) { $0.hatchQueue += new }
+                }
             case .paused, .resumed:
                 break // the view reads `isPaused`
             case .done:
                 finishSession()
             }
         }
-        if cues.contains(.resumed), session.phase == .success {
+        if cues.contains(.resumed), session.phase == .success, !nextAfterHatching {
             // the piano dropped during the celebration. pick it up again
             scheduleNext(after: celebrate)
         }
@@ -149,7 +225,9 @@ final class PracticeController {
             if let attempt = session.summary.attempts.last {
                 onItemDone?(attempt, session.engine.state)
             }
-            scheduleNext(after: celebrate)
+            if !nextAfterHatching {
+                scheduleNext(after: celebrate)
+            }
         }
         scheduleTick()
     }
@@ -178,10 +256,6 @@ final class PracticeController {
         }
     }
 
-    func hatched(_ id: ItemID) {
-        hatching.removeAll { $0 == id }
-    }
-
     private func finishSession() {
         guard !finished else { return }
         finished = true
@@ -208,7 +282,7 @@ final class PracticeController {
 
     private func scheduleNext(after delay: Double) {
         nextTask?.cancel()
-        guard !holdAfterSuccess, !(holdOnUnlock && !hatching.isEmpty) else { return }
+        guard !holdAfterSuccess else { return }
         nextTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(delay * (self?.timeScale ?? 1)))
             guard !Task.isCancelled, let self, self.session.phase == .success else { return }
@@ -235,7 +309,7 @@ final class PracticeController {
     }
 
     func demoHatch(_ id: ItemID) {
-        hatching.append(id)
+        hatchQueue.append(id)
     }
 
     func demoRepeatSoundHint() {

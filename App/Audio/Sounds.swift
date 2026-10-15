@@ -37,6 +37,11 @@ final class Sounds {
         play(cached("chomp") { Synth.chomp(format: $0) })
     }
 
+    /// A high five.
+    func clap() {
+        play(cached("clap") { Synth.clap(format: $0) })
+    }
+
     /// An egg hatches.
     func pop() {
         play(cached("pop") { Synth.pop(format: $0) })
@@ -184,6 +189,22 @@ enum Synth {
                     let env = min(1, t / 0.005) * max(0, 1 - t / 0.12)
                     data[start + i] += Float(env * (0.32 * sin(phase) + 0.07 * noise))
                 }
+            }
+        }
+    }
+
+    /// A clap: a short bright noise burst.
+    static func clap(format: AVAudioFormat) -> AVAudioPCMBuffer? {
+        buffer(seconds: 0.25, format: format) { data, frames, rate in
+            var seed: UInt32 = 987_654
+            var low = 0.0
+            for i in 0..<frames {
+                let t = Double(i) / rate
+                seed = seed &* 1_664_525 &+ 1_013_904_223
+                let noise = Double(Int32(bitPattern: seed)) / Double(Int32.max)
+                low += 0.25 * (noise - low)
+                let env = min(1, t / 0.002) * exp(-t * 38)
+                data[i] += Float(0.5 * env * (noise - low))
             }
         }
     }

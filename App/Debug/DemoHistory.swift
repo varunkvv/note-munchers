@@ -40,7 +40,7 @@ enum DemoHistory {
             summary.endUnit = engine.unit.number
             store.addSession(summary, startedAt: start, endedAt: start.addingTimeInterval(clock))
         }
-        store.saveMastery(engine.state, config: engine.config)
+        store.saveMastery(engine.state, settings: ParentSettings(engine.config))
         print("demo: seeded \(days) days, now unit \(engine.unit.number), \(engine.allProgress.count) items played")
         return engine
     }
