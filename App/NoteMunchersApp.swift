@@ -35,11 +35,12 @@ struct RootView: View {
         #if DEBUG
         .modifier(DemoLandscape(enabled: model.demo.landscape))
         #endif
-        .environment(model.muncherColors)
         .sheet(isPresented: $model.showParent) {
             ParentView(model: model)
                 .presentationSizing(.page)
         }
+        // outside the sheet modifier, so the parent area gets the colours too
+        .environment(model.muncherColors)
         // light mode on purpose: light-on-dark smears more for astigmatic eyes
         .preferredColorScheme(.light)
         #if os(iOS)
