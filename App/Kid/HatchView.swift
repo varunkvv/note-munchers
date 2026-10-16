@@ -2,9 +2,10 @@ import NoteCore
 import SwiftUI
 
 /// A new muncher hatches and he picks its colour (autonomy: it's his muncher).
-/// Big egg in the middle, then the pale baby and six big colour swatches. Tapping a
-/// swatch colours it, it does a happy hop, and practice carries on. No text, and no
-/// clock: the session waits for him.
+/// The egg wobbles and cracks and a pale baby pops out. Then two big munchers stand side
+/// by side: the same muncher in two colours drawn at random from `MuncherLook.pickable`.
+/// He taps the one he wants, it does a happy hop, the other fades, and practice carries
+/// on. No text, and no clock: the session waits for him.
 struct HatchView: View {
     let controller: PracticeController
     let id: ItemID
@@ -12,82 +13,132 @@ struct HatchView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var start = Date()
     @State private var hatched = false
+    /// the two colours he picks between, and the muncher they were drawn for
+    @State private var offered: [Int]
+    @State private var offeredFor: ItemID
+    /// the two munchers have stepped out to the sides
+    @State private var spread = false
     @State private var chosen: Int?
     @State private var hop = false
+    @State private var centered = false
+
+    init(controller: PracticeController, id: ItemID) {
+        self.controller = controller
+        self.id = id
+        _offered = State(initialValue: Self.drawPair())
+        _offeredFor = State(initialValue: id)
+    }
 
     private var hatchLength: Double { 2.2 * controller.timeScale }
 
+    /// Two different colours, at random.
+    static func drawPair() -> [Int] {
+        Array(MuncherLook.pickable.shuffled().prefix(2))
+    }
+
     var body: some View {
         GeometryReader { proxy in
-            let s = min(proxy.size.width, proxy.size.height)
+            let size = proxy.size
+            let gap = size.width * 0.05
+            let side = min(size.height * 0.62, (size.width - 3 * gap) / 2)
             ZStack {
                 Theme.paper.opacity(0.97).ignoresSafeArea()
-                VStack(spacing: s * 0.06) {
-                    TimelineView(.animation(paused: hatched)) { timeline in
-                        Canvas { context, size in
-                            let rect = CGRect(origin: .zero, size: size)
-                            if hatched {
-                                let look = chosen.map { MuncherLook(id: id, colorIndex: $0) } ?? .uncolored(id: id)
-                                MuncherPainter(look: look, pose: MuncherPose(fluency: 0.15, mouthOpen: chosen == nil ? 0 : 0.5))
-                                    .draw(in: &context, rect: rect)
-                            } else {
-                                let p = timeline.date.timeIntervalSince(start) / hatchLength
-                                EggPainter(look: MuncherLook(id: id), progress: min(1, p)).draw(in: &context, rect: rect, id: id)
-                            }
-                        }
+                if hatched {
+                    ForEach(Array(offered.enumerated()), id: \.element) { slot, color in
+                        choice(color, slot: slot, side: side, gap: gap, in: size)
                     }
-                    .frame(width: s * 0.42, height: s * 0.42)
-                    .scaleEffect(hop ? 1.12 : 1, anchor: .bottom)
-                    .offset(y: hop ? -s * 0.04 : 0)
-
-                    HStack(spacing: s * 0.035) {
-                        ForEach(MuncherLook.pickable, id: \.self) { index in
-                            Button {
-                                pick(index)
-                            } label: {
-                                Circle()
-                                    .fill(MuncherLook.swatch(index))
-                                    .overlay(Circle().stroke(.white, lineWidth: chosen == index ? 8 : 0))
-                                    .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
-                                    .frame(width: s * 0.11, height: s * 0.11)
-                                    .scaleEffect(chosen == index ? 1.15 : 1)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(chosen != nil)
-                        }
-                    }
-                    .opacity(hatched ? 1 : 0)
+                } else {
+                    egg
+                        .frame(width: min(size.width, size.height) * 0.42, height: min(size.width, size.height) * 0.42)
+                        .position(x: size.width / 2, y: size.height / 2)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .task(id: id) {
+            if offeredFor != id {
+                offered = Self.drawPair()
+                offeredFor = id
+            }
             start = Date()
             hatched = false
+            spread = false
             chosen = nil
+            hop = false
+            centered = false
             try? await Task.sleep(for: .seconds(hatchLength * 0.55))
+            guard !Task.isCancelled else { return }
             controller.playHatchPop()
             try? await Task.sleep(for: .seconds(hatchLength * 0.45))
-            withAnimation(.easeOut(duration: 0.3)) { hatched = true }
+            guard !Task.isCancelled else { return }
+            hatched = true
+            // the pale baby steps out into two coloured munchers, one each side
+            withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.35)) { spread = true }
             controller.sayPickColor()
             #if DEBUG
             if let wait = controller.demoAutoPick {
                 try? await Task.sleep(for: .seconds(wait))
                 if chosen == nil, !Task.isCancelled {
-                    pick(MuncherLook.pickable[Int(MuncherLook.fnv1a(id) % UInt64(MuncherLook.pickable.count))])
+                    // one of the two on screen, never some other colour
+                    pick(offered[Int(MuncherLook.fnv1a(id) % UInt64(offered.count))])
                 }
             }
             #endif
         }
     }
 
+    private var egg: some View {
+        TimelineView(.animation(paused: hatched)) { timeline in
+            Canvas { context, size in
+                let p = timeline.date.timeIntervalSince(start) / hatchLength
+                // spots in the two colours he'll pick between, and a pale baby inside
+                EggPainter(look: .uncolored(id: id), progress: min(1, p), spotColors: offered.map(MuncherLook.swatch))
+                    .draw(in: &context, rect: CGRect(origin: .zero, size: size), id: id)
+            }
+        }
+    }
+
+    private func choice(_ color: Int, slot: Int, side: CGFloat, gap: CGFloat, in size: CGSize) -> some View {
+        let isChosen = chosen == color
+        let outward = (side + gap) / 2 * (slot == 0 ? -1 : 1)
+        let x = size.width / 2 + (spread && !(isChosen && centered) ? outward : 0)
+        let look = MuncherLook(id: id, colorIndex: color)
+        return Button {
+            pick(color)
+        } label: {
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion || chosen != nil)) { timeline in
+                Canvas { context, canvas in
+                    // a soft shadow on the floor
+                    let floor = CGRect(x: canvas.width * 0.24, y: canvas.height * 0.93, width: canvas.width * 0.52, height: canvas.height * 0.05)
+                    context.fill(Path(ellipseIn: floor), with: .color(.black.opacity(0.06)))
+                    var pose = MuncherPose(fluency: 0.15, mouthOpen: isChosen ? 0.55 : 0)
+                    if !reduceMotion, chosen == nil {
+                        // the two take turns bobbing, as if each is saying "me!"
+                        let phase = timeline.date.timeIntervalSinceReferenceDate * 2 * .pi / 1.6 + Double(slot) * .pi
+                        pose.bob = 6 * (1 + sin(phase)) / 2
+                    }
+                    MuncherPainter(look: look, pose: pose).draw(in: &context, rect: CGRect(x: 0, y: 0, width: canvas.width, height: canvas.height * 0.96))
+                }
+            }
+            .frame(width: side, height: side)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .allowsHitTesting(chosen == nil)
+        .scaleEffect(spread ? (hop && isChosen ? 1.1 : 1) : 0.45, anchor: .bottom)
+        .offset(y: hop && isChosen ? -side * 0.06 : 0)
+        .scaleEffect(chosen != nil && !isChosen ? 0.85 : 1)
+        .opacity(chosen == nil || isChosen ? 1 : 0)
+        .position(x: x, y: size.height / 2)
+    }
+
     private func pick(_ index: Int) {
-        guard chosen == nil else { return }
-        withAnimation(.spring(duration: 0.25)) { chosen = index }
+        guard chosen == nil, hatched else { return }
+        withAnimation(.easeOut(duration: 0.35)) { chosen = index }
         controller.playHatchPop()
         if !reduceMotion {
-            withAnimation(.spring(duration: 0.3, bounce: 0.6).delay(0.15)) { hop = true }
-            withAnimation(.spring(duration: 0.3, bounce: 0.4).delay(0.5)) { hop = false }
+            withAnimation(.spring(duration: 0.3, bounce: 0.6).delay(0.1)) { hop = true }
+            withAnimation(.spring(duration: 0.3, bounce: 0.4).delay(0.45)) { hop = false }
+            withAnimation(.spring(duration: 0.5, bounce: 0.2).delay(0.5)) { centered = true }
         }
         Task {
             try? await Task.sleep(for: .seconds(1.1 * controller.timeScale))
