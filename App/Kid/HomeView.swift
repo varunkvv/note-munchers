@@ -52,32 +52,28 @@ struct PlayButton: View {
     }
 }
 
-/// Every muncher he has, in curriculum order. Notes that are unlocked but not met yet
-/// wait as eggs. Each has a tiny staff with its note under it (no letters).
+/// Every muncher he has, one per note: treble first, low to high, then bass. Notes
+/// that are unlocked but waiting for their intro wait as eggs. Each has a tiny staff
+/// with its note under it (no letters).
 struct MunchersGrid: View {
     let model: AppModel
 
     struct Entry: Identifiable {
-        let id: ItemID
+        let key: NoteKey
         let fluency: Double
         let isEgg: Bool
+        var id: ItemID { key.id }
     }
 
     static func entries(_ engine: MasteryEngine) -> [Entry] {
-        let unit = engine.unit
-        let waiting = Set(unit.newItems.prefix(engine.unlockedCount(unit.number)).map(\.id))
-        return engine.curriculum.allItems.compactMap { item in
-            let stats = engine.stats(for: item.id)
-            if stats.attempts > 0 || engine.state.introduced.contains(item.id) {
-                return Entry(id: item.id, fluency: stats.peakFluency, isEgg: false)
-            }
-            return waiting.contains(item.id) ? Entry(id: item.id, fluency: 0, isEgg: true) : nil
-        }
+        let met = engine.metNotes.map { Entry(key: $0, fluency: engine.stats(for: $0).peakFluency, isEgg: false) }
+        let eggs = engine.pendingIntros.filter { !engine.metNotes.contains($0) }.map { Entry(key: $0, fluency: 0, isEgg: true) }
+        return (met + eggs).sorted { $0.key < $1.key }
     }
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 240), spacing: 18)], spacing: 22) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 210), spacing: 18)], spacing: 22) {
                 ForEach(Self.entries(model.engine)) { entry in
                     MuncherCard(entry: entry, sounds: model.sounds)
                 }
@@ -107,12 +103,10 @@ struct MuncherCard: View {
             }
             .frame(height: 130)
             .rotationEffect(.degrees(jiggle ? 6 : 0), anchor: .bottom)
-            if let item = Curriculum.standard.item(entry.id) {
-                StaffView(spec: StaffSpec(items: [item], layout: item.clef == .treble ? .treble : .bass), item: item)
-                    .frame(height: 92)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Theme.paper))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.keyEdge.opacity(0.2)))
-            }
+            NoteStaff(key: entry.key)
+                .frame(height: 92)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.paper))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.keyEdge.opacity(0.2)))
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -124,5 +118,16 @@ struct MuncherCard: View {
                 withAnimation(.spring(duration: 0.3, bounce: 0.5)) { jiggle = false }
             }
         }
+    }
+}
+
+/// One note on a small staff of its own clef. F# is read from the G major key
+/// signature, the way he meets it in practice.
+struct NoteStaff: View {
+    let key: NoteKey
+
+    var body: some View {
+        let item = PracticeItem(key, keySignature: key.pitch.isWhiteKey ? .none : .gMajor)
+        StaffView(spec: StaffSpec(item: item), item: item)
     }
 }

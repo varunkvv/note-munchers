@@ -5,10 +5,14 @@ import NoteCore
 /// DEBUG launch arguments for driving the app without a piano (simulator, agents).
 ///
 ///     -demoScript <name>   play a scripted sequence through InputHub.emit (see DemoRunner.run)
-///     -demoScreen <name>   open a screen directly: home, parent, parent#units, parent#staff,
-///                          parent#history, monitor, gallery (with -demoGalleryUnit <n>)
-///     -demoUnit <n>        start in unit n
-///     -demoSeed <n>        fixed picker seed, for repeatable screenshots
+///     -demoScreen <name>   open a screen directly: home, parent, parent#levels, parent#staff,
+///                          parent#history, levels (the level picker), monitor, gallery
+///                          (generated screens of -demoLesson)
+///     -demoLesson <id>     start in lesson id (e.g. 2.5)
+///     -demoLevel <n>       start in level n (its first lesson)
+///     -demoMet YES         every note in the lesson already met (no intros or hatches)
+///     -demoSize <n>        notes per screen to start at (kept inside the lesson's range)
+///     -demoSeed <n>        fixed seed (screens and the kid's note draw), for repeatable screenshots
 ///     -demoSlow <x>        stretch animations and delays x times
 ///     -demoProgress YES    fake a few weeks of history first
 ///     -demoMaxItems <n>    session length in items
@@ -20,10 +24,15 @@ import NoteCore
 ///     -debugKeyboard YES   show the on-screen keyboard (not a demo, works with MIDI too)
 ///     -logMIDI YES         print every input event and MIDI source change (not a demo)
 ///     -demoAutoPick <s>    pick a hatching muncher's colour after s seconds (default 0.8)
+///     -demoGate <how>      open|right|wrong: open the parent gate on home by itself and
+///                          optionally answer it (read in ParentGate.swift)
 struct DemoOptions {
     var script: String?
     var screen: String?
-    var unit: Int?
+    var lesson: LessonID?
+    var level: Int?
+    var met = false
+    var size: Int?
     var seed: UInt64?
     var slow = 1.0
     var progress = false
@@ -32,7 +41,6 @@ struct DemoOptions {
     var persist = false
     var sound = false
     var debugKeyboard = false
-    var galleryUnit: Int?
     var logMIDI = false
     /// seconds before a demo picks a muncher colour by itself
     var autoPick = 0.8
@@ -40,7 +48,10 @@ struct DemoOptions {
     init(defaults: UserDefaults = .standard) {
         script = defaults.string(forKey: "demoScript")
         screen = defaults.string(forKey: "demoScreen")
-        unit = defaults.string(forKey: "demoUnit").flatMap(Int.init)
+        lesson = defaults.string(forKey: "demoLesson")
+        level = defaults.string(forKey: "demoLevel").flatMap(Int.init)
+        met = defaults.bool(forKey: "demoMet")
+        size = defaults.string(forKey: "demoSize").flatMap(Int.init)
         seed = defaults.string(forKey: "demoSeed").flatMap { UInt64($0) }
         slow = defaults.string(forKey: "demoSlow").flatMap(Double.init) ?? 1
         progress = defaults.bool(forKey: "demoProgress")
@@ -49,7 +60,6 @@ struct DemoOptions {
         persist = defaults.bool(forKey: "demoPersist")
         sound = defaults.bool(forKey: "demoSound")
         debugKeyboard = defaults.bool(forKey: "debugKeyboard")
-        galleryUnit = defaults.string(forKey: "demoGalleryUnit").flatMap(Int.init)
         logMIDI = defaults.bool(forKey: "logMIDI")
         autoPick = defaults.string(forKey: "demoAutoPick").flatMap(Double.init) ?? 0.8
     }
@@ -80,10 +90,17 @@ final class DemoRunner {
         if options.debugKeyboard { model.input.debugKeyboardOn = true }
 
         // in-memory store: start fresh. -demoPersist: keep what the real store loaded
-        var engine = options.persist ? model.engine : MasteryEngine()
+        var engine = options.persist ? model.engine : MasteryEngine(state: MasteryState(seed: options.seed ?? 1))
         if options.progress { engine = DemoHistory.seed(into: model.store) }
         if let maxItems = options.maxItems { engine.config.sessionMaxItems = maxItems }
-        if let unit = options.unit { engine.moveToUnit(unit) }
+        if let level = options.level { engine.moveToLevel(level) }
+        if let lesson = options.lesson { engine.moveToLesson(lesson) }
+        if options.met { engine = Self.meetEverything(engine) }
+        if let size = options.size {
+            var state = engine.state
+            state.screenSize = size
+            engine = MasteryEngine(config: engine.config, state: state)
+        }
         model.demoReplaceEngine(engine)
 
         Task { await run() }
@@ -97,7 +114,10 @@ final class DemoRunner {
             log("screen \(screen)")
             switch screen {
             case "gallery":
-                model.galleryUnit = options.galleryUnit ?? options.unit ?? 1
+                model.galleryLesson = options.lesson ?? model.engine.lesson.id
+            case "levels":
+                model.parentPage = "levels"
+                model.showParent = true
             case "parent":
                 model.showParent = true
             case let page where page.hasPrefix("parent#"):
@@ -125,14 +145,15 @@ final class DemoRunner {
         guard let c = model.practice else { return }
         // setup steps run fast. the slow factor is for the state being screenshotted
         c.timeScale = 0.3
-        // notes he hasn't met hatch first (he picks their colours), then the session starts
         await waitUntil(seconds: 40) { c.phase != .notStarted }
         log("start", c)
         await sleep(0.6)
 
         switch script {
         case "intro":
-            c.timeScale = options.slow // first item is an intro: keyboard picture up, "here's a new one"
+            // a fresh kid's first screen is an intro: the muncher hatches, then keyboard picture up, "this is G"
+            await waitUntil(seconds: 20) { !c.isHatching }
+            c.timeScale = options.slow
         case "prompt":
             await skipIntros(c)
         case "wobble":
@@ -182,7 +203,7 @@ final class DemoRunner {
                 await playItem(c, stretch: item.notes.map { $0.value == .half ? 0.4 : 1 })
             }
             await sleep(1.0)
-            log("rhythm result \(c.session.summary.attempts.last?.rhythm.map { "\($0.verdicts)" } ?? "none")", c)
+            log("rhythm result \(c.session.summary.screens.last?.rhythm.map { "\($0.verdicts)" } ?? "none")", c)
             await repeatEffect(.glow, c)
         case "almost":
             await skipIntros(c)
@@ -211,23 +232,19 @@ final class DemoRunner {
             log("after resume", c)
         case "tour":
             await tour(c)
-        case "learn", "hatch":
-            // right first try, quickly. "hatch" stops when a new muncher hatches, so
-            // the colour picker can be screenshotted (use -demoAutoPick 60)
+        case "hatch":
+            // a new note's muncher hatches right before its intro. stops there so the
+            // colour picker can be screenshotted (use -demoAutoPick 60)
+            await waitUntil(seconds: 60) { c.isHatching }
+            c.timeScale = options.slow
+            log("hatching \(c.hatchQueue)", c)
+        case "learn":
+            // right first try, quickly
             var rounds = 0
-            c.demoAutoPick = options.autoPick
             while c.phase.isPlaying, rounds < 200 {
                 rounds += 1
                 let shown = c.itemsShown
                 await playItem(c)
-                if script == "hatch" {
-                    await sleep(1.5)
-                    if !c.hatchQueue.isEmpty {
-                        c.timeScale = options.slow
-                        log("hatching \(c.hatchQueue)", c)
-                        return
-                    }
-                }
                 await waitForNext(c, after: shown)
             }
             log("learn finished after \(rounds) rounds", c)
@@ -286,6 +303,7 @@ final class DemoRunner {
 
     /// The right key(s) for the note he's on.
     private func right(_ c: PracticeController) async {
+        await waitUntil(seconds: 30) { !c.isHatching }
         guard let item = c.item, c.phase.isPlaying else { return }
         let pitches = item.notes[c.session.noteIndex].pitches
         let label = "\(item.id)\(c.session.isIntro ? " (intro)" : "")"
@@ -294,6 +312,7 @@ final class DemoRunner {
     }
 
     private func wrong(_ c: PracticeController) async {
+        await waitUntil(seconds: 30) { !c.isHatching }
         guard let item = c.item, c.phase.isPlaying else { return }
         // two white keys up: never the right letter
         let pitches = item.notes[c.session.noteIndex].pitches.map { whiteKey($0, steps: 2) }
@@ -302,6 +321,7 @@ final class DemoRunner {
     }
 
     private func wrongOctave(_ c: PracticeController) async {
+        await waitUntil(seconds: 30) { !c.isHatching }
         guard let item = c.item, c.phase.isPlaying else { return }
         let pitches = item.notes[c.session.noteIndex].pitches.map { Pitch(midi: $0.midi + 12) }
         await press(pitches)
@@ -311,6 +331,7 @@ final class DemoRunner {
     /// Plays every remaining note of the item. Rhythm items at a steady beat;
     /// `stretch` scales each note's length (e.g. 0.5 plays a half as a quarter).
     private func playItem(_ c: PracticeController, beat: Double = 0.5, stretch: [Double]? = nil) async {
+        await waitUntil(seconds: 30) { !c.isHatching }
         guard let item = c.item, c.phase.isPlaying else { return }
         if item.isRhythm {
             for index in c.session.noteIndex..<item.notes.count {
@@ -359,13 +380,24 @@ final class DemoRunner {
 
     private func repeatEffect(_ kind: StaffEffects.Kind, _ c: PracticeController) async {
         var column = max(0, c.doneCount - (kind == .sparkle ? 1 : 0))
-        if kind == .glow, let nudge = c.session.summary.attempts.last?.rhythm?.nudgeIndex {
+        if kind == .glow, let nudge = c.session.summary.screens.last?.rhythm?.nudgeIndex {
             column = nudge
         }
         while true {
             await sleep(1.6 * options.slow)
             c.demoReplay(kind, column: column)
         }
+    }
+
+    /// Every note waiting for its intro gets one, as if he'd met them all (`-demoMet`).
+    static func meetEverything(_ engine: MasteryEngine) -> MasteryEngine {
+        var engine = engine
+        let lesson = engine.lesson
+        for key in engine.pendingIntros {
+            let note = AttemptResult(itemID: key.id, lesson: lesson.id, level: lesson.level, wasIntro: true, firstTry: true, responseTime: 2)
+            engine.record(ScreenResult(screenID: key.id, lesson: lesson.id, wasIntro: true, notes: [note], size: 1))
+        }
+        return engine
     }
 
     private func whiteKey(_ pitch: Pitch, steps: Int) -> Pitch {
@@ -388,7 +420,7 @@ final class DemoRunner {
             return
         }
         let hint = c.session.keyboardHint.map(\.name).joined(separator: ",")
-        print("demo: \(message) | phase=\(c.phase.rawValue) unit=\(c.session.engine.unit.number) item=\(c.item?.id ?? "-") note=\(c.session.noteIndex) intro=\(c.session.isIntro) keyboard=[\(hint)] played=\(c.session.summary.itemsPlayed) unlocked=\(c.session.summary.unlocked)")
+        print("demo: \(message) | phase=\(c.phase.rawValue) lesson=\(c.session.engine.lesson.id) size=\(c.session.engine.screenSize) screen=\(c.item?.id ?? "-") note=\(c.session.noteIndex) intro=\(c.session.isIntro) keyboard=[\(hint)] screens=\(c.session.summary.screensPlayed) unlocked=\(c.session.summary.unlocked)")
     }
 }
 #endif

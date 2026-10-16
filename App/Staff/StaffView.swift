@@ -1,8 +1,8 @@
 import NoteCore
 import SwiftUI
 
-/// The staff, drawn big and calm for a kid with slight astigmatism: thick lines,
-/// ledger lines as heavy as the staff and wider than the head, filled oversized heads,
+/// The staff, drawn calm and clear: lines and ledger lines a little heavier than
+/// engraving, ledger lines as heavy as the staff and wider than the head, filled heads,
 /// near-black on warm paper. Clefs come from Bravura, everything else is a path.
 struct StaffView: View {
     let spec: StaffSpec
@@ -11,13 +11,15 @@ struct StaffView: View {
     var doneCount = 0
     var effects: StaffEffects?
     var style = StaffStyle()
+    /// Line gap in points. nil = the biggest that fits (small previews).
+    var gap: CGFloat?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         TimelineView(.animation(paused: effects?.isEmpty ?? true)) { timeline in
             Canvas { context, size in
-                let geometry = StaffGeometry(spec: spec, size: size, style: style)
+                let geometry = StaffGeometry(spec: spec, size: size, style: style, gap: gap)
                 var painter = StaffPainter(
                     geo: geometry, style: style, effects: effects?.effects ?? [],
                     now: timeline.date, reduceMotion: reduceMotion
@@ -44,6 +46,7 @@ struct StaffPainter {
         for clef in geo.spec.clefs {
             drawLines(&context, clef)
             drawClef(&context, clef)
+            drawKeySignature(&context, clef)
         }
         if geo.spec.clefs.count > 1 { drawSystemLine(&context) }
         if let item { drawItem(&context, item, doneCount: doneCount) }
@@ -90,17 +93,31 @@ struct StaffPainter {
         }
     }
 
+    /// Sharps after the clef (G major: one, on the F line). Drawn with the font's sharp
+    /// so it reads like his books.
+    private func drawKeySignature(_ context: inout GraphicsContext, _ clef: Clef) {
+        for (i, step) in geo.spec.keySignature.sharpSteps(clef).enumerated() {
+            let origin = CGPoint(x: geo.keySignatureX + CGFloat(i) * CGFloat(Metrics.sharpWidth) * g, y: geo.y(step, on: clef))
+            if let path = Bravura.path(.sharp, staffSpace: g) {
+                context.fill(path.offsetBy(dx: origin.x, dy: origin.y), with: .color(style.ink))
+            } else {
+                let text = Text("#").font(.system(size: g * 2.2, weight: .heavy)).foregroundColor(style.ink)
+                context.draw(text, at: CGPoint(x: origin.x + g * 0.5, y: origin.y), anchor: .center)
+            }
+        }
+    }
+
     // MARK: notes
 
     private func drawItem(_ context: inout GraphicsContext, _ item: PracticeItem, doneCount: Int) {
         let centers = geo.columnCenters(item)
-        // bar lines between measures (rhythm items), under everything else
-        if !Metrics.barLinesAfter(item).isEmpty {
+        // bar lines between bars, through every staff on screen, under everything else
+        if !item.barLinesAfter.isEmpty {
             var bars = Path()
-            for i in Metrics.barLinesAfter(item) {
+            for i in item.barLinesAfter {
                 let x = (centers[i] + centers[i + 1]) / 2
-                bars.move(to: CGPoint(x: x, y: geo.y(8, on: item.clef) - geo.lineWidth / 2))
-                bars.addLine(to: CGPoint(x: x, y: geo.y(0, on: item.clef) + geo.lineWidth / 2))
+                bars.move(to: CGPoint(x: x, y: geo.systemTop - geo.lineWidth / 2))
+                bars.addLine(to: CGPoint(x: x, y: geo.systemBottom + geo.lineWidth / 2))
             }
             context.stroke(bars, with: .color(style.ink), lineWidth: geo.lineWidth)
         }
@@ -130,7 +147,7 @@ struct StaffPainter {
     /// A stem on the head's right edge going up, or its left edge going down. The
     /// tilted head's edge point sits a little off center, so the stem starts there.
     func stem(item: PracticeItem, index: Int, x: CGFloat, up: Bool) -> Stem {
-        let ys = item.positions(ofNote: index).map { geo.y($0.step, on: item.clef) }
+        let ys = item.positions(ofNote: index).map { geo.y($0.step, on: item.clef(ofNote: index)) }
         let lowest = ys.max() ?? 0, highest = ys.min() ?? 0
         let width = CGFloat(Metrics.stemWidth) * g
         let edge = CGFloat(Metrics.headHalfWidth) * g - width / 2
@@ -221,7 +238,7 @@ struct StaffPainter {
             } else {
                 shifted = false
             }
-            result.append((CGPoint(x: hx, y: geo.y(position.step, on: item.clef)), position))
+            result.append((CGPoint(x: hx, y: geo.y(position.step, on: item.clef(ofNote: index))), position))
             previous = position.step
         }
         return result
@@ -242,7 +259,7 @@ struct StaffPainter {
             let maxX = heads.map(\.0.x).max()! + CGFloat(Metrics.headHalfWidth + Metrics.ledgerOverhang) * g
             var path = Path()
             for step in ledgerSteps {
-                let y = geo.y(step, on: item.clef)
+                let y = geo.y(step, on: item.clef(ofNote: index))
                 path.move(to: CGPoint(x: minX, y: y))
                 path.addLine(to: CGPoint(x: maxX, y: y))
             }

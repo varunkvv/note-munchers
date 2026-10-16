@@ -22,8 +22,8 @@ final class Voice {
         if logs { print("voice: \(parts.map(\.text).joined())") }
         guard !isMuted else { return }
         switch speech {
-        case .letter, .letters:
-            // he may play faster than the voice talks. the newest letter wins
+        case .almost, .sharpHint, .hintListen, .hintShow, .hintLook:
+            // feedback on the key he just pressed: the newest one wins
             synth.stopSpeaking(at: .immediate)
         default:
             break
@@ -61,42 +61,42 @@ final class Voice {
         synth.speak(utterance([Part(text: line.rawValue)]))
     }
 
+    /// Placeholder words for each situation. Agent C replaces these with recorded clips
+    /// (several takes per line, never the same one twice in a row).
     func words(for speech: Speech) -> [Part] {
         switch speech {
-        case .newNote:
-            // new rhythm line, played to him right after: sound before symbol
-            return [Part(text: "here's a new one! listen")]
-        case .meetNote(let letter):
+        case .hello:
+            return [Part(text: "hi! let's play")]
+        case .meetNote(let name):
             // intro, right after its pitch sounds and the key lights up (i do)
-            return [Part(text: "this is "), letterPart(letter)]
-        case .meetNotes(let letters):
-            return [Part(text: "these are ")] + listed(letters)
-        case .letter(let letter):
-            return [letterPart(letter), Part(text: "!")]
-        case .letters(let letters):
-            var parts: [Part] = []
-            for (i, letter) in letters.enumerated() {
-                if i > 0 { parts.append(Part(text: ", ")) }
-                parts.append(letterPart(letter))
+            return [Part(text: "this one is new. it's ")] + namePart(name)
+        case .listen:
+            // a new rhythm lesson, played to him right after: sound before symbol
+            return [Part(text: "here's a new one! listen")]
+        case .twoAtOnce:
+            return [Part(text: "two notes at once! listen")]
+        case .almost(let name, let hint):
+            let rest = switch hint {
+            case .middleC: "this one is the middle C"
+            case .higher: "this one is higher up"
+            case .lower: "this one is lower down"
             }
-            parts.append(Part(text: "!"))
-            return parts
+            return [Part(text: "that's ")] + namePart(name) + [Part(text: "! \(rest)")]
+        case .sharpHint(let name):
+            return [Part(text: "that's ")] + namePart(NoteName(rawValue: name.letter.rawValue) ?? name)
+                + [Part(text: ". this one is ")] + namePart(name) + [Part(text: ", the black key")]
+        case .hintListen:
+            return [Part(text: "listen")]
+        case .hintShow(let name):
+            return [Part(text: "this one is ")] + namePart(name) + [Part(text: ". here it is")]
+        case .hintLook:
+            return [Part(text: "here they are")]
         // process praise: what he did, never what he is. no "smart", "genius",
         // "talented", "good boy" or empty "great job" (mueller & dweck)
         case .keptTrying:
             return [Part(text: "you kept trying and found it!")]
         case .lookedCarefully:
             return [Part(text: "you looked carefully!")]
-        case .almost(let played, let expected):
-            var parts = [Part(text: "that's a "), letterPart(played.naturalLetter), Part(text: "! ")]
-            if expected == .middleC {
-                parts.append(Part(text: "this one is the middle C"))
-            } else if expected > played {
-                parts.append(Part(text: "this one is higher up"))
-            } else {
-                parts.append(Part(text: "this one is lower down"))
-            }
-            return parts
         case .holdLonger:
             return [Part(text: "hold this one longer")]
         case .turnOnPiano:
@@ -106,18 +106,9 @@ final class Voice {
         }
     }
 
-    /// "C, E and G"
-    private func listed(_ letters: [Letter]) -> [Part] {
-        var parts: [Part] = []
-        for (i, letter) in letters.enumerated() {
-            if i > 0 { parts.append(Part(text: i == letters.count - 1 ? " and " : ", ")) }
-            parts.append(letterPart(letter))
-        }
-        return parts
-    }
-
-    private func letterPart(_ letter: Letter) -> Part {
-        let ipa: String = switch letter {
+    /// "D", or "F sharp". Letters get an IPA hint so "A" is "ay", never "uh".
+    private func namePart(_ name: NoteName) -> [Part] {
+        let ipa: String = switch name.letter {
         case .a: "ˈeɪ"
         case .b: "ˈbiː"
         case .c: "ˈsiː"
@@ -126,7 +117,8 @@ final class Voice {
         case .f: "ˈɛf"
         case .g: "ˈdʒiː"
         }
-        return Part(text: letter.name, ipa: ipa)
+        let letter = Part(text: name.letter.name, ipa: ipa)
+        return name.isSharp ? [letter, Part(text: " sharp")] : [letter]
     }
 
     private func utterance(_ parts: [Part]) -> AVSpeechUtterance {

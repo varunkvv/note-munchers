@@ -17,6 +17,7 @@ struct PracticeView: View {
 
     private var style: StaffStyle {
         StaffStyle(size: staffSize, lineThickness: lineThickness, spaceTint: spaceTint, highContrast: contrast == .increased)
+            .clamped
     }
 
     var body: some View {
@@ -28,7 +29,7 @@ struct PracticeView: View {
                     HStack(spacing: 0) {
                         staffColumn(height: proxy.size.height)
                         MuncherLane(controller: controller)
-                            .frame(width: max(190, proxy.size.width * 0.21))
+                            .frame(width: max(180, proxy.size.width * 0.17))
                     }
                 } else {
                     VStack(spacing: 0) {
@@ -69,7 +70,7 @@ struct PracticeView: View {
         VStack(spacing: 0) {
             StaffView(
                 spec: controller.spec, item: controller.item, doneCount: controller.doneCount,
-                effects: controller.effects, style: style
+                effects: controller.effects, style: style, gap: Metrics.gap * CGFloat(style.size)
             )
             .padding(.horizontal, 8)
             .padding(.top, 12)

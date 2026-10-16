@@ -2,363 +2,329 @@ import Foundation
 import Testing
 @testable import NoteCore
 
-extension MasteryEngine {
-    /// Records a non-intro attempt.
-    @discardableResult
-    mutating func play(_ id: ItemID, right: Bool = true, time: Double = 1.5, rhythmOK: Bool? = nil) -> MasteryUpdate {
-        var rhythm: RhythmResult?
-        if let ok = rhythmOK {
-            rhythm = RhythmResult(verdicts: [ok ? .ok : .tooShort], beat: 0.6)
+@Suite struct NoteKeyTests {
+    @Test func idsRoundTrip() {
+        for id in ["treble:G4", "bass:G2", "treble:F#4", "bass:C4"] {
+            #expect(NoteKey(id: id)?.id == id)
         }
-        return record(AttemptResult(itemID: id, unit: state.unit, firstTry: right, wrongPresses: right ? 0 : 1, responseTime: time, rhythm: rhythm))
+        #expect(NoteKey(.treble, Pitch(.g, 4)).id == "treble:G4")
     }
 
-    mutating func intro(_ id: ItemID) {
-        record(AttemptResult(itemID: id, unit: state.unit, wasIntro: true, firstTry: true, responseTime: 3))
-    }
-
-    /// Picks and plays `count` items with a player that answers per item.
-    /// Returns the picked ids in order.
-    @discardableResult
-    mutating func simulate(_ count: Int, seed: UInt64, player: (PracticeItem) -> (right: Bool, time: Double, rhythmOK: Bool?) = { _ in (true, 1.0, true) }) -> [ItemID] {
-        var rng = SeededRandom(seed: seed)
-        var picks: [ItemID] = []
-        for _ in 0..<count {
-            let item = pickNext(using: &rng)
-            picks.append(item.id)
-            if needsIntro(item) {
-                intro(item.id)
-            } else {
-                let answer = player(item)
-                play(item.id, right: answer.right, time: answer.time, rhythmOK: item.isRhythm ? answer.rhythmOK : nil)
-            }
+    @Test func roundOneItemIDsAreNotNotes() {
+        for id in ["treble:C4-D4", "treble:C4+E4", "treble:G4/q-G4/q-G4/h", "alto:C4", "treble:H4", "treble:Bb3", "lesson:1.1"] {
+            #expect(NoteKey(id: id) == nil, "\(id)")
         }
-        return picks
     }
-}
 
-func maxRun(_ ids: [ItemID]) -> Int {
-    var best = 0, run = 0
-    var last: ItemID?
-    for id in ids {
-        run = id == last ? run + 1 : 1
-        last = id
-        best = max(best, run)
+    @Test func noteNames() {
+        #expect(NoteName(Pitch(.g, 4)) == .g)
+        #expect(NoteName(Pitch("F#4")!) == .fSharp)
+        #expect(NoteName(Pitch("C#4")!) == nil)
+        #expect(NoteName.fSharp.letter == .f && NoteName.fSharp.spoken == "F sharp")
+        #expect(NoteName.allCases.count == 8)
     }
-    return best
+
+    @Test func linesAndSpacesInGPosition() {
+        #expect(["treble:G4", "treble:B4", "treble:D5", "bass:G2", "bass:B2", "bass:D3"].allSatisfy { key($0).isOnLine })
+        #expect(["treble:A4", "treble:C5", "bass:A2", "bass:C3"].allSatisfy { !key($0).isOnLine })
+    }
 }
 
 @Suite struct MasteryEngineTests {
-    let c4 = "treble:C4", g4 = "treble:G4", e4 = "treble:E4", d4 = "treble:D4", f4 = "treble:F4"
+    /// Plays each note right, fast, `times` times (the fast track takes 3).
+    func makeSolid(_ engine: inout MasteryEngine, _ keys: [NoteKey], times: Int = 3) {
+        for _ in 0..<times {
+            for k in keys { engine.play(k, time: 1) }
+        }
+    }
 
-    @Test func freshEngineStartsUnitOneWithCAndG() {
+    @Test func freshEngineStartsLessonOneWithThreeNotesPerClef() {
         let engine = MasteryEngine()
-        #expect(engine.unit.number == 1)
-        #expect(engine.pool.map(\.id) == [c4, g4])
-        #expect(engine.newestBatch.map(\.id) == [c4, g4])
+        #expect(engine.lesson.id == "1.1")
+        for clef in Clef.allCases {
+            let pool = engine.pool(clef)
+            #expect(pool.count == 3, "\(clef)")
+            #expect(pool.contains(where: \.isOnLine) && pool.contains(where: { !$0.isOnLine }), "\(clef) has a line and a space")
+            #expect(engine.newestBatch(clef) == pool, "the start set counts as the newest batch")
+            #expect(pool.allSatisfy(engine.needsIntro), "every start note waits for its intro")
+        }
+        #expect(engine.screenSize == 1)
+    }
+
+    @Test func startSetIsPickedAtRandomPerKid() {
+        var sets = Set<[NoteKey]>()
+        for seed in 1...30 {
+            let engine = MasteryEngine(state: MasteryState(seed: UInt64(seed)))
+            let treble = engine.pool(.treble)
+            #expect(treble.contains(where: \.isOnLine) && treble.contains(where: { !$0.isOnLine }), "seed \(seed)")
+            sets.insert(treble)
+            // same seed, same choice
+            #expect(MasteryEngine(state: MasteryState(seed: UInt64(seed))).pool(.treble) == treble)
+        }
+        #expect(sets.count >= 5, "start sets vary between kids: \(sets.count)")
+        #expect(!sets.contains([key("treble:G4"), key("treble:B4"), key("treble:D5")]), "never all lines")
+    }
+
+    @Test func initIsIdempotent() {
+        let engine = MasteryEngine(state: MasteryState(seed: 3))
+        let again = MasteryEngine(state: engine.state)
+        #expect(again.state == engine.state, "rebuilding an engine from its state changes nothing")
     }
 
     @Test func leitnerMovesOneBoxAndStaysInRange() {
-        var engine = MasteryEngine()
-        engine.play(c4, right: false)
-        #expect(engine.stats(for: c4).box == 1)
-        for _ in 0..<10 { engine.play(c4) }
-        #expect(engine.stats(for: c4).box == 5)
-        engine.play(c4, right: false)
-        #expect(engine.stats(for: c4).box == 4)
-        #expect(engine.stats(for: c4).recent.count == 8, "only the last 8 are kept")
+        var engine = engine(in: "1.1")
+        let g = engine.pool(.treble)[0]
+        engine.play(g, right: false)
+        #expect(engine.stats(for: g).box == 1)
+        for _ in 0..<7 { engine.play(g) }
+        #expect(engine.stats(for: g).box == 5)
+        engine.play(g, right: false)
+        #expect(engine.stats(for: g).box == 4)
     }
 
     @Test func stuckWithoutAWrongKeyHoldsTheBox() {
-        var engine = MasteryEngine()
-        for _ in 0..<3 { engine.play(c4) }
-        #expect(engine.stats(for: c4).box == 4)
-        engine.record(AttemptResult(itemID: c4, unit: 1, firstTry: false, stuckSteps: 1, hints: .wobble, responseTime: 16))
-        #expect(engine.stats(for: c4).box == 4, "stuck is not a miss")
-        #expect(engine.stats(for: c4).recent.last?.firstTry == false, "but it isn't first try either")
+        var engine = engine(in: "1.1")
+        let g = engine.pool(.treble)[0]
+        engine.play(g)
+        engine.play(g)
+        let note = AttemptResult(itemID: g.id, lesson: "1.1", level: 1, firstTry: false, stuckSteps: 1, hints: .wobble, responseTime: 16)
+        engine.record(ScreenResult(screenID: g.id, lesson: "1.1", reason: .warmUp, notes: [note]))
+        #expect(engine.stats(for: g).box == 3)
+        #expect(!engine.stats(for: g).recent.last!.firstTry)
     }
 
-    @Test func solidIsSevenOfEightWithMedianUnderFourSeconds() {
-        var engine = MasteryEngine()
-        // slow enough to stay off the fast track
-        for i in 0..<8 { engine.play(c4, right: i != 3, time: 3.0) }
-        #expect(engine.isPitchSolid(c4))
+    @Test func solidIsSevenOfEightOrThreeFastInARow() {
+        var engine = engine(in: "1.1")
+        let g = engine.pool(.treble)[0]
+        engine.play(g, time: 1)
+        engine.play(g, time: 1)
+        #expect(!engine.isSolid(g))
+        engine.play(g, time: 1)
+        #expect(engine.isSolid(g), "fast track: 3 in a row under 3s")
 
-        var twoMisses = MasteryEngine()
-        for i in 0..<8 { twoMisses.play(c4, right: i != 3 && i != 5, time: 3.0) }
-        #expect(!twoMisses.isPitchSolid(c4))
-
-        var slow = MasteryEngine()
-        for _ in 0..<8 { slow.play(c4, time: 4.5) }
-        #expect(!slow.isPitchSolid(c4), "all right but median 4.5s")
+        var slow = NoteCoreTests.engine(in: "1.1")
+        for _ in 0..<3 { slow.play(g, time: 3.2) }
+        #expect(!slow.isSolid(g), "3.2s is too slow for the fast track")
+        slow.play(g, right: false, time: 3.2)
+        for _ in 0..<4 { slow.play(g, time: 3.2) }
+        #expect(slow.isSolid(g), "7 of 8 with a median under 4s")
     }
 
-    @Test func fastTrackFiveInARowUnderTwoSeconds() {
-        var engine = MasteryEngine()
-        for _ in 0..<4 { engine.play(c4, time: 1.2) }
-        #expect(!engine.isPitchSolid(c4))
-        engine.play(c4, time: 1.9)
-        #expect(engine.isPitchSolid(c4), "solid after 5, no need to wait for 8")
-
-        var oneSlow = MasteryEngine()
-        for t in [1.2, 1.2, 2.5, 1.2, 1.2] { oneSlow.play(c4, time: t) }
-        #expect(!oneSlow.isPitchSolid(c4), "one of the five was over 2s")
-
-        var broken = MasteryEngine()
-        for right in [true, true, false, true, true] { broken.play(c4, right: right, time: 1) }
-        #expect(!broken.isPitchSolid(c4))
+    @Test func gateIsPerClefAndUnlocksAPair() {
+        var engine = engine(in: "1.1")
+        let treble = engine.pool(.treble)
+        let bass = engine.pool(.bass)
+        makeSolid(&engine, Array(treble.dropLast()))
+        #expect(engine.pool(.treble).count == 3, "one start note isn't solid yet")
+        let update = engine.play(treble.last!, time: 1) // box 2
+        #expect(update.unlocked.isEmpty)
+        engine.play(treble.last!, time: 1)
+        let opened = engine.play(treble.last!, time: 1)
+        #expect(opened.unlocked.count == 2, "pairs early on: \(opened.unlocked)")
+        #expect(engine.pool(.treble).count == 5)
+        #expect(engine.pool(.bass) == bass, "bass has its own gate")
+        #expect(Set(engine.newestBatch(.treble).map(\.id)) == Set(opened.unlocked))
+        #expect(engine.newestBatch(.treble).allSatisfy(engine.needsIntro))
     }
 
-    @Test func unlockNeedsNewestSolidAndNobodyBelowBoxThree() {
-        var engine = MasteryEngine()
-        // both of the starting pair are newest. C solid, G not yet
-        for _ in 0..<5 { engine.play(c4, time: 1) }
-        #expect(!engine.isGateOpen)
-        for _ in 0..<4 { engine.play(g4, time: 1) }
-        let update = engine.play(g4, time: 1)
-        #expect(update.unlocked == [e4])
-        #expect(engine.newestBatch.map(\.id) == [e4])
-
-        // E gets solid, but C slipped to box 2: the gate stays shut
-        engine.play(c4, right: false)
-        engine.play(c4, right: false)
-        engine.play(c4, right: false)
-        #expect(engine.stats(for: c4).box == 2)
-        for _ in 0..<5 { engine.play(e4, time: 1) }
-        #expect(engine.isPitchSolid(e4))
-        #expect(!engine.isGateOpen, "C is below box 3")
-        #expect(engine.unlockedCount(1) == 3)
-
-        // one right C brings it back to box 3. older notes don't need 8 fresh attempts
-        let reopened = engine.play(c4)
-        #expect(engine.stats(for: c4).box == 3)
-        #expect(reopened.unlocked == [d4])
+    @Test func gateWaitsForEveryNoteOnTheClefAtBoxThree() {
+        var engine = engine(in: "1.1")
+        let start = engine.pool(.treble)
+        makeSolid(&engine, start)
+        let pair = engine.newestBatch(.treble)
+        #expect(pair.count == 2)
+        for k in pair { engine.intro(k) }
+        engine.play(start[0], right: false)
+        engine.play(start[0], right: false) // box 4 -> 2
+        makeSolid(&engine, pair)
+        #expect(!engine.isGateOpen(.treble), "\(start[0]) slipped to box 2")
+        engine.play(start[0], time: 1)
+        #expect(engine.isGateOpen(.treble), "box 3 again")
     }
 
-    @Test func introsComeFirstAndDontCount() {
+    @Test func introsDontCount() {
         var engine = MasteryEngine()
+        let first = engine.pool(.treble)[0]
+        engine.intro(first)
+        #expect(!engine.needsIntro(first))
+        #expect(engine.stats(for: first).attempts == 0)
+        #expect(engine.stats(for: first).box == 1)
+        #expect(engine.metNotes.contains(first))
+    }
+
+    @Test func sizeGrowsAfterFourGoodScreensAndDropsBack() {
+        var engine = engine(in: "1.2")
+        #expect(engine.screenSize == 2)
+        let notes = engine.pool(.treble)
+        let screen = Array(notes.prefix(2))
+        for i in 0..<3 {
+            let update = engine.play(screen)
+            #expect(update.screenSize == nil, "screen \(i)")
+        }
+        #expect(engine.play(screen).screenSize == 3)
+        // three bad screens at 3 drop it back to 2
+        let three = Array(notes.prefix(3))
+        engine.play(three, right: false)
+        engine.play(three, right: false)
+        #expect(engine.play(three, right: false).screenSize == 2)
+        // never below the lesson's range
+        for _ in 0..<6 { engine.play(screen, right: false) }
+        #expect(engine.screenSize == 2)
+    }
+
+    @Test func screensAtAnotherSizeDontCountTowardGrowing() {
+        var engine = engine(in: "1.2")
+        let notes = engine.pool(.treble)
+        for _ in 0..<6 { engine.play(Array(notes.prefix(3))) } // stretch-sized, size is 2
+        #expect(engine.screenSize == 2)
+        for _ in 0..<6 { engine.play(Array(notes.prefix(2)), reason: .warmUp) }
+        #expect(engine.screenSize == 2, "warm-up and easing screens don't count")
+    }
+
+    @Test func lessonCompletesAndTheNextOneStarts() {
+        var engine = engine(in: "1.1")
         var rng = SeededRandom(seed: 1)
-        let first = engine.pickNext(using: &rng)
-        #expect(first.id == c4 && engine.needsIntro(first))
-        engine.intro(first.id)
-        #expect(engine.stats(for: c4).attempts == 0)
-        #expect(engine.stats(for: c4).box == 1)
-        let second = engine.pickNext(using: &rng)
-        #expect(second.id == g4 && engine.needsIntro(second))
-        engine.intro(second.id)
-        let third = engine.pickNext(using: &rng)
-        #expect(!engine.needsIntro(third))
-    }
-
-    @Test func pickerNeverThreeInARowAcrossUnitsAndIntros() {
-        var engine = MasteryEngine()
-        // a kid who's quick and right: flies through the units, lots of intros and unit changes
-        let picks = engine.simulate(4000, seed: 7)
-        #expect(maxRun(picks) <= 2)
-        #expect(engine.state.completedUnits.count >= 6, "crossed several unit boundaries")
-
-        // and a kid who struggles: stays on small pools for a long time
-        var slow = MasteryEngine()
-        var rng = SeededRandom(seed: 99)
-        let slowPicks = slow.simulate(4000, seed: 8) { _ in (unitInterval(&rng) < 0.6, 3.5, true) }
-        #expect(maxRun(slowPicks) <= 2)
-    }
-
-    @Test func poolOfExactlyTwoAlternatesAtLeastEveryThird() {
-        var engine = MasteryEngine()
-        engine.intro(c4)
-        engine.intro(g4)
-        // keep the pool at two: never solid
-        let picks = engine.simulate(2000, seed: 3) { _ in (false, 5, nil) }
-        #expect(Set(picks) == [c4, g4])
-        #expect(maxRun(picks) <= 2)
-    }
-
-    @Test func newestIsExcludedAfterTwoInARow() {
-        var engine = MasteryEngine()
-        for id in [c4, g4] { engine.intro(id); for _ in 0..<5 { engine.play(id, time: 1) } }
-        #expect(engine.newestBatch.map(\.id) == [e4])
-        engine.intro(e4)
-        var rng = SeededRandom(seed: 5)
-        var picks: [ItemID] = []
-        for _ in 0..<3000 { picks.append(engine.pickNext(using: &rng).id) }
-        #expect(maxRun(picks) <= 2)
-        // newest still gets close to its 25% even with the cap on runs
-        let share = Double(picks.filter { $0 == e4 }.count) / Double(picks.count)
-        #expect(share > 0.2 && share < 0.3, "newest share \(share)")
-    }
-
-    @Test func lowBoxesGetShownMore() {
-        var engine = MasteryEngine()
-        for id in [c4, g4] { engine.intro(id); for _ in 0..<5 { engine.play(id, time: 1) } }
-        engine.intro(e4)
-        // knock C down to box 1, G stays at 5
-        for _ in 0..<5 { engine.play(c4, right: false) }
-        var rng = SeededRandom(seed: 11)
-        var counts: [ItemID: Int] = [:]
-        for _ in 0..<6000 { counts[engine.pickNext(using: &rng).id, default: 0] += 1 }
-        #expect(counts[c4]! > counts[g4]! * 3, "box 1 is weighted 5x box 5: \(counts)")
-    }
-
-    @Test func reviewUnitThreeCompletesOnFreshSolidAttempts() {
-        var engine = MasteryEngine()
-        engine.moveToUnit(3)
-        #expect(engine.newestBatch.isEmpty)
-        #expect(engine.pool.count == 10, "units 1 and 2 on the grand staff")
-        // everything is box 1 (skipped there), so the gate is shut until each is box 3
-        for item in engine.pool { engine.play(item.id) }
-        #expect(engine.unit.number == 3)
-        var update = MasteryUpdate()
-        for item in engine.pool { update = engine.play(item.id) }
-        #expect(update.completedUnit == 3)
-        #expect(update.enteredUnit == 4)
-        #expect(update.unlocked == ["treble:A4"])
-        #expect(engine.unit.number == 4)
-        #expect(engine.state.unitRecent.isEmpty)
-    }
-
-    @Test func movingBackNeedsFreshAttemptsThenReturns() {
-        var engine = MasteryEngine()
-        var seed: UInt64 = 0
-        while engine.unit.number < 5 {
-            engine.simulate(1, seed: seed)
-            seed += 1
+        var entered: LessonID?
+        for _ in 0..<200 where entered == nil {
+            let pick = engine.pickScreen(using: &rng)
+            if let intro = pick.intro {
+                engine.intro(intro)
+                continue
+            }
+            let update = engine.play(pick.item.notes.flatMap(\.keys), time: 1)
+            entered = update.enteredLesson
         }
-        #expect(engine.status(ofUnit: 1) == .completed)
-
-        engine.moveToUnit(1)
-        #expect(engine.status(ofUnit: 1) == .current)
-        #expect(engine.pool.count == 5)
-        #expect(engine.newestBatch.map(\.id) == [f4])
-        #expect(engine.isGateOpen, "his old stats are still solid")
-        // but the unit wants fresh attempts before moving on (3s each, so no fast track)
-        var update = MasteryUpdate()
-        for _ in 0..<6 {
-            update = engine.play(c4, time: 3)
-            #expect(update.completedUnit == nil)
-        }
-        update = engine.play(c4, time: 3)
-        #expect(update.completedUnit == 1, "7 fresh right answers")
-        #expect(update.enteredUnit == 5, "back to where he was, not unit 2")
+        #expect(entered == "1.2")
+        #expect(engine.state.completedLessons == ["1.1"])
+        #expect(engine.pool.count == 10)
+        #expect(engine.screenSize >= 2, "1.2 starts at 2 per screen")
+        #expect(engine.status(ofLesson: "1.1") == .completed)
+        #expect(engine.status(ofLesson: "1.2") == .current)
+        #expect(engine.status(ofLesson: "1.3") == .upcoming)
     }
 
-    @Test func skippingAheadDoesNotMarkUnitsDone() {
-        var engine = MasteryEngine()
-        engine.moveToUnit(4)
-        #expect(engine.status(ofUnit: 2) == .skipped)
-        #expect(engine.status(ofUnit: 5) == .upcoming)
-        #expect(engine.pool.map(\.id).first == "treble:A4")
-        #expect(engine.pool.count == 6, "A4 plus unit 1 review")
+    @Test func lessonNeedsEnoughScreensEvenWhenHeKnowsEverything() {
+        var engine = engine(in: "1.2")
+        let t = engine.pool(.treble), b = engine.pool(.bass)
+        // every note twice (box 3), right and quick, over exactly 10 screens
+        let screens = [[t[0], t[1]], [t[2], t[3]], [t[4], t[0]], [t[1], t[2]], [t[3], t[4]],
+                       [b[0], b[1]], [b[2], b[3]], [b[4], b[0]], [b[1], b[2]], [b[3], b[4]]]
+        for (i, screen) in screens.enumerated() {
+            engine.play(screen, time: 1)
+            #expect(engine.lesson.id == (i < 9 ? "1.2" : "1.3"), "after screen \(i + 1)")
+        }
     }
 
-    @Test func rhythmSlipNeverHoldsBackTheBoxGate() {
+    @Test func parentJumpsAndMovingBack() {
         var engine = MasteryEngine()
-        engine.moveToUnit(10)
-        let first = engine.pool[0].id, second = engine.pool[1].id
-        // pitch right every time, rhythm wrong every time
-        for _ in 0..<8 {
-            engine.play(first, time: 1, rhythmOK: false)
-            engine.play(second, time: 1, rhythmOK: false)
-        }
-        #expect(engine.stats(for: first).box == 5, "rhythm never moves the pitch box")
-        #expect(engine.stats(for: first).rhythmBox == 1)
-        #expect(engine.isPitchSolid(first) && !engine.isRhythmSolid(first))
-        #expect(!engine.isGateOpen, "the newest rhythm items need their rhythm to unlock the next rhythm")
-
-        // rhythm comes good on both
-        for _ in 0..<5 {
-            engine.play(first, time: 1, rhythmOK: true)
-        }
-        var update = MasteryUpdate()
-        for _ in 0..<5 {
-            update = engine.play(second, time: 1, rhythmOK: true)
-        }
-        #expect(update.unlocked.count == 1)
-
-        // now rhythm slips on an older item: box gate uses the pitch box only
-        let third = update.unlocked[0]
-        for _ in 0..<4 { engine.play(first, time: 1, rhythmOK: false) }
-        #expect(engine.stats(for: first).rhythmBox < 3)
-        for _ in 0..<4 { engine.play(third, time: 1, rhythmOK: true) }
-        update = engine.play(third, time: 1, rhythmOK: true)
-        #expect(update.unlocked.count == 1, "a rhythm slip on an old item doesn't block the next unlock")
-    }
-
-    @Test func rhythmNotJudgedLeavesTheRhythmTrackAlone() {
-        var engine = MasteryEngine()
-        engine.moveToUnit(10)
-        let id = engine.pool[0].id
-        engine.play(id, right: false, rhythmOK: nil)
-        #expect(engine.stats(for: id).rhythmAttempts == 0)
-        #expect(engine.stats(for: id).attempts == 1)
+        engine.moveToLesson("1.3")
+        #expect(engine.lesson.id == "1.3")
+        #expect(engine.pool.count == 10, "known notes unlock on entry")
+        #expect(engine.pendingIntros.isEmpty, "known notes don't get intros")
+        #expect(engine.status(ofLesson: "1.1") == .skipped)
+        #expect(engine.status(ofLevel: 1) == .current)
+        engine.moveToLevel(1)
+        #expect(engine.lesson.id == "1.1", "a level starts at its first lesson not done")
+        #expect(engine.moveToLesson("9.9").isEmpty)
+        #expect(engine.lesson.id == "1.1")
     }
 
     @Test func stateRoundTripsThroughJSONAndPicksTheSame() throws {
-        var engine = MasteryEngine()
-        engine.simulate(400, seed: 4) { item in (item.id != "treble:D4", 1.5, true) }
+        var engine = engine(in: "1.1")
+        var rng = SeededRandom(seed: 9)
+        for _ in 0..<15 {
+            let pick = engine.pickScreen(using: &rng)
+            engine.play(pick.item.notes.flatMap(\.keys), right: true, time: 1.2)
+        }
         let data = try JSONEncoder().encode(engine.state)
-        let restoredState = try JSONDecoder().decode(MasteryState.self, from: data)
-        #expect(restoredState == engine.state)
-        var restored = MasteryEngine(state: restoredState)
-        let a = engine.simulate(200, seed: 9)
-        let b = restored.simulate(200, seed: 9)
-        #expect(a == b)
+        let restored = MasteryEngine(state: try JSONDecoder().decode(MasteryState.self, from: data))
+        #expect(restored.state == engine.state)
+        var a = engine, b = restored
+        var r1 = SeededRandom(seed: 4), r2 = SeededRandom(seed: 4)
+        for _ in 0..<20 {
+            #expect(a.pickScreen(using: &r1) == b.pickScreen(using: &r2))
+        }
     }
 
     @Test func fluencyGrowsAndPeakNeverShrinks() {
-        var engine = MasteryEngine()
-        #expect(engine.progress(for: c4)!.fluency == 0)
-        for _ in 0..<6 { engine.play(c4, time: 1) }
-        let high = engine.progress(for: c4)!
-        #expect(high.fluency > 0.9)
-        for _ in 0..<3 { engine.play(c4, right: false, time: 6) }
-        let after = engine.progress(for: c4)!
-        #expect(after.fluency < high.fluency)
-        #expect(after.peakFluency == high.peakFluency, "his muncher never shrinks")
-        #expect(engine.allProgress.map(\.id) == [c4])
+        var engine = engine(in: "1.1")
+        let g = engine.pool(.treble)[0]
+        for _ in 0..<4 { engine.play(g, time: 1) }
+        let peak = engine.stats(for: g).peakFluency
+        #expect(peak > 0.5)
+        for _ in 0..<3 { engine.play(g, right: false, time: 5) }
+        #expect(engine.fluency(engine.stats(for: g)) < peak)
+        #expect(engine.stats(for: g).peakFluency == peak)
+        #expect(engine.allProgress.map(\.key) == [g])
     }
 
-    @Test func playsTheWholeCurriculum() {
-        var engine = MasteryEngine()
-        var picks = 0
-        while !engine.isCurriculumComplete, picks < 20_000 {
-            engine.simulate(50, seed: UInt64(picks))
-            picks += 50
-        }
-        #expect(engine.isCurriculumComplete, "a quick, right kid gets through all 12 units")
-        #expect(picks < 5000, "took \(picks) picks")
-        #expect(engine.state.completedUnits == Set(1...12))
-        #expect(engine.unit.number == 12, "stays on the last unit")
+    @Test func missingKeysFallBackToDefaults() throws {
+        let state = try JSONDecoder().decode(MasteryState.self, from: Data("{}".utf8))
+        #expect(state.lesson == "1.1")
+        #expect(MasteryEngine(state: state).pool.count == 6)
+        let config = try JSONDecoder().decode(NoteCoreConfig.self, from: Data(#"{"sessionMaxItems": 30}"#.utf8))
+        #expect(config.sessionMaxItems == 30)
+        #expect(config.fastTrackCount == NoteCoreConfig.default.fastTrackCount)
+    }
+
+    @Test func everyConfigFieldDecodes() throws {
+        var config = NoteCoreConfig()
+        config.newestShare = 0.31
+        config.sizeWindow = 6
+        config.lessonMinScreens = 12
+        config.keptTryingChance = 0.7
+        let decoded = try JSONDecoder().decode(NoteCoreConfig.self, from: JSONEncoder().encode(config))
+        #expect(decoded == config)
     }
 }
 
-@Suite struct SavedStateTests {
-    @Test func missingKeysFallBackToDefaults() throws {
-        let empty = Data("{}".utf8)
-        #expect(try JSONDecoder().decode(NoteCoreConfig.self, from: empty) == NoteCoreConfig())
-        #expect(try JSONDecoder().decode(MasteryState.self, from: empty) == MasteryState())
-        #expect(try JSONDecoder().decode(ItemStats.self, from: empty) == ItemStats())
+/// His progress from round 1 (per curated item, units) must load, keep the single-note
+/// stats where clef and pitch match, and never crash.
+@Suite struct MigrationTests {
+    /// Shaped like a real round-1 save: unit 1 with C4-F4 played and G4 met, a few
+    /// items from later units, a whole config's worth of other keys.
+    static let roundOneState = #"""
+    {"unit":1,"unlockedCounts":{"1":5,"2":2},"completedUnits":[],
+     "stats":{
+       "treble:C4":{"box":4,"recent":[{"firstTry":true,"responseTime":1.8},{"firstTry":true,"responseTime":1.5}],"attempts":14,"firstTryCount":12,"rhythmBox":1,"rhythmRecent":[],"rhythmAttempts":0,"peakFluency":0.62},
+       "treble:G4":{"box":3,"recent":[{"firstTry":true,"responseTime":2.4}],"attempts":9,"firstTryCount":7,"rhythmBox":1,"rhythmRecent":[],"rhythmAttempts":0,"peakFluency":0.41},
+       "treble:E4":{"box":2,"recent":[],"attempts":3,"firstTryCount":2,"rhythmBox":1,"rhythmRecent":[],"rhythmAttempts":0,"peakFluency":0.2},
+       "treble:C4-D4":{"box":2,"recent":[],"attempts":2,"firstTryCount":1,"rhythmBox":1,"rhythmRecent":[],"rhythmAttempts":0,"peakFluency":0.1},
+       "treble:G4/q-G4/q-G4/h":{"box":1,"recent":[],"attempts":1,"firstTryCount":0,"rhythmBox":2,"rhythmRecent":[true],"rhythmAttempts":1,"peakFluency":0}
+     },
+     "introduced":["treble:C4","treble:G4","treble:E4","treble:D4","treble:C4-D4"],
+     "unitRecent":[{"firstTry":true,"responseTime":1.2}],
+     "recentPicks":["treble:C4","treble:E4"]}
+    """#
+
+    @Test func roundOneStateLoadsAndKeepsMatchingNotes() throws {
+        let state = try JSONDecoder().decode(MasteryState.self, from: Data(Self.roundOneState.utf8))
+        #expect(Set(state.stats.keys) == ["treble:C4", "treble:G4", "treble:E4"], "group and rhythm items are dropped")
+        #expect(state.stats["treble:G4"]?.box == 3)
+        #expect(state.stats["treble:G4"]?.peakFluency == 0.41)
+        #expect(state.introduced == ["treble:C4", "treble:G4", "treble:E4", "treble:D4"])
+        let engine = MasteryEngine(state: state)
+        #expect(engine.lesson.id == "1.1")
+        #expect(engine.pool(.treble).count == 3)
+        #expect(!engine.needsIntro(key("treble:G4")), "he met G4 in round 1")
+        #expect(engine.allProgress.map(\.id) == ["treble:C4", "treble:E4", "treble:G4"])
     }
 
-    @Test func stateSavedBeforeAFieldExistedStillLoads() throws {
-        var engine = MasteryEngine()
-        engine.simulate(200, seed: 3)
-        // pretend an older build saved this, before peakFluency and recentPicks existed
-        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(engine.state)) as! [String: Any]
-        json.removeValue(forKey: "recentPicks")
-        var stats = json["stats"] as! [String: [String: Any]]
-        for key in stats.keys { stats[key]!.removeValue(forKey: "peakFluency") }
-        json["stats"] = stats
-        let old = try JSONSerialization.data(withJSONObject: json)
-        let state = try JSONDecoder().decode(MasteryState.self, from: old)
-        #expect(state.unit == engine.state.unit)
-        #expect(state.stats.mapValues(\.box) == engine.state.stats.mapValues(\.box))
-        #expect(state.recentPicks.isEmpty)
+    @Test func garbageNeverCrashes() {
+        for json in ["[]", "\"x\"", #"{"stats": 5}"#, #"{"unit": "one"}"#, "{"] {
+            _ = try? JSONDecoder().decode(MasteryState.self, from: Data(json.utf8))
+        }
+        let unknownLesson = try? JSONDecoder().decode(MasteryState.self, from: Data(#"{"lesson":"7.7"}"#.utf8))
+        #expect(unknownLesson.map { MasteryEngine(state: $0).lesson.id } == "1.1", "an unknown lesson falls back to the first")
     }
 
-    @Test func partialConfigKeepsTheRestAtDefaults() throws {
-        let config = try JSONDecoder().decode(NoteCoreConfig.self, from: Data(#"{"sessionMaxItems": 30}"#.utf8))
-        #expect(config.sessionMaxItems == 30)
-        #expect(config.solidRequired == 7)
+    @Test func roundOneAttemptsAndSummariesStillDecode() throws {
+        let attempt = #"{"itemID":"treble:C4","unit":1,"wasIntro":false,"firstTry":true,"wrongPresses":0,"almostPresses":0,"hints":0,"responseTime":1.4}"#
+        let decoded = try JSONDecoder().decode(AttemptResult.self, from: Data(attempt.utf8))
+        #expect(decoded.itemID == "treble:C4" && decoded.firstTry && decoded.responseTime == 1.4)
+        let summary = #"{"startUnit":1,"endUnit":1,"itemsPlayed":12,"firstTryCount":10,"activeDuration":200,"attempts":[],"unlocked":["treble:E4"],"completedUnits":[],"practiced":[]}"#
+        let s = try JSONDecoder().decode(SessionSummary.self, from: Data(summary.utf8))
+        #expect(s.unlocked == ["treble:E4"])
+        #expect(s.activeDuration == 200)
     }
 }

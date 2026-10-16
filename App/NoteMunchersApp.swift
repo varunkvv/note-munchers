@@ -23,8 +23,8 @@ struct RootView: View {
     var body: some View {
         ZStack {
             #if DEBUG
-            if let number = model.galleryUnit, let unit = Curriculum.standard.unit(number) {
-                StaffGallery(unit: unit)
+            if let id = model.galleryLesson, let lesson = Curriculum.standard.lesson(id) {
+                StaffGallery(lesson: lesson)
             } else {
                 screens
             }

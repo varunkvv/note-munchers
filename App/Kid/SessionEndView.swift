@@ -24,13 +24,11 @@ struct SessionEndView: View {
         let isNew: Bool
     }
 
+    /// Every note he played, in the order first played. New = met for the first time
+    /// this session (it hatched before its intro).
     static func fed(_ summary: SessionSummary) -> [Fed] {
-        let new = Set(summary.unlocked)
-        var list = summary.practiced.map { Fed(id: $0.id, before: $0.fluencyBefore, after: $0.fluencyAfter, isNew: new.contains($0.id)) }
-        for id in summary.unlocked where !list.contains(where: { $0.id == id }) {
-            list.append(Fed(id: id, before: 0, after: 0, isNew: true))
-        }
-        return list
+        let new = Set(summary.screens.filter(\.wasIntro).flatMap { $0.notes.map(\.itemID) })
+        return summary.practiced.map { Fed(id: $0.id, before: $0.fluencyBefore, after: $0.fluencyAfter, isNew: new.contains($0.id)) }
     }
 
     var body: some View {
@@ -39,7 +37,7 @@ struct SessionEndView: View {
             let columns = max(1, min(fed.count, Int(proxy.size.width / 230)))
             let rows = (fed.count + columns - 1) / columns
             let room = proxy.size.height - 220
-            // a session feeds at most its item count, so everything fits without scrolling
+            // a session feeds at most the lesson's notes (23 in level 3), so rows shrink to fit without scrolling
             let height = min(260, max(60, (room - 40) / CGFloat(max(1, rows)) - 20))
             let button = min(150, proxy.size.width * 0.17)
             ZStack {

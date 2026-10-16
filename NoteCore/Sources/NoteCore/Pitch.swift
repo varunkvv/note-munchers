@@ -1,5 +1,5 @@
-/// A white-key letter name. Sharps and flats are out of scope for the curriculum,
-/// but black keys still come in over MIDI, so `Pitch` can represent them.
+/// A white-key letter name. Black keys come in over MIDI too, so `Pitch` can
+/// represent them, and the curriculum uses one (F#, from level 3).
 public enum Letter: String, CaseIterable, Codable, Hashable, Sendable {
     case c = "C", d = "D", e = "E", f = "F", g = "G", a = "A", b = "B"
 
@@ -29,7 +29,7 @@ public enum Letter: String, CaseIterable, Codable, Hashable, Sendable {
         }
     }
 
-    /// "C", "D" ... what the voice says after a right key.
+    /// "C", "D" ...
     public var name: String { rawValue }
 }
 
@@ -96,4 +96,31 @@ public struct Pitch: Hashable, Comparable, Codable, Sendable, CustomStringConver
     public func isSamePitchClass(as other: Pitch) -> Bool { pitchClass == other.pitchClass }
 
     public static func < (lhs: Pitch, rhs: Pitch) -> Bool { lhs.midi < rhs.midi }
+}
+
+/// A note the voice can name: the seven white keys and F sharp (G major, level 3 on).
+/// A finite set on purpose, so recorded voice clips can cover every line that names one.
+public enum NoteName: String, CaseIterable, Codable, Hashable, Sendable {
+    case c = "C", d = "D", e = "E", f = "F", fSharp = "F#", g = "G", a = "A", b = "B"
+
+    /// nil for black keys other than F#. The curriculum never asks for those.
+    public init?(_ pitch: Pitch) {
+        if let letter = pitch.letter {
+            self.init(rawValue: letter.rawValue)
+        } else if pitch.pitchClass == 6 {
+            self = .fSharp
+        } else {
+            return nil
+        }
+    }
+
+    /// The letter on the staff (F for F#).
+    public var letter: Letter {
+        self == .fSharp ? .f : Letter(rawValue: rawValue)!
+    }
+
+    public var isSharp: Bool { self == .fSharp }
+
+    /// "F sharp", "D". How it's said out loud.
+    public var spoken: String { isSharp ? "\(letter.name) sharp" : rawValue }
 }

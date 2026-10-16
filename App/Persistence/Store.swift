@@ -67,21 +67,26 @@ final class Store {
 
     // MARK: history
 
+    /// One note. The record's columns are round 1's and stay as they are (changing a
+    /// column's type would stop the store from opening): `itemID` is the note id,
+    /// `unit` holds the level. The lesson id is in the JSON.
     func addAttempt(_ attempt: AttemptResult, at date: Date = Date(), commit: Bool = true) {
         context.insert(AttemptRecord(
-            date: date, itemID: attempt.itemID, unit: attempt.unit, wasIntro: attempt.wasIntro,
+            date: date, itemID: attempt.itemID, unit: attempt.level, wasIntro: attempt.wasIntro,
             firstTry: attempt.firstTry, responseTime: attempt.responseTime, hints: attempt.hints.rawValue,
             wrongPresses: attempt.wrongPresses, almostPresses: attempt.almostPresses,
-            rhythmOK: attempt.rhythm?.isOK, resultData: (try? encoder.encode(attempt)) ?? Data()
+            rhythmOK: nil, resultData: (try? encoder.encode(attempt)) ?? Data()
         ))
         if commit { save() }
     }
 
+    /// `itemsPlayed` and `firstTryCount` count notes, `startUnit` / `endUnit` hold levels.
     func addSession(_ summary: SessionSummary, startedAt: Date, endedAt: Date = Date()) {
+        let level = { (id: LessonID) in Curriculum.standard.lesson(id)?.level ?? 0 }
         context.insert(SessionRecord(
-            startedAt: startedAt, endedAt: endedAt, itemsPlayed: summary.itemsPlayed,
-            firstTryCount: summary.firstTryCount, activeDuration: summary.activeDuration,
-            startUnit: summary.startUnit, endUnit: summary.endUnit,
+            startedAt: startedAt, endedAt: endedAt, itemsPlayed: summary.notesPlayed,
+            firstTryCount: summary.firstTryNotes, activeDuration: summary.activeDuration,
+            startUnit: level(summary.startLesson), endUnit: level(summary.endLesson),
             summaryData: (try? encoder.encode(summary)) ?? Data()
         ))
         save()

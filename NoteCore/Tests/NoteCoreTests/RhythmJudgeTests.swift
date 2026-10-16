@@ -15,7 +15,7 @@ func performance(_ lengths: [Double], start: Double = 10) -> (onsets: [Double], 
 
 @Suite struct RhythmJudgeTests {
     let judge = RhythmJudge()
-    let rhythmItems = (10...12).flatMap { Curriculum.standard.unit($0)!.newItems }
+    let rhythms = RhythmFixtures.roundOne
 
     func run(_ values: [NoteValue], _ lengths: [Double]) -> RhythmResult {
         let p = performance(lengths)
@@ -23,11 +23,10 @@ func performance(_ lengths: [Double], start: Double = 10) -> (onsets: [Double], 
     }
 
     @Test func exactAtAnyTempoPasses() {
-        for item in rhythmItems {
-            let values = item.values!
+        for values in rhythms {
             for beat in [0.3, 0.6, 1.2, 2.4] { // double speed, normal, half speed, quarter speed
                 let result = run(values, values.map { $0.beats * beat })
-                #expect(result.isOK, "\(item.id) at beat \(beat)")
+                #expect(result.isOK, "\(RhythmFixtures.name(values)) at beat \(beat)")
                 #expect(abs(result.beat - beat) < 1e-9)
             }
         }
@@ -48,16 +47,15 @@ func performance(_ lengths: [Double], start: Double = 10) -> (onsets: [Double], 
         #expect(result.nudgeIndex == 0)
     }
 
-    /// Every half in every curriculum line, played as a quarter, comes back too short.
+    /// Every half in every fixture line, played as a quarter, comes back too short.
     @Test func everyCurriculumHalfShortenedIsTooShort() {
-        for item in rhythmItems {
-            let values = item.values!
+        for values in rhythms {
             for (i, value) in values.enumerated() where value == .half {
                 var lengths = values.map { $0.beats * 0.6 }
                 lengths[i] = NoteValue.quarter.beats * 0.6
                 let result = run(values, lengths)
-                #expect(result.verdicts[i] == .tooShort, "\(item.id) note \(i)")
-                #expect(result.verdicts.enumerated().allSatisfy { $0.offset == i || $0.element == .ok }, "\(item.id) only note \(i) is off")
+                #expect(result.verdicts[i] == .tooShort, "\(RhythmFixtures.name(values)) note \(i)")
+                #expect(result.verdicts.enumerated().allSatisfy { $0.offset == i || $0.element == .ok }, "\(RhythmFixtures.name(values)) only note \(i) is off")
             }
         }
     }
@@ -65,14 +63,13 @@ func performance(_ lengths: [Double], start: Double = 10) -> (onsets: [Double], 
     /// Every quarter next to an eighth, played as an eighth, comes back too short.
     @Test func everyCurriculumQuarterNextToAnEighthShortenedIsTooShort() {
         var checked = 0
-        for item in rhythmItems {
-            let values = item.values!
+        for values in rhythms {
             for (i, value) in values.enumerated() where value == .quarter {
                 let neighbours = [i - 1, i + 1].filter { values.indices.contains($0) }.map { values[$0] }
                 guard neighbours.contains(.eighth) else { continue }
                 var lengths = values.map { $0.beats * 0.6 }
                 lengths[i] = NoteValue.eighth.beats * 0.6
-                #expect(run(values, lengths).verdicts[i] == .tooShort, "\(item.id) note \(i)")
+                #expect(run(values, lengths).verdicts[i] == .tooShort, "\(RhythmFixtures.name(values)) note \(i)")
                 checked += 1
             }
         }
@@ -81,12 +78,11 @@ func performance(_ lengths: [Double], start: Double = 10) -> (onsets: [Double], 
 
     /// Every quarter (not last) played as a half comes back too long.
     @Test func everyCurriculumQuarterPlayedAsHalfIsTooLong() {
-        for item in rhythmItems {
-            let values = item.values!
+        for values in rhythms {
             for (i, value) in values.enumerated().dropLast() where value == .quarter {
                 var lengths = values.map { $0.beats * 0.6 }
                 lengths[i] = NoteValue.half.beats * 0.6
-                #expect(run(values, lengths).verdicts[i] == .tooLong, "\(item.id) note \(i)")
+                #expect(run(values, lengths).verdicts[i] == .tooLong, "\(RhythmFixtures.name(values)) note \(i)")
             }
         }
     }
@@ -94,14 +90,13 @@ func performance(_ lengths: [Double], start: Double = 10) -> (onsets: [Double], 
     @Test func jitteryButRoughlyRightPasses() {
         var rng = SeededRandom(seed: 42)
         for trial in 0..<2000 {
-            let item = rhythmItems[trial % rhythmItems.count]
-            let values = item.values!
+            let values = rhythms[trial % rhythms.count]
             let beat = 0.4 + Double(rng.next() % 1000) / 1000 // 0.4s to 1.4s per quarter
             let lengths = values.map { value -> Double in
                 let jitter = (Double(rng.next() % 1000) / 1000 - 0.5) * 0.4 // +-20%
                 return value.beats * beat * (1 + jitter)
             }
-            #expect(run(values, lengths).isOK, "\(item.id) trial \(trial)")
+            #expect(run(values, lengths).isOK, "\(RhythmFixtures.name(values)) trial \(trial)")
         }
     }
 
@@ -140,9 +135,9 @@ func performance(_ lengths: [Double], start: Double = 10) -> (onsets: [Double], 
 
     /// The main thing to catch: every note the same length never passes.
     @Test func everyNoteTheSameLengthNeverPasses() {
-        for item in rhythmItems {
+        for values in rhythms {
             for length in [0.3, 0.6, 1.0] {
-                #expect(!run(item.values!, item.values!.map { _ in length }).isOK, "\(item.id) at \(length)s each")
+                #expect(!run(values, values.map { _ in length }).isOK, "\(RhythmFixtures.name(values)) at \(length)s each")
             }
         }
     }
@@ -157,4 +152,18 @@ func performance(_ lengths: [Double], start: Double = 10) -> (onsets: [Double], 
         #expect(atSettle == muchLater)
         #expect(atSettle.isOK)
     }
+}
+
+enum RhythmFixtures {
+    static let e = NoteValue.eighth, q = NoteValue.quarter, h = NoteValue.half
+
+    /// The round-1 curriculum's rhythm lines (units 10-12), kept as fixed cases for the judge.
+    static let roundOne: [[NoteValue]] = [
+        [q, q, h], [h, q, q], [q, h, q], [q, q, h, q, q, h], [h, h, q, q, h], [q, q, q, q, h, h],
+        [e, e, q, h], [q, e, e, q, q], [e, e, e, e, h], [h, e, e, q], [q, q, e, e, q], [e, e, q, e, e, q],
+        [q, q, h, q, q, h], [q, q, q, q, q, q, h], [h, q, q, q, q, h], [e, e, e, e, h],
+        [e, e, q, q, q, h, h], [q, e, e, h],
+    ]
+
+    static func name(_ values: [NoteValue]) -> String { values.map(\.rawValue).joined(separator: " ") }
 }

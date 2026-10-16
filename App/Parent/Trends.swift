@@ -89,31 +89,17 @@ struct Trends {
     }
 }
 
-/// Parent-facing names for items. The kid never sees these.
+/// Parent-facing names for notes. The kid never sees these.
 enum ItemLabel {
+    /// "G4 treble", "F#3 bass". Round-1 item ids that aren't notes come back as they are.
     static func text(_ id: ItemID) -> String {
-        guard let item = Curriculum.standard.item(id) else { return id }
-        let clef = item.clef == .treble ? "treble" : "bass"
-        switch item.kind {
-        case .note:
-            return "\(item.notes[0].pitches[0].name) \(clef)"
-        case .group:
-            return item.notes.map { $0.pitches[0].name }.joined(separator: " ") + " (\(clef))"
-        case .chord:
-            return item.notes[0].pitches.map(\.name).joined(separator: "+")
-        case .rhythm:
-            let pitches = Set(item.notes.flatMap(\.pitches))
-            let values = item.notes.map { $0.value?.rawValue ?? "" }
-            if pitches.count == 1, let pitch = pitches.first {
-                return "\(pitch.name): " + values.joined(separator: " ")
-            }
-            return zip(item.notes, values).map { "\($0.pitches[0].naturalLetter.name)\($1)" }.joined(separator: " ")
-        }
+        guard let key = NoteKey(id: id) else { return id }
+        return "\(key.pitch.name) \(key.clef.rawValue)"
     }
 }
 
 /// One specific thing for the parent to celebrate with him this week (relatedness:
-/// noticing together). Picks the most concrete one: a finished unit, notes he met,
+/// noticing together). Picks the most concrete one: a finished lesson, notes he met,
 /// a note he finds a lot faster, more right first try, then simply showing up.
 enum Celebration {
     static func suggest(engine: MasteryEngine, trends: Trends, records: [AttemptRecord], sessions: [SessionRecord], now: Date = Date()) -> String {
@@ -122,9 +108,10 @@ enum Celebration {
         let weekSessions = sessions.filter { $0.startedAt > weekAgo }
         let finished = weekSessions
             .compactMap { try? decoder.decode(SessionSummary.self, from: $0.summaryData) }
-            .flatMap(\.completedUnits)
-        if let unit = finished.max(), let title = engine.curriculum.unit(unit)?.title {
-            return "He finished unit \(unit) (\(title.lowercased())) this week. Ask him to play you his favourite note from it."
+            .flatMap(\.completedLessons)
+        if let id = finished.max(by: { (engine.curriculum.index(of: $0) ?? 0) < (engine.curriculum.index(of: $1) ?? 0) }),
+           let lesson = engine.curriculum.lesson(id) {
+            return "He finished lesson \(id) (\(lesson.title.lowercased())) this week. Ask him to play you his favourite note from it."
         }
 
         // notes whose first counted try was this week
@@ -132,7 +119,7 @@ enum Celebration {
         for record in records where firstSeen[record.itemID] == nil {
             firstSeen[record.itemID] = record.date
         }
-        let met = engine.curriculum.allItems.map(\.id).filter { (firstSeen[$0] ?? .distantPast) > weekAgo }
+        let met = engine.curriculum.allKeys.map(\.id).filter { (firstSeen[$0] ?? .distantPast) > weekAgo }
         if !met.isEmpty {
             let names = met.prefix(3).map(ItemLabel.text)
             let list = names.count == 1 ? names[0] : names.dropLast().joined(separator: ", ") + " and " + names.last!

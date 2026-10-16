@@ -105,8 +105,8 @@ import Testing
     ]
 
     @Test func everyCurriculumNoteInBothClefs() throws {
-        let pitches = Set(Curriculum.standard.allItems.flatMap { $0.notes.flatMap(\.pitches) })
-        #expect(pitches.count >= 25)
+        let pitches = Set(Curriculum.standard.allKeys.map(\.pitch) + Self.trebleSteps.keys.map { Pitch($0)! })
+        #expect(pitches.count >= 29)
         for pitch in pitches {
             let expectedTreble = try #require(Self.trebleSteps[pitch.name], "\(pitch.name) missing from table")
             #expect(Clef.treble.position(of: pitch).step == expectedTreble, "\(pitch.name) treble")

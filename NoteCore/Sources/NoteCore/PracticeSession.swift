@@ -1,6 +1,6 @@
 public enum SessionPhase: String, Codable, Hashable, Sendable {
     case notStarted
-    /// An item is up and he's on the first rung of the hint ladder for the current note.
+    /// A screen is up and he's on the first rung of the hint ladder for the current note.
     case prompt
     /// One step up the ladder (a wrong key, or stuck): it wobbled, still waiting.
     case waiting
@@ -8,7 +8,7 @@ public enum SessionPhase: String, Codable, Hashable, Sendable {
     case hint1
     /// Three or more: the keyboard picture lights up the key (picture only, not tappable).
     case hint2
-    /// Item done. Celebrate, then call `next(at:)` when the animation ends.
+    /// Screen done. Celebrate, then call `next(at:)` when the animation ends.
     case success
     /// Piano disconnected: the "turn on the piano" screen. Picks up where it was.
     case paused
@@ -19,29 +19,49 @@ public enum SessionPhase: String, Codable, Hashable, Sendable {
     public var isPlaying: Bool { [.prompt, .waiting, .hint1, .hint2].contains(self) }
 }
 
-/// What the voice should say. The app turns these into words (or a recorded parent
-/// voice later). The kid never sees text.
+/// Which way the right key is, after the right letter in the wrong octave.
+public enum AlmostHint: String, CaseIterable, Codable, Hashable, Sendable {
+    /// "this one is higher up"
+    case higher
+    /// "this one is lower down"
+    case lower
+    /// "this one is the middle C" (only when the note is middle C)
+    case middleC
+}
+
+/// What the voice says. A finite set of situations: the app turns each into words (and
+/// later into one of several recorded clips). Where a line names a note it's an
+/// associated value, so a clip bank needs one take per note name (A-G and F sharp).
 ///
-/// Praise is process praise only - it names what he did (mueller & dweck). Never
-/// "smart", "genius", "good boy".
+/// Voice is rare: no letter after right keys (the piano already makes the sound).
+/// NoteCore decides when to talk. Praise is process praise only - it names what he
+/// did (mueller & dweck), never "smart", "genius", "good boy".
 public enum Speech: Hashable, Codable, Sendable {
-    /// Intro of a new rhythm item, before the app plays it to him: "here's a new one! listen"
-    case newNote
-    /// Intro of a new single note, with its pitch played and the key lit: "this is D"
-    case meetNote(Letter)
-    /// Intro of a new chord or group: "these are C, E and G"
-    case meetNotes([Letter])
-    /// After a right single note: "D!"
-    case letter(Letter)
-    /// After a right group or chord: "C, E, G!"
-    case letters([Letter])
-    /// Right letter, wrong octave in a lenient unit: "that's a C! this one is the middle C".
-    /// Doesn't count against him.
-    case almost(played: Pitch, expected: Pitch)
-    /// Now and then after a first-try success: "you looked carefully!"
-    case lookedCarefully
-    /// Every success that needed a hint: "you kept trying and found it!"
+    /// Session start: "hi! let's play"
+    case hello
+    /// A new note's intro, right after its pitch plays and the key lights up: "this is D"
+    case meetNote(NoteName)
+    /// First screen of a rhythm lesson, before the app plays it to him: "here's a new one! listen"
+    case listen
+    /// First screen of a two-at-once lesson, before the app plays it: "two at once! listen"
+    case twoAtOnce
+    /// Right letter, wrong octave in a lenient lesson: "that's a C! this one is the
+    /// middle C" / "...higher up" / "...lower down". Doesn't count against him.
+    case almost(NoteName, AlmostHint)
+    /// The natural next to a sharp note (F on an F# note): "that's F - this one is F
+    /// sharp, the black key". The value is the sharp note.
+    case sharpHint(NoteName)
+    /// Hint ladder, second step, just before the app plays the right pitch: "listen"
+    case hintListen
+    /// Hint ladder, third step, as the keyboard picture lights up: "this one is D -
+    /// here it is"
+    case hintShow(NoteName)
+    /// Hint ladder, third step, on two notes at once: "here they are"
+    case hintLook
+    /// Now and then after a screen that needed a hint: "you kept trying and found it!"
     case keptTrying
+    /// Now and then after a screen he read right first try: "you looked carefully!"
+    case lookedCarefully
     /// Rhythm: a note was too short. "hold this one longer"
     case holdLonger
     /// Shown with the paused screen.
@@ -53,21 +73,21 @@ public enum Speech: Hashable, Codable, Sendable {
 /// One-shot things to do after a call: sounds, voice, animations. What to draw is
 /// read from the session's state (`item`, `noteIndex`, `keyboardHint`, `phase`).
 public enum Cue: Hashable, Sendable {
-    /// A new item is up. Draw `item` on `staffLayout`, starting at note 0.
+    /// A new screen is up. Draw `item`, starting at note 0.
     case showItem
     /// One step up the hint ladder (wrong key, or stuck): that note wobbles a little.
     case wobble(note: Int)
-    /// Play these pitches out loud. A hint, or the demo of a new note or chord.
+    /// Play these pitches out loud. A hint, or the demo of a new note.
     case playPitches([Pitch])
-    /// Right key(s) for that note: it hops off the staff and gets gobbled (chomp).
+    /// Right key(s) for that note: it hops off the staff and its muncher gobbles it.
     case correct(note: Int)
     case say(Speech)
     /// Rhythm nudge: that note glows for its full written length.
     case rhythmGlow(note: Int)
-    /// Play the whole item at `beat` seconds per quarter: the demo of a new group or
-    /// rhythm item, before he plays it.
+    /// Play the whole screen at `beat` seconds per quarter: the demo of a new rhythm
+    /// lesson, before he plays it.
     case playPhrase(beat: Double)
-    /// New items unlocked: an egg hatches for each.
+    /// New notes unlocked. Each gets an intro (and a new muncher) when it comes up.
     case unlocked([ItemID])
     /// Show the "turn on the piano" screen.
     case paused
@@ -77,19 +97,9 @@ public enum Cue: Hashable, Sendable {
     case done
 }
 
-/// Why the current item was picked.
-public enum PickReason: String, Codable, Hashable, Sendable {
-    case normal
-    /// Session opener: one of his strongest items.
-    case warmUp
-    /// He missed or needed hints on 3 of his last 5: one of his strongest items.
-    case easing
-    /// Time or count is up but the last one wasn't first try: an easy one to end on.
-    case extra
-}
-
-/// One item's share of a session, for the end screen.
+/// One note's share of a session, for the end screen.
 public struct PracticedItem: Hashable, Codable, Sendable {
+    /// The note's id (`"treble:G4"`).
     public let id: ItemID
     public var plays: Int
     public var firstTries: Int
@@ -103,27 +113,32 @@ public struct SessionSummary: Hashable, Codable, Sendable {
         case itemLimit, timeLimit
     }
 
-    public var startUnit: Int
-    public var endUnit: Int
-    public var itemsPlayed = 0
-    public var firstTryCount = 0
+    public var startLesson: LessonID
+    public var endLesson: LessonID
+    public var screensPlayed = 0
+    /// Notes played (no intros), one per key.
+    public var notesPlayed = 0
+    public var firstTryNotes = 0
     /// Seconds, not counting time paused.
     public var activeDuration = 0.0
-    public var attempts: [AttemptResult] = []
-    /// Items unlocked this session (eggs hatched).
+    public var screens: [ScreenResult] = []
+    /// Notes unlocked this session.
     public var unlocked: [ItemID] = []
-    public var completedUnits: [Int] = []
-    /// Every item played this session, in the order first played.
+    public var completedLessons: [LessonID] = []
+    /// Every note played this session, in the order first played.
     public var practiced: [PracticedItem] = []
-    /// The limit that was reached. The session then ran until a first-try success.
+    /// The limit that was reached. The session then ran until a screen all right first try.
     public var endedBy: EndReason?
-    /// Easy items played after the limit so the session ends on a success (max `maxExtraItems`).
+    /// Easy screens played after the limit so the session ends on a success (max `maxExtraItems`).
     public var extraItems = 0
 
-    public init(startUnit: Int) {
-        self.startUnit = startUnit
-        endUnit = startUnit
+    public init(startLesson: LessonID) {
+        self.startLesson = startLesson
+        endLesson = startLesson
     }
+
+    /// Every note, screen by screen.
+    public var attempts: [AttemptResult] { screens.flatMap(\.notes) }
 }
 
 /// One practice session: prompt -> waiting -> hint1 -> hint2 -> success -> next ... -> done.
@@ -134,30 +149,38 @@ public struct SessionSummary: Hashable, Codable, Sendable {
 /// (it closes chord windows, steps up the hint ladder when he's stuck, and stops
 /// waiting for the last key-up of a rhythm line).
 ///
+/// Each note on a screen is judged on its own: its own hint ladder, its own first try,
+/// its own response time from when it became the next note.
+///
 /// Shape of a session (learning principles in the plan):
-/// - opens with up to `warmUpCount` of his strongest items, new items wait until after
-/// - a new item is introduced i do / we do / you do: the app plays it and lights the
+/// - says hello, then opens with screens of his strongest notes (about 3 notes)
+/// - a new note is introduced i do / we do / you do: the app plays it and lights the
 ///   key (`.playPitches` + `.say(.meetNote)`), he plays it with the picture up, after
 ///   that the picture only comes back as a hint
-/// - after 3 of his last 5 weren't right first try, the next 2 are his strongest
-/// - when time or count is up it ends after his next first-try success (easy items,
-///   at most `maxExtraItems` extra)
+/// - after 3 of his last 5 notes weren't right first try, the next 2 screens are his strongest
+/// - when time or the screen count is up it ends after his next screen all right first
+///   try (easy screens, at most `maxExtraItems` extra)
 public struct PracticeSession: Sendable {
     public private(set) var engine: MasteryEngine
     public private(set) var phase: SessionPhase = .notStarted
     public private(set) var summary: SessionSummary
     public private(set) var isPianoConnected: Bool
 
-    /// The item on screen.
+    /// The screen that's up.
     public private(set) var item: PracticeItem?
-    /// Which note of `item` he's on (groups and rhythm lines go left to right).
+    /// Which note of `item` he's on (left to right).
     public private(set) var noteIndex = 0
     /// Keys lit in the keyboard picture. Empty means the picture is hidden.
     public private(set) var keyboardHint: [Pitch] = []
-    /// True while the current item is having its intro.
-    public private(set) var isIntro = false
-    /// Why the current item was picked.
+    /// The note this screen introduces, if it's an intro.
+    public private(set) var introNote: NoteKey?
+    /// The first screen of a lesson with a new texture.
+    public private(set) var isLessonIntro = false
+    /// Why the current screen was picked.
     public private(set) var pickReason = PickReason.normal
+
+    /// True while the current screen is an intro (a new note, or a new lesson texture).
+    public var isIntro: Bool { introNote != nil || isLessonIntro }
 
     private var config: NoteCoreConfig { engine.config }
     private var rng: SeededRandom
@@ -170,22 +193,25 @@ public struct PracticeSession: Sendable {
     private var resumePhase: SessionPhase?
 
     // session shape
+    private var greeted = false
     private var warmUpLeft = 0
     private var easingLeft = 0
-    /// Last few attempts: true when it wasn't right first try.
+    /// Last few notes: true when it wasn't right first try.
     private var struggles: [Bool] = []
     private var limitReached: SessionSummary.EndReason?
+    private var praisedLast = false
 
-    // the current item
-    private var promptTime = 0.0
+    // the current screen, per column
+    private var pickSize = 1
     private var lastActivity = 0.0
-    private var firstCorrectTime: Double?
+    private var startTimes: [Double] = []
+    private var correctTimes: [Double] = []
+    private var wrongs: [Int] = []
+    private var stucks: [Int] = []
+    private var almosts: [Int] = []
+    private var hints: [HintLevel] = []
     /// Steps up the hint ladder on the current note (wrong keys and stuck steps).
     private var ladder = 0
-    private var totalWrongs = 0
-    private var stuckSteps = 0
-    private var almosts = 0
-    private var hints = HintLevel.none
     private var onsets: [Double] = []
     private var rhythmJudgeable = true
     private var awaitingRelease = false
@@ -194,11 +220,11 @@ public struct PracticeSession: Sendable {
         self.engine = engine
         rng = SeededRandom(seed: seed)
         isPianoConnected = pianoConnected
-        summary = SessionSummary(startUnit: engine.unit.number)
+        summary = SessionSummary(startLesson: engine.lesson.id)
     }
 
-    /// Staves to show for the current unit.
-    public var staffLayout: StaffLayout { engine.unit.staff }
+    /// Staves to show for the current screen.
+    public var staffLayout: StaffLayout { item?.layout ?? (engine.lesson.layout == .grand ? .grand : .treble) }
 
     /// Seconds into the session, not counting pauses.
     public func activeTime(at time: Double) -> Double {
@@ -228,7 +254,7 @@ public struct PracticeSession: Sendable {
     public mutating func start(at time: Double) -> [Cue] {
         guard phase == .notStarted else { return [] }
         startTime = time
-        warmUpLeft = min(config.warmUpCount, engine.playedPool.count)
+        warmUpLeft = engine.lesson.clefs.contains { !engine.strongestNotes($0).isEmpty } ? config.warmUpCount : 0
         guard isPianoConnected else {
             pausedAt = time
             resumePhase = nil
@@ -244,7 +270,7 @@ public struct PracticeSession: Sendable {
         var cues: [Cue] = []
         switch event.kind {
         case .off:
-            if awaitingRelease, event.pitch == item.notes[item.notes.count - 1].pitches[0] {
+            if awaitingRelease, item.notes[item.notes.count - 1].pitches.contains(event.pitch) {
                 cues += finishRhythm(release: t)
             }
         case .on:
@@ -276,28 +302,39 @@ public struct PracticeSession: Sendable {
         }
         if phase.isPlaying, !awaitingRelease, ladder < 3, t >= lastActivity + config.stuckAfter {
             // stuck: one step up the ladder, same as a wrong try but not a wrong press
-            stuckSteps += 1
+            stucks[noteIndex] += 1
             lastActivity = t
-            cues += climbLadder()
+            cues += climbLadder(speak: true)
         }
         return cues
     }
 
-    /// After the success animation: the next item, or the end of the session.
+    /// The app put something over the screen before he could play (a new muncher
+    /// hatching before its intro). Starts the response clock and the stuck timer for
+    /// the current note again, so the hatch doesn't count as time to find it. Only
+    /// before he has played anything on this screen.
+    public mutating func restartPromptClock(at time: Double) {
+        guard phase.isPlaying, noteIndex == 0, onsets.isEmpty, !startTimes.isEmpty else { return }
+        let t = activeTime(at: time)
+        startTimes[0] = t
+        lastActivity = t
+    }
+
+    /// After the success animation: the next screen, or the end of the session.
     public mutating func next(at time: Double) -> [Cue] {
         guard phase == .success else { return [] }
         let t = activeTime(at: time)
         summary.activeDuration = t
         if limitReached == nil {
-            if summary.itemsPlayed >= config.sessionMaxItems {
+            if summary.screensPlayed >= config.sessionMaxItems {
                 limitReached = .itemLimit
             } else if t >= config.sessionMaxDuration {
                 limitReached = .timeLimit
             }
         }
         if let limit = limitReached {
-            // end on a success: right after a first-try one, or once the extras run out
-            if summary.attempts.last?.firstTry == true || summary.extraItems >= config.maxExtraItems {
+            // end on a success: right after a screen all right first try, or once the extras run out
+            if summary.screens.last?.firstTry == true || summary.extraItems >= config.maxExtraItems {
                 return end(limit)
             }
             summary.extraItems += 1
@@ -340,53 +377,61 @@ public struct PracticeSession: Sendable {
     // MARK: internals
 
     private mutating func showNext(at t: Double, reason forced: PickReason? = nil) -> [Cue] {
+        var cues: [Cue] = []
+        if !greeted {
+            greeted = true
+            cues.append(.say(.hello))
+        }
         var reason = forced ?? .normal
         if forced == nil {
             if warmUpLeft > 0 {
-                warmUpLeft -= 1
                 reason = .warmUp
             } else if easingLeft > 0 {
                 easingLeft -= 1
                 reason = .easing
             }
         }
-        let next = engine.pickNext(reason == .normal ? .normal : .strongest, using: &rng)
+        let pick = engine.pickScreen(reason == .normal ? .normal : .strongest, using: &rng)
+        if reason == .warmUp {
+            warmUpLeft -= pick.item.notes.count
+        }
+        if !pick.usedStrongest {
+            reason = pick.isStretch ? .stretch : .normal
+        }
+        let next = pick.item
         item = next
         pickReason = reason
-        isIntro = engine.needsIntro(next)
+        pickSize = pick.size
+        introNote = pick.intro
+        isLessonIntro = pick.isLessonIntro
         noteIndex = 0
-        promptTime = t
         lastActivity = t
-        firstCorrectTime = nil
+        let columns = next.notes.count
+        startTimes = Array(repeating: t, count: columns)
+        correctTimes = Array(repeating: t, count: columns)
+        wrongs = Array(repeating: 0, count: columns)
+        stucks = Array(repeating: 0, count: columns)
+        almosts = Array(repeating: 0, count: columns)
+        hints = Array(repeating: .none, count: columns)
         ladder = 0
-        totalWrongs = 0
-        stuckSteps = 0
-        almosts = 0
-        hints = .none
         onsets = []
         rhythmJudgeable = true
         awaitingRelease = false
+        let policy = engine.lesson.octavePolicy
         if judge == nil {
-            judge = AttemptJudge(expected: next.notes[0].pitches, octavePolicy: engine.unit.octavePolicy, config: config)
+            judge = AttemptJudge(expected: next.notes[0].pitches, octavePolicy: policy, config: config)
         } else {
             judge!.expect(next.notes[0].pitches)
-            judge!.octavePolicy = engine.unit.octavePolicy
+            judge!.octavePolicy = policy
         }
         keyboardHint = isIntro ? next.notes[0].pitches : []
         phase = .prompt
-        var cues: [Cue] = [.showItem]
-        if isIntro {
+        cues.append(.showItem)
+        if let intro = pick.intro {
             // i do: the app shows him. then we do: he plays it with the picture up
-            let letters = next.notes.flatMap { $0.pitches.map(\.naturalLetter) }
-            switch next.kind {
-            case .note:
-                cues += [.playPitches(next.notes[0].pitches), .say(.meetNote(letters[0]))]
-            case .chord:
-                cues += [.playPitches(next.notes[0].pitches), .say(.meetNotes(letters))]
-            case .group:
-                cues += [.playPhrase(beat: config.demoBeat), .say(.meetNotes(letters))]
-            case .rhythm:
-                cues += [.say(.newNote), .playPhrase(beat: config.demoBeat)] // sound before symbol
+            cues.append(.playPitches([intro.pitch]))
+            if let name = intro.name {
+                cues.append(.say(.meetNote(name)))
             }
         }
         return cues
@@ -397,14 +442,13 @@ public struct PracticeSession: Sendable {
         let expected = item.notes[noteIndex].pitches
         switch verdict {
         case .correct:
-            var cues: [Cue] = [.correct(note: noteIndex)]
+            let cues: [Cue] = [.correct(note: noteIndex)]
             onsets.append(t)
             lastActivity = t
-            if firstCorrectTime == nil {
-                firstCorrectTime = t
-            }
+            correctTimes[noteIndex] = t
             if noteIndex < item.notes.count - 1 {
                 noteIndex += 1
+                startTimes[noteIndex] = t
                 ladder = 0
                 phase = .prompt
                 let nextPitches = item.notes[noteIndex].pitches
@@ -416,23 +460,31 @@ public struct PracticeSession: Sendable {
                 awaitingRelease = true // the last note's hold counts
                 return cues
             }
-            cues += finish(at: t, rhythm: nil)
-            return cues
+            return cues + finish(at: t, rhythm: nil)
 
         case .almost(let played):
-            almosts += 1
+            almosts[noteIndex] += 1
             keyboardHint = expected
-            return [.say(.almost(played: played[0], expected: expected[0]))]
+            guard let name = NoteName(played[0]) else { return [] }
+            let hint: AlmostHint = expected[0] == .middleC ? .middleC : expected[0] > played[0] ? .higher : .lower
+            return [.say(.almost(name, hint))]
 
-        case .wrong:
-            totalWrongs += 1
-            return climbLadder()
+        case .wrong(let played):
+            wrongs[noteIndex] += 1
+            // the natural next to a sharp (F on an F# note): say what it is, show the black key
+            if expected.count == 1, played.count == 1, !expected[0].isWhiteKey,
+               played[0].midi == expected[0].midi - 1, let sharp = NoteName(expected[0]) {
+                let cues = climbLadder(speak: false)
+                keyboardHint = expected
+                return cues + [.say(.sharpHint(sharp))]
+            }
+            return climbLadder(speak: true)
         }
     }
 
     /// One step up the hint ladder for the current note: wobble, then the sound, then
     /// the keyboard picture. Past the top, a wrong key replays the sound.
-    private mutating func climbLadder() -> [Cue] {
+    private mutating func climbLadder(speak: Bool) -> [Cue] {
         guard let item else { return [] }
         let expected = item.notes[noteIndex].pitches
         ladder += 1
@@ -441,16 +493,23 @@ public struct PracticeSession: Sendable {
         switch ladder {
         case 1:
             phase = .waiting
-            hints = max(hints, .wobble)
+            hints[noteIndex] = max(hints[noteIndex], .wobble)
         case 2:
             phase = .hint1
-            hints = max(hints, .playedPitch)
+            hints[noteIndex] = max(hints[noteIndex], .playedPitch)
+            if speak { cues.append(.say(.hintListen)) }
             cues.append(.playPitches(expected))
         default:
             phase = .hint2
-            hints = .keyboard
+            hints[noteIndex] = .keyboard
             if keyboardHint == expected {
                 cues.append(.playPitches(expected)) // picture already up: say it with sound again
+            } else if speak {
+                if expected.count == 1, let name = NoteName(expected[0]) {
+                    cues.append(.say(.hintShow(name)))
+                } else {
+                    cues.append(.say(.hintLook))
+                }
             }
             keyboardHint = expected
         }
@@ -468,84 +527,90 @@ public struct PracticeSession: Sendable {
     private mutating func finish(at t: Double, rhythm: RhythmResult?) -> [Cue] {
         guard let item else { return [] }
         awaitingRelease = false
-        let lastCorrect = onsets.last ?? t
-        let responseTime: Double
-        switch item.kind {
-        case .note, .chord:
-            responseTime = lastCorrect - promptTime
-        case .group:
-            responseTime = (lastCorrect - promptTime) / Double(item.notes.count)
-        case .rhythm:
-            responseTime = (firstCorrectTime ?? lastCorrect) - promptTime
+        let lesson = engine.lesson
+        // a rhythm line's gaps are the rhythm, not reading: every note gets the reading time
+        let readingTime = correctTimes[0] - startTimes[0]
+        var notes: [AttemptResult] = []
+        for (i, column) in item.notes.enumerated() {
+            let time = item.isRhythm ? readingTime : correctTimes[i] - startTimes[i]
+            for key in column.keys {
+                notes.append(AttemptResult(
+                    itemID: key.id, lesson: lesson.id, level: lesson.level, wasIntro: introNote == key,
+                    firstTry: wrongs[i] == 0 && stucks[i] == 0, wrongPresses: wrongs[i], almostPresses: almosts[i],
+                    stuckSteps: stucks[i], hints: hints[i], responseTime: max(0, time)
+                ))
+            }
         }
-        let attempt = AttemptResult(
-            itemID: item.id, unit: engine.unit.number, wasIntro: isIntro,
-            firstTry: totalWrongs == 0 && stuckSteps == 0, wrongPresses: totalWrongs, almostPresses: almosts,
-            stuckSteps: stuckSteps, hints: hints, responseTime: max(0, responseTime), rhythm: rhythm
+        let screen = ScreenResult(
+            screenID: item.id, lesson: lesson.id, reason: pickReason, wasIntro: introNote != nil,
+            wasLessonIntro: isLessonIntro, notes: notes, rhythm: rhythm, size: pickSize
         )
-        let fluencyBefore = engine.stats(for: item.id).peakFluency
-        let update = engine.record(attempt)
-        noteSummary(attempt, update: update, fluencyBefore: fluencyBefore)
-        noteStruggle(attempt)
+        let before = Dictionary(item.keys.map { ($0.id, engine.stats(for: $0).peakFluency) }, uniquingKeysWith: { a, _ in a })
+        let update = engine.record(screen)
+        noteSummary(screen, update: update, fluencyBefore: before)
+        noteStruggles(screen)
 
         phase = .success
         keyboardHint = []
         var cues: [Cue] = []
-        switch item.kind {
-        case .note:
-            cues.append(.say(.letter(item.notes[0].pitches[0].naturalLetter)))
-        case .chord:
-            cues.append(.say(.letters(item.notes[0].pitches.map(\.naturalLetter))))
-        case .group:
-            cues.append(.say(.letters(item.notes.map { $0.pitches[0].naturalLetter })))
-        case .rhythm:
-            break
-        }
+        var praised = false
+        let roll = unitInterval(&rng)
         if let rhythm, let nudge = rhythm.nudgeIndex {
             cues.append(.rhythmGlow(note: nudge))
             if rhythm.verdicts[nudge] == .tooShort {
                 cues.append(.say(.holdLonger))
             }
-        } else if hints > .none {
-            cues.append(.say(.keptTrying))
-        } else if unitInterval(&rng) < config.praiseChance {
-            cues.append(.say(.lookedCarefully))
+        } else if !isIntro, !praisedLast {
+            // process praise, now and then. never two screens in a row
+            let hinted = screen.usedHints
+            if roll < (hinted ? config.keptTryingChance : config.praiseChance) {
+                cues.append(.say(hinted ? .keptTrying : .lookedCarefully))
+                praised = true
+            }
         }
+        praisedLast = praised
         if !update.unlocked.isEmpty {
             cues.append(.unlocked(update.unlocked))
         }
         return cues
     }
 
-    /// Easing: after `easingTrigger` of the last `easingWindow` weren't right first try,
-    /// the next `easingItems` are his strongest.
-    private mutating func noteStruggle(_ attempt: AttemptResult) {
-        struggles = Array((struggles + [!attempt.firstTry]).suffix(config.easingWindow))
-        if easingLeft == 0, struggles.filter({ $0 }).count >= config.easingTrigger {
-            easingLeft = config.easingItems
-            struggles = []
+    /// Easing: after `easingTrigger` of the last `easingWindow` notes weren't right first
+    /// try, the next `easingItems` screens are his strongest.
+    private mutating func noteStruggles(_ screen: ScreenResult) {
+        for note in screen.notes {
+            struggles = Array((struggles + [!note.firstTry]).suffix(config.easingWindow))
+            if easingLeft == 0, struggles.filter({ $0 }).count >= config.easingTrigger {
+                easingLeft = config.easingItems
+                struggles = []
+            }
         }
     }
 
-    private mutating func noteSummary(_ attempt: AttemptResult, update: MasteryUpdate, fluencyBefore: Double) {
-        summary.itemsPlayed += 1
-        summary.firstTryCount += attempt.firstTry ? 1 : 0
-        summary.attempts.append(attempt)
-        summary.unlocked += update.unlocked
-        if let unit = update.completedUnit {
-            summary.completedUnits.append(unit)
+    private mutating func noteSummary(_ screen: ScreenResult, update: MasteryUpdate, fluencyBefore: [ItemID: Double]) {
+        summary.screensPlayed += 1
+        summary.screens.append(screen)
+        for note in screen.notes where !note.wasIntro {
+            summary.notesPlayed += 1
+            summary.firstTryNotes += note.firstTry ? 1 : 0
         }
-        summary.endUnit = engine.unit.number
-        let after = engine.stats(for: attempt.itemID).peakFluency
-        if let i = summary.practiced.firstIndex(where: { $0.id == attempt.itemID }) {
-            summary.practiced[i].plays += 1
-            summary.practiced[i].firstTries += attempt.firstTry ? 1 : 0
-            summary.practiced[i].fluencyAfter = after
-        } else {
-            summary.practiced.append(PracticedItem(
-                id: attempt.itemID, plays: 1, firstTries: attempt.firstTry ? 1 : 0,
-                fluencyBefore: fluencyBefore, fluencyAfter: after
-            ))
+        summary.unlocked += update.unlocked
+        if let lesson = update.completedLesson {
+            summary.completedLessons.append(lesson)
+        }
+        summary.endLesson = engine.lesson.id
+        for note in screen.notes {
+            let after = engine.stats(for: note.itemID).peakFluency
+            if let i = summary.practiced.firstIndex(where: { $0.id == note.itemID }) {
+                summary.practiced[i].plays += 1
+                summary.practiced[i].firstTries += note.firstTry ? 1 : 0
+                summary.practiced[i].fluencyAfter = after
+            } else {
+                summary.practiced.append(PracticedItem(
+                    id: note.itemID, plays: 1, firstTries: note.firstTry ? 1 : 0,
+                    fluencyBefore: fluencyBefore[note.itemID] ?? 0, fluencyAfter: after
+                ))
+            }
         }
     }
 
@@ -557,18 +622,20 @@ public struct PracticeSession: Sendable {
     }
 }
 
-// see LenientDecoding.swift. the app keeps every session as JSON
+// see LenientDecoding.swift. the app keeps every session as JSON. a round-1 summary
+// decodes with zeros for what it didn't have
 extension SessionSummary {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        startUnit = try c.value(.startUnit, or: 1)
-        endUnit = try c.value(.endUnit, or: startUnit)
-        itemsPlayed = try c.value(.itemsPlayed, or: 0)
-        firstTryCount = try c.value(.firstTryCount, or: 0)
+        startLesson = try c.value(.startLesson, or: "")
+        endLesson = try c.value(.endLesson, or: startLesson)
+        screensPlayed = try c.value(.screensPlayed, or: 0)
+        notesPlayed = try c.value(.notesPlayed, or: 0)
+        firstTryNotes = try c.value(.firstTryNotes, or: 0)
         activeDuration = try c.value(.activeDuration, or: 0)
-        attempts = try c.value(.attempts, or: [])
+        screens = try c.value(.screens, or: [])
         unlocked = try c.value(.unlocked, or: [])
-        completedUnits = try c.value(.completedUnits, or: [])
+        completedLessons = try c.value(.completedLessons, or: [])
         practiced = try c.value(.practiced, or: [])
         endedBy = try c.decodeIfPresent(EndReason.self, forKey: .endedBy)
         extraItems = try c.value(.extraItems, or: 0)

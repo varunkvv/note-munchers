@@ -27,10 +27,10 @@ enum Theme {
 
 /// Parent settings for the staff (vision). Stored in UserDefaults.
 struct StaffStyle: Equatable {
-    /// 0.6...1.0 of the biggest staff that fits the screen.
+    /// Line gap as a multiple of `Metrics.gap` (30pt on the iPad). The same for every lesson.
     var size = 1.0
     /// Staff, ledger line and stem weight as a fraction of the line gap.
-    /// Engraving standard is ~0.13. Kept thick on purpose.
+    /// Engraving is ~0.11-0.13. A little heavier on purpose.
     var lineThickness = 0.14
     /// Faint tint in the four spaces so line vs space reads easier. Off by default.
     var spaceTint = false
@@ -45,6 +45,14 @@ struct StaffStyle: Equatable {
         static let spaceTint = "spaceTint"
     }
 
-    static let sizeRange = 0.6...1.0
+    static let sizeRange = 0.8...1.3
     static let thicknessRange = 0.08...0.24
+
+    /// Settings saved by an older build can be outside today's ranges.
+    var clamped: StaffStyle {
+        var style = self
+        style.size = min(max(size, Self.sizeRange.lowerBound), Self.sizeRange.upperBound)
+        style.lineThickness = min(max(lineThickness, Self.thicknessRange.lowerBound), Self.thicknessRange.upperBound)
+        return style
+    }
 }

@@ -8,7 +8,7 @@ public struct AttemptSample: Hashable, Codable, Sendable {
     }
 }
 
-/// Rolling stats for one item. Value type, Codable - lives inside `MasteryState`.
+/// Rolling stats for one note (`NoteKey`). Value type, Codable - lives inside `MasteryState`.
 public struct ItemStats: Hashable, Codable, Sendable {
     /// Leitner box, 1...boxCount. Right first try moves up one, a miss moves down one.
     public var box = 1
@@ -16,12 +16,6 @@ public struct ItemStats: Hashable, Codable, Sendable {
     public var recent: [AttemptSample] = []
     public var attempts = 0
     public var firstTryCount = 0
-
-    /// Rhythm items only: the separate rhythm track.
-    public var rhythmBox = 1
-    public var rhythmRecent: [Bool] = []
-    public var rhythmAttempts = 0
-
     /// Highest fluency ever reached (0...1). Never goes down, so his muncher for this
     /// note never shrinks.
     public var peakFluency = 0.0
@@ -37,169 +31,241 @@ public struct ItemStats: Hashable, Codable, Sendable {
     }
 }
 
-/// Everything the engine remembers. The app saves this (e.g. JSON-encoded in one
-/// SwiftData record) after every item and restores it with `MasteryEngine(state:)`.
+/// One normal screen at his current size: how many notes, how many right first try.
+public struct SizeSample: Hashable, Codable, Sendable {
+    public var notes: Int
+    public var firstTry: Int
+
+    public init(notes: Int, firstTry: Int) {
+        self.notes = notes
+        self.firstTry = firstTry
+    }
+}
+
+/// Everything the engine remembers. The app saves this (JSON in one SwiftData record)
+/// after every screen and restores it with `MasteryEngine(state:)`.
 public struct MasteryState: Hashable, Codable, Sendable {
-    /// Current unit number.
-    public var unit = 1
-    /// Per unit number: how many of its new items are unlocked. Items never re-lock.
-    public var unlockedCounts: [Int: Int] = [:]
-    public var completedUnits: Set<Int> = []
+    /// Current lesson.
+    public var lesson: LessonID = "1.1"
+    /// Note ids he can be shown. Notes never re-lock, across lessons.
+    public var unlocked: Set<ItemID> = []
+    public var completedLessons: Set<LessonID> = []
+    /// Per note id (`"treble:G4"`).
     public var stats: [ItemID: ItemStats] = [:]
-    /// Items that have had their intro.
+    /// Notes he has met (intro done, or played), plus `"lesson:<id>"` once a lesson's
+    /// new texture (two at once, rhythm) has been shown to him.
     public var introduced: Set<ItemID> = []
-    /// Last `solidWindow` attempts in the current unit. Reset when the unit changes.
-    public var unitRecent: [AttemptSample] = []
-    /// Last few picks, for the no-repeat rule.
-    public var recentPicks: [ItemID] = []
+    /// The most recent batch that unlocked in this lesson, per clef (`Clef.rawValue`).
+    /// The gate waits for these to be solid.
+    public var newest: [String: [ItemID]] = [:]
+    /// Screens played in this lesson (no intros). Reset when the lesson changes.
+    public var lessonScreens = 0
+    /// His last notes in this lesson. Reset when the lesson changes.
+    public var lessonRecent: [AttemptSample] = []
+    /// Rhythm lessons: whether each recent judged screen had every note ok.
+    public var rhythmRecent: [Bool] = []
+    /// Notes per screen (bars on rhythm screens). Grows when he's doing well, drops
+    /// back when he struggles, always inside the lesson's range.
+    public var screenSize = 1
+    /// Normal screens at the current size. Cleared when the size changes.
+    public var sizeRecent: [SizeSample] = []
+    /// Last screen ids, oldest first, so a screen doesn't come back too soon.
+    public var recentScreens: [ItemID] = []
+    /// Last few columns shown (`"treble:G4"`, `"treble:G4+B4"`), for the no-long-runs rule.
+    public var recentColumns: [ItemID] = []
+    public var lastScreenWasIntro = false
+    /// The engine's own dice for curriculum choices: which notes a lesson starts with
+    /// and which come next. Seeded once per kid (the app seeds it at first launch),
+    /// saved with everything else, so the same state always makes the same choice.
+    public var dice: SeededRandom
 
-    public init() {}
+    public init(seed: UInt64 = 0x5EED_F00D) {
+        dice = SeededRandom(seed: seed)
+    }
 }
 
-/// What changed after recording an attempt.
+/// What changed after recording a screen.
 public struct MasteryUpdate: Hashable, Codable, Sendable {
-    /// Newly unlocked items (a new egg hatches for each).
+    /// Newly unlocked notes. Each one gets an intro (and a new muncher) when it comes up.
     public var unlocked: [ItemID] = []
-    public var completedUnit: Int?
-    /// Set when the engine moved to another unit.
-    public var enteredUnit: Int?
+    public var completedLesson: LessonID?
+    /// Set when the engine moved to another lesson.
+    public var enteredLesson: LessonID?
+    /// Set when notes per screen changed.
+    public var screenSize: Int?
     public init() {}
 }
 
-/// How to pick the next item.
+/// How to pick the next screen.
 public enum PickStyle: String, Codable, Hashable, Sendable {
-    /// Intros first, then the newest share and low boxes.
+    /// Intros when one is due, otherwise his current size, weighted toward weak notes,
+    /// with the newest notes as about 1 in 4 of the notes on their clef.
     case normal
-    /// His strongest items: highest box among items he has already played, a different
-    /// one from the last pick when there's a choice. Used for the warm-up, easing after
-    /// misses, and the easy items at the end. No intros. Falls back to `normal` when he
-    /// hasn't played anything in this pool yet.
+    /// Only his strongest notes (highest boxes among notes he has played). For the
+    /// warm-up, easing after misses, and the easy screens at the end. No intros. Falls
+    /// back to `normal` when he hasn't played anything in this lesson's pool yet.
     case strongest
 }
 
-public enum UnitStatus: String, Codable, Hashable, Sendable {
+public enum LessonStatus: String, Codable, Hashable, Sendable {
     case completed, current, skipped, upcoming
 }
 
-/// Progress for one item, for the munchers view and the parent dashboard.
+/// Progress for one note, for the munchers view and the parent dashboard.
 public struct NoteProgress: Identifiable, Hashable, Codable, Sendable {
-    public let id: ItemID
-    public let kind: PracticeItem.Kind
-    /// The unit that introduces it.
-    public let unit: Int
+    public let key: NoteKey
     public let box: Int
     public let isSolid: Bool
     public let attempts: Int
     /// Over the last `solidWindow` attempts.
     public let recentFirstTryRate: Double?
     public let medianResponse: Double?
-    /// Rhythm items only.
-    public let rhythmBox: Int?
     /// 0...1 from the leitner box and how fast he finds it. Can dip after misses.
     public let fluency: Double
     /// Highest `fluency` ever. Use this to size his muncher so it never shrinks.
     public let peakFluency: Double
+
+    public var id: ItemID { key.id }
 }
 
-/// Leitner boxes, the unlock gate, unit progression and the next-item picker.
+/// Per-note mastery, the unlock gate, lessons and levels, and the screen picker
+/// (`pickScreen`, in ScreenGenerator.swift).
 ///
-/// Pure value type. No clock, no randomness of its own - `pickNext` takes the generator.
+/// Pure value type. No clock, and no dice of its own: curriculum choices use
+/// `state.dice`, screens use the generator the caller passes in.
 public struct MasteryEngine: Sendable {
     public let curriculum: Curriculum
     public var config: NoteCoreConfig
-    public private(set) var state: MasteryState
+    public internal(set) var state: MasteryState
 
     public init(curriculum: Curriculum = .standard, config: NoteCoreConfig = .default, state: MasteryState = MasteryState()) {
-        precondition(!curriculum.units.isEmpty)
         self.curriculum = curriculum
         self.config = config
         self.state = state
-        let unitNumber = curriculum.unitNumbers.contains(state.unit) ? state.unit : 1
-        _ = enter(unitNumber, resetWindow: unitNumber != state.unit)
+        if curriculum.lesson(state.lesson) == nil {
+            enter(curriculum.firstLesson.id)
+        } else {
+            prepareLesson()
+        }
     }
 
     // MARK: reading
 
-    public var unit: Unit { curriculum.unit(state.unit)! }
+    public var lesson: Lesson { curriculum.lesson(state.lesson)! }
 
-    public func unlockedCount(_ unitNumber: Int) -> Int {
-        guard let unit = curriculum.unit(unitNumber) else { return 0 }
-        return min(state.unlockedCounts[unitNumber] ?? 0, unit.newItems.count)
+    public var level: Level { curriculum.level(lesson.level)! }
+
+    public var screenSize: Int { state.screenSize }
+
+    public func isUnlocked(_ key: NoteKey) -> Bool { state.unlocked.contains(key.id) }
+
+    /// Unlocked notes of the current lesson on one clef, low to high.
+    public func pool(_ clef: Clef) -> [NoteKey] {
+        guard let notes = lesson.notes(clef) else { return [] }
+        return notes.all.map { NoteKey(clef, $0) }.filter(isUnlocked).sorted()
     }
 
-    /// Items the picker draws from: the current unit's unlocked items plus every item
-    /// of the units it reviews.
-    public var pool: [PracticeItem] {
-        let own = Array(unit.newItems.prefix(unlockedCount(unit.number)))
-        let reviewed = unit.reviews.flatMap { curriculum.unit($0)?.newItems ?? [] }
-        return own + reviewed
+    /// Unlocked notes of the current lesson, treble first.
+    public var pool: [NoteKey] { lesson.clefs.flatMap(pool) }
+
+    /// Pool notes that can go on a normal screen: all but new notes still waiting for their intro.
+    public func playable(_ clef: Clef) -> [NoteKey] {
+        pool(clef).filter { !needsIntro($0) }
     }
 
-    /// The most recently unlocked item, or the starting batch if nothing has unlocked
-    /// since the unit began. Empty for a review-only unit.
-    public var newestBatch: [PracticeItem] {
-        let count = unlockedCount(unit.number)
-        guard count > 0 else { return [] }
-        if count <= unit.startCount {
-            return Array(unit.newItems.prefix(count))
-        }
-        return [unit.newItems[count - 1]]
+    /// This lesson's new notes on a clef that haven't unlocked yet.
+    public func lockedNew(_ clef: Clef) -> [NoteKey] {
+        guard let notes = lesson.notes(clef) else { return [] }
+        return notes.new.map { NoteKey(clef, $0) }.filter { !isUnlocked($0) }
     }
+
+    /// The most recent batch to unlock on this clef in this lesson (or the start set).
+    /// Empty when the lesson started with everything already unlocked.
+    public func newestBatch(_ clef: Clef) -> [NoteKey] {
+        (state.newest[clef.rawValue] ?? []).compactMap { NoteKey(id: $0) }.filter(isUnlocked)
+    }
+
+    /// Does this note get its intro (keyboard picture up front, "this is D") next time?
+    /// Only a lesson's new notes get intros. Known notes from earlier lessons don't,
+    /// even if a parent skipped ahead past where he would have met them.
+    public func needsIntro(_ key: NoteKey) -> Bool {
+        isUnlocked(key) && !state.introduced.contains(key.id) && lesson.newKeys.contains(key)
+    }
+
+    /// Unlocked notes on a clef still waiting for their intro.
+    public func pendingIntros(_ clef: Clef) -> [NoteKey] { pool(clef).filter(needsIntro) }
+
+    public var pendingIntros: [NoteKey] { lesson.clefs.flatMap(pendingIntros) }
 
     public func stats(for id: ItemID) -> ItemStats { state.stats[id] ?? ItemStats() }
 
+    public func stats(for key: NoteKey) -> ItemStats { stats(for: key.id) }
+
     /// 7 of the last 8 right first try with median response under 4s, or the fast
-    /// track: the last 5 all right first try, each under 2s.
-    public func isPitchSolid(_ id: ItemID) -> Bool {
-        let recent = stats(for: id).recent
-        return isSolid(recent)
+    /// track: the last 3 all right first try, each under 3s.
+    public func isSolid(_ key: NoteKey) -> Bool { isSolid(stats(for: key).recent) }
+
+    /// The unlock gate for one clef: the newest batch solid AND nothing on this clef
+    /// below box 3.
+    public func isGateOpen(_ clef: Clef) -> Bool {
+        newestBatch(clef).allSatisfy(isSolid) && pool(clef).allSatisfy { stats(for: $0).box >= config.gateMinBox }
     }
 
-    /// Rhythm track: 6 of the last 8 judged runs fully ok, or the last 5 all ok.
-    public func isRhythmSolid(_ id: ItemID) -> Bool {
-        let recent = stats(for: id).rhythmRecent.suffix(config.solidWindow)
+    /// His notes in this lesson are going well: the size can grow and stretch screens
+    /// can come up.
+    public var isDoingWell: Bool {
+        let recent = state.lessonRecent.suffix(config.lessonWindow)
+        guard recent.count >= config.sizeWindow * 2 else { return false }
+        return Double(recent.filter(\.firstTry).count) / Double(recent.count) >= config.sizeUpRate
+    }
+
+    /// Rhythm track for the current lesson: 6 of the last 8 judged screens fully ok,
+    /// or the last 3 all ok.
+    public var isRhythmSolid: Bool {
+        let recent = state.rhythmRecent.suffix(config.solidWindow)
         if recent.filter({ $0 }).count >= config.rhythmSolidRequired { return true }
         return recent.count >= config.fastTrackCount && recent.suffix(config.fastTrackCount).allSatisfy { $0 }
     }
 
-    /// Pitch solid, and rhythm solid too for rhythm items.
-    public func isSolid(item: PracticeItem) -> Bool {
-        isPitchSolid(item.id) && (!item.isRhythm || isRhythmSolid(item.id))
+    public func status(ofLesson id: LessonID) -> LessonStatus {
+        if id == state.lesson { return .current }
+        if state.completedLessons.contains(id) { return .completed }
+        guard let index = curriculum.index(of: id), let current = curriculum.index(of: state.lesson) else { return .upcoming }
+        return index < current ? .skipped : .upcoming
     }
 
-    /// The unlock gate: newest item(s) solid AND nothing in the pool below box 3.
-    /// Only the pitch box counts here, so a rhythm slip never holds anything back.
-    public var isGateOpen: Bool {
-        newestBatch.allSatisfy { isSolid(item: $0) }
-            && pool.allSatisfy { stats(for: $0.id).box >= config.gateMinBox }
+    /// A level is current while he's in one of its lessons, completed when every lesson is.
+    public func status(ofLevel number: Int) -> LessonStatus {
+        guard let level = curriculum.level(number) else { return .upcoming }
+        if lesson.level == number { return .current }
+        if level.lessons.allSatisfy({ state.completedLessons.contains($0.id) }) { return .completed }
+        return number < lesson.level ? .skipped : .upcoming
     }
 
-    /// Does this item get the intro treatment (keyboard picture up front) next time?
-    public func needsIntro(_ item: PracticeItem) -> Bool {
-        unit.newItems.contains(item) && !state.introduced.contains(item.id)
+    public var isCurriculumComplete: Bool {
+        curriculum.lessons.allSatisfy { state.completedLessons.contains($0.id) }
     }
 
-    public func status(ofUnit number: Int) -> UnitStatus {
-        if number == state.unit { return .current }
-        if state.completedUnits.contains(number) { return .completed }
-        return number < state.unit ? .skipped : .upcoming
-    }
-
-    public var isCurriculumComplete: Bool { state.completedUnits.contains(curriculum.units.count) }
-
-    public func progress(for id: ItemID) -> NoteProgress? {
-        guard let item = curriculum.item(id), let unitNumber = curriculum.unitNumber(of: id) else { return nil }
-        let s = stats(for: id)
+    public func progress(for key: NoteKey) -> NoteProgress {
+        let s = stats(for: key)
         return NoteProgress(
-            id: id, kind: item.kind, unit: unitNumber, box: s.box, isSolid: isSolid(item: item),
-            attempts: s.attempts, recentFirstTryRate: s.recentFirstTryRate, medianResponse: s.medianResponse,
-            rhythmBox: item.isRhythm ? s.rhythmBox : nil, fluency: fluency(s), peakFluency: s.peakFluency
+            key: key, box: s.box, isSolid: isSolid(key), attempts: s.attempts,
+            recentFirstTryRate: s.recentFirstTryRate, medianResponse: s.medianResponse,
+            fluency: fluency(s), peakFluency: s.peakFluency
         )
     }
 
-    /// Every item he has played at least once (not counting intros), in curriculum order.
+    public func progress(for id: ItemID) -> NoteProgress? { NoteKey(id: id).map { progress(for: $0) } }
+
+    /// Every note he has played at least once (not counting intros), treble first, low to high.
     public var allProgress: [NoteProgress] {
-        curriculum.allItems.filter { stats(for: $0.id).attempts > 0 }.compactMap { progress(for: $0.id) }
+        state.stats.filter { $0.value.attempts > 0 }.keys.compactMap(NoteKey.init(id:)).sorted().map { progress(for: $0) }
+    }
+
+    /// Notes he has met (intro done, or played), treble first, low to high.
+    public var metNotes: [NoteKey] {
+        let ids = state.introduced.union(state.stats.filter { $0.value.attempts > 0 }.keys)
+        return ids.compactMap(NoteKey.init(id:)).sorted()
     }
 
     /// 0...1. 60% from the leitner box, 40% from speed: full marks at half the
@@ -218,163 +284,185 @@ public struct MasteryEngine: Sendable {
 
     // MARK: changing
 
-    /// Records one finished item and opens the gate if it's ready.
+    /// Records one finished screen, note by note, then opens gates and moves on if
+    /// he's ready.
     @discardableResult
-    public mutating func record(_ attempt: AttemptResult) -> MasteryUpdate {
+    public mutating func record(_ screen: ScreenResult) -> MasteryUpdate {
         var update = MasteryUpdate()
-        guard let item = curriculum.item(attempt.itemID) else { return update }
-        state.introduced.insert(item.id)
-        var s = stats(for: item.id)
-        if attempt.wasIntro {
-            return update
+        if screen.wasLessonIntro {
+            state.introduced.insert(lessonIntroID)
         }
-
-        let sample = AttemptSample(firstTry: attempt.firstTry, responseTime: max(0, attempt.responseTime))
-        s.recent = Array((s.recent + [sample]).suffix(config.solidWindow))
-        // stuck isn't wrong: a hint from being stuck alone holds the box where it is
-        if attempt.firstTry {
-            s.box = min(config.boxCount, s.box + 1)
-        } else if attempt.wrongPresses > 0 {
-            s.box = max(1, s.box - 1)
+        for attempt in screen.notes {
+            guard let key = NoteKey(id: attempt.itemID) else { continue }
+            state.introduced.insert(key.id) // met, whichever screen it was on
+            guard !attempt.wasIntro else { continue }
+            var s = stats(for: key)
+            let sample = AttemptSample(firstTry: attempt.firstTry, responseTime: max(0, attempt.responseTime))
+            s.recent = Array((s.recent + [sample]).suffix(config.solidWindow))
+            // stuck isn't wrong: a hint from being stuck alone holds the box where it is
+            if attempt.firstTry {
+                s.box = min(config.boxCount, s.box + 1)
+            } else if attempt.wrongPresses > 0 {
+                s.box = max(1, s.box - 1)
+            }
+            s.attempts += 1
+            s.firstTryCount += attempt.firstTry ? 1 : 0
+            s.peakFluency = max(s.peakFluency, fluency(s))
+            state.stats[key.id] = s
+            state.lessonRecent = Array((state.lessonRecent + [sample]).suffix(max(config.lessonWindow, config.solidWindow)))
         }
-        s.attempts += 1
-        s.firstTryCount += attempt.firstTry ? 1 : 0
-        if item.isRhythm, let rhythm = attempt.rhythm {
-            s.rhythmRecent = Array((s.rhythmRecent + [rhythm.isOK]).suffix(config.solidWindow))
-            s.rhythmBox = rhythm.isOK ? min(config.boxCount, s.rhythmBox + 1) : max(1, s.rhythmBox - 1)
-            s.rhythmAttempts += 1
+        if !screen.wasIntro, !screen.wasLessonIntro {
+            state.lessonScreens += 1
         }
-        s.peakFluency = max(s.peakFluency, fluency(s))
-        state.stats[item.id] = s
-
-        if pool.contains(item) {
-            state.unitRecent = Array((state.unitRecent + [sample]).suffix(config.solidWindow))
+        if let rhythm = screen.rhythm {
+            state.rhythmRecent = Array((state.rhythmRecent + [rhythm.isOK]).suffix(config.solidWindow))
+        }
+        if screen.reason == .normal, !screen.wasIntro, !screen.wasLessonIntro, screen.size == state.screenSize {
+            noteSize(screen, &update)
         }
         advance(&update)
         return update
     }
 
-    private mutating func advance(_ update: inout MasteryUpdate) {
-        guard isGateOpen else { return }
-        let current = unit
-        let count = unlockedCount(current.number)
-        if count < current.newItems.count {
-            state.unlockedCounts[current.number] = count + 1
-            update.unlocked.append(current.newItems[count].id)
+    /// Parent jump: to any lesson, in any level. Lessons in between are not marked done.
+    /// He plays the lesson until it's solid (fresh screens), then moves on to the next
+    /// lesson that isn't done. Returns the notes that unlocked.
+    @discardableResult
+    public mutating func moveToLesson(_ id: LessonID) -> [ItemID] {
+        guard curriculum.lesson(id) != nil, id != state.lesson else { return [] }
+        return enter(id)
+    }
+
+    /// Parent picks a level: its first lesson that isn't done (or its first lesson).
+    @discardableResult
+    public mutating func moveToLevel(_ number: Int) -> [ItemID] {
+        guard let level = curriculum.level(number) else { return [] }
+        let target = level.lessons.first { !state.completedLessons.contains($0.id) } ?? level.lessons[0]
+        return moveToLesson(target.id)
+    }
+
+    // MARK: internals
+
+    var lessonIntroID: ItemID { "lesson:\(lesson.id)" }
+
+    private mutating func noteSize(_ screen: ScreenResult, _ update: inout MasteryUpdate) {
+        let counted = screen.notes.filter { !$0.wasIntro }
+        state.sizeRecent = Array((state.sizeRecent + [SizeSample(notes: counted.count, firstTry: counted.filter(\.firstTry).count)]).suffix(config.sizeWindow))
+        let notes = state.sizeRecent.reduce(0) { $0 + $1.notes }
+        guard notes > 0 else { return }
+        let rate = Double(state.sizeRecent.reduce(0) { $0 + $1.firstTry }) / Double(notes)
+        let sizes = lesson.sizes
+        // a screen never needs every note he has on a clef, or it's only a reshuffle:
+        // 3 notes on a clef allow 2 a screen, 5 allow 4
+        let room = lesson.clefs.map { playable($0).count - 1 }.min() ?? 1
+        if state.sizeRecent.count >= config.sizeWindow, rate >= config.sizeUpRate, state.screenSize < sizes.upperBound,
+           state.screenSize < room {
+            state.screenSize += 1
+        } else if state.sizeRecent.count >= config.sizeWindow - 1, rate < config.sizeDownRate, state.screenSize > sizes.lowerBound {
+            state.screenSize -= 1
+        } else {
             return
         }
-        // everything in the unit is out. the unit is done once its recent attempts are solid too
-        guard isSolid(state.unitRecent) else { return }
-        state.completedUnits.insert(current.number)
-        update.completedUnit = current.number
-        // move on to the next unit not done yet (a parent may have moved him back)
-        guard let next = curriculum.units.first(where: {
-            $0.number > current.number && !state.completedUnits.contains($0.number)
-        }) else { return }
-        update.enteredUnit = next.number
-        update.unlocked += enter(next.number, resetWindow: true)
+        state.sizeRecent = []
+        update.screenSize = state.screenSize
     }
 
-    /// Parent skip forward or back. Earlier units are not marked done by skipping
-    /// ahead. Going back to a unit means he plays it until it's solid again (fresh
-    /// attempts), then moves on to the first unit that isn't done.
+    private mutating func advance(_ update: inout MasteryUpdate) {
+        let lesson = self.lesson
+        for clef in lesson.clefs where isGateOpen(clef) {
+            let locked = lockedNew(clef)
+            guard !locked.isEmpty else { continue }
+            let batch = chooseBatch(from: locked, count: lesson.unlockBatch, joining: pool(clef))
+            unlock(batch, clef: clef)
+            update.unlocked += batch.map(\.id)
+        }
+        guard isLessonDone else { return }
+        state.completedLessons.insert(lesson.id)
+        update.completedLesson = lesson.id
+        // on to the next lesson not done yet (a parent may have moved him back). the
+        // last lesson of a level leads into the next level
+        guard let index = curriculum.index(of: lesson.id),
+              let next = curriculum.lessons[(index + 1)...].first(where: { !state.completedLessons.contains($0.id) })
+        else { return }
+        update.enteredLesson = next.id
+        update.unlocked += enter(next.id)
+    }
+
+    /// Every note out and met, every note at box 3 or more, enough screens in this
+    /// lesson, and his recent notes here right first try (and rhythm solid in rhythm
+    /// lessons). The newest batch doesn't need its own 7 of 8 here: that rule paces
+    /// unlocks, and with nothing left to unlock the lesson window covers it.
+    var isLessonDone: Bool {
+        let lesson = self.lesson
+        guard lesson.clefs.allSatisfy({ lockedNew($0).isEmpty && pendingIntros($0).isEmpty }),
+              pool.allSatisfy({ stats(for: $0).box >= config.gateMinBox }),
+              state.lessonScreens >= config.lessonMinScreens
+        else { return false }
+        let window = state.lessonRecent.suffix(config.lessonWindow)
+        guard window.count >= config.lessonWindow,
+              Double(window.filter(\.firstTry).count) / Double(window.count) >= config.lessonRate,
+              median(window.map(\.responseTime)) < config.solidMedianResponse
+        else { return false }
+        return true
+    }
+
+    /// Starts a lesson: fresh windows, then its notes.
     @discardableResult
-    public mutating func moveToUnit(_ number: Int) -> [ItemID] {
-        guard curriculum.unitNumbers.contains(number), number != state.unit else { return [] }
-        return enter(number, resetWindow: true)
+    private mutating func enter(_ id: LessonID) -> [ItemID] {
+        state.lesson = id
+        state.lessonScreens = 0
+        state.lessonRecent = []
+        state.rhythmRecent = []
+        state.newest = [:]
+        state.sizeRecent = []
+        return prepareLesson()
     }
 
-    /// Returns the ids that unlocked on entry.
-    private mutating func enter(_ number: Int, resetWindow: Bool) -> [ItemID] {
-        let unit = curriculum.unit(number)!
-        state.unit = number
-        if resetWindow {
-            state.unitRecent = []
-        }
-        let before = unlockedCount(number)
-        let after = max(before, unit.startCount)
-        state.unlockedCounts[number] = after
-        return unit.newItems[before..<after].map(\.id)
-    }
-
-    /// Pool items he has played at least once (intros don't count). These are what a
-    /// `.strongest` pick chooses from.
-    public var playedPool: [PracticeItem] {
-        pool.filter { stats(for: $0.id).attempts > 0 && !needsIntro($0) }
-    }
-
-    /// Picks the next item to show.
-    ///
-    /// - a new item that hasn't had its intro goes first, in curriculum order
-    /// - otherwise the newest batch shares `newestShare` (25%), the rest share what's
-    ///   left, weighted toward low boxes (weight 6 - box, so box 1 is 5x box 5)
-    /// - `.strongest` skips both and takes one of his highest-box items instead
-    /// - an item picked `maxRepeats` (2) times in a row is never picked a third time
-    ///   while the pool has 2+ items
-    public mutating func pickNext(_ style: PickStyle = .normal, using rng: inout some RandomNumberGenerator) -> PracticeItem {
-        let pool = self.pool
-        precondition(!pool.isEmpty, "unit \(unit.number) has an empty pool")
-        let recent = state.recentPicks.suffix(config.maxRepeats)
-        var blocked: ItemID?
-        if pool.count > 1, recent.count == config.maxRepeats, Set(recent).count == 1 {
-            blocked = recent.first
-        }
-        let picked: PracticeItem
-        if style == .strongest, let strong = strongestPick(blocked: blocked, using: &rng) {
-            picked = strong
-        } else if let intro = pool.first(where: { $0.id != blocked && needsIntro($0) }) {
-            picked = intro
-        } else {
-            // weigh the whole pool, then drop the blocked item, so blocking one item
-            // doesn't hand its share to whichever item happens to be left in its group
-            let newestIDs = Set(newestBatch.map(\.id))
-            let newest = pool.filter { newestIDs.contains($0.id) }
-            let others = pool.filter { !newestIDs.contains($0.id) }
-            var weighted: [(PracticeItem, Double)]
-            if newest.isEmpty || others.isEmpty {
-                weighted = pool.map { ($0, boxWeight($0)) }
-            } else {
-                let otherTotal = others.reduce(0) { $0 + boxWeight($1) }
-                weighted = newest.map { ($0, config.newestShare / Double(newest.count)) }
-                weighted += others.map { ($0, (1 - config.newestShare) * boxWeight($0) / otherTotal) }
+    /// Unlocks the lesson's known notes and tops its new notes up to the start count.
+    /// Safe to call again: a lesson that's already set up doesn't change.
+    @discardableResult
+    private mutating func prepareLesson() -> [ItemID] {
+        let lesson = self.lesson
+        var unlocked: [ItemID] = []
+        for clef in lesson.clefs {
+            let notes = lesson.notes(clef)!
+            for pitch in notes.known where !state.unlocked.contains(NoteKey(clef, pitch).id) {
+                state.unlocked.insert(NoteKey(clef, pitch).id)
             }
-            picked = weightedPick(weighted.filter { $0.0.id != blocked }, using: &rng)
+            let out = notes.new.filter { state.unlocked.contains(NoteKey(clef, $0).id) }.count
+            if out < notes.start {
+                let batch = chooseBatch(from: lockedNew(clef), count: notes.start - out, joining: pool(clef))
+                unlock(batch, clef: clef)
+                unlocked += batch.map(\.id)
+            }
         }
-        state.recentPicks = Array((state.recentPicks + [picked.id]).suffix(max(1, config.maxRepeats)))
-        return picked
+        state.screenSize = min(max(state.screenSize, lesson.sizes.lowerBound), lesson.sizes.upperBound)
+        return unlocked
     }
 
-    private func strongestPick(blocked: ItemID?, using rng: inout some RandomNumberGenerator) -> PracticeItem? {
-        var eligible = playedPool.filter { $0.id != blocked }
-        if eligible.count > 1, let last = state.recentPicks.last {
-            eligible.removeAll { $0.id == last }
+    private mutating func unlock(_ batch: [NoteKey], clef: Clef) {
+        for key in batch { state.unlocked.insert(key.id) }
+        state.newest[clef.rawValue] = batch.map(\.id)
+    }
+
+    /// `count` notes at random from `locked`, so that the pool they join has at least
+    /// one line note and one space note when that's possible.
+    private mutating func chooseBatch(from locked: [NoteKey], count: Int, joining pool: [NoteKey]) -> [NoteKey] {
+        let n = min(count, locked.count)
+        guard n > 0 else { return [] }
+        var first: [NoteKey]?
+        for _ in 0..<40 {
+            let pick = Array(shuffled(locked, using: &state.dice).prefix(n))
+            let all = pool + pick
+            if all.contains(where: \.isOnLine), all.contains(where: { !$0.isOnLine }) {
+                return pick.sorted()
+            }
+            first = first ?? pick
         }
-        guard let top = eligible.map(effectiveBox).max() else { return nil }
-        let tier = eligible.filter { effectiveBox($0) == top }
-        return tier[min(tier.count - 1, Int(unitInterval(&rng) * Double(tier.count)))]
+        return first!.sorted()
     }
 
-    /// The pitch box, or the lower of pitch and rhythm boxes for rhythm items.
-    private func effectiveBox(_ item: PracticeItem) -> Int {
-        let s = stats(for: item.id)
-        return item.isRhythm ? min(s.box, s.rhythmBox) : s.box
-    }
-
-    private func boxWeight(_ item: PracticeItem) -> Double {
-        Double(config.boxCount + 1 - effectiveBox(item))
-    }
-
-    private func weightedPick(_ weighted: [(PracticeItem, Double)], using rng: inout some RandomNumberGenerator) -> PracticeItem {
-        let total = weighted.reduce(0) { $0 + $1.1 }
-        var target = unitInterval(&rng) * total
-        for (item, weight) in weighted {
-            if target < weight { return item }
-            target -= weight
-        }
-        return weighted[weighted.count - 1].0
-    }
-
-    private func isSolid(_ recent: [AttemptSample]) -> Bool {
+    func isSolid(_ recent: [AttemptSample]) -> Bool {
         let window = recent.suffix(config.solidWindow)
         let firstTries = window.filter(\.firstTry).count
         if firstTries >= config.solidRequired, median(window.map(\.responseTime)) < config.solidMedianResponse {
@@ -391,6 +479,16 @@ func unitInterval(_ rng: inout some RandomNumberGenerator) -> Double {
     Double(rng.next() >> 11) * 0x1p-53
 }
 
+/// Fisher-Yates with `unitInterval`, so the order only depends on the generator.
+func shuffled<T>(_ items: [T], using rng: inout some RandomNumberGenerator) -> [T] {
+    var items = items
+    for i in stride(from: items.count - 1, to: 0, by: -1) {
+        let j = min(i, Int(unitInterval(&rng) * Double(i + 1)))
+        items.swapAt(i, j)
+    }
+    return items
+}
+
 func median(_ values: [Double]) -> Double {
     precondition(!values.isEmpty)
     let sorted = values.sorted()
@@ -398,18 +496,28 @@ func median(_ values: [Double]) -> Double {
     return sorted.count.isMultiple(of: 2) ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
 }
 
-// see LenientDecoding.swift
+// see LenientDecoding.swift. a round-1 state (per curated item, with units) decodes
+// too: single-note stats carry over where clef and pitch match ("treble:G4"), group,
+// chord and rhythm item ids are dropped, and he starts at lesson 1.1.
 extension MasteryState {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = MasteryState()
-        unit = try c.value(.unit, or: d.unit)
-        unlockedCounts = try c.value(.unlockedCounts, or: d.unlockedCounts)
-        completedUnits = try c.value(.completedUnits, or: d.completedUnits)
-        stats = try c.value(.stats, or: d.stats)
-        introduced = try c.value(.introduced, or: d.introduced)
-        unitRecent = try c.value(.unitRecent, or: d.unitRecent)
-        recentPicks = try c.value(.recentPicks, or: d.recentPicks)
+        lesson = try c.value(.lesson, or: d.lesson)
+        unlocked = try c.value(.unlocked, or: d.unlocked).filter { NoteKey(id: $0) != nil }
+        completedLessons = try c.value(.completedLessons, or: d.completedLessons)
+        stats = try c.value(.stats, or: d.stats).filter { NoteKey(id: $0.key) != nil }
+        introduced = try c.value(.introduced, or: d.introduced).filter { NoteKey(id: $0) != nil || $0.hasPrefix("lesson:") }
+        newest = try c.value(.newest, or: d.newest)
+        lessonScreens = try c.value(.lessonScreens, or: d.lessonScreens)
+        lessonRecent = try c.value(.lessonRecent, or: d.lessonRecent)
+        rhythmRecent = try c.value(.rhythmRecent, or: d.rhythmRecent)
+        screenSize = try c.value(.screenSize, or: d.screenSize)
+        sizeRecent = try c.value(.sizeRecent, or: d.sizeRecent)
+        recentScreens = try c.value(.recentScreens, or: d.recentScreens)
+        recentColumns = try c.value(.recentColumns, or: d.recentColumns)
+        lastScreenWasIntro = try c.value(.lastScreenWasIntro, or: d.lastScreenWasIntro)
+        dice = try c.value(.dice, or: d.dice)
     }
 }
 
@@ -421,9 +529,6 @@ extension ItemStats {
         recent = try c.value(.recent, or: d.recent)
         attempts = try c.value(.attempts, or: d.attempts)
         firstTryCount = try c.value(.firstTryCount, or: d.firstTryCount)
-        rhythmBox = try c.value(.rhythmBox, or: d.rhythmBox)
-        rhythmRecent = try c.value(.rhythmRecent, or: d.rhythmRecent)
-        rhythmAttempts = try c.value(.rhythmAttempts, or: d.rhythmAttempts)
         peakFluency = try c.value(.peakFluency, or: d.peakFluency)
     }
 }

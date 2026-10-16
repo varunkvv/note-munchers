@@ -33,8 +33,8 @@ public enum StaffLayout: String, CaseIterable, Codable, Hashable, Sendable {
 /// 1 the first space, 2 the second line ... 8 the top line. Negative is below the
 /// staff, above 8 is above it. Even steps are lines, odd steps are spaces.
 ///
-/// Black keys sit on their white key's step (sharp spelling). Drawing the sharp
-/// sign is out of scope for now.
+/// Black keys sit on their white key's step (sharp spelling). F# is read from the
+/// key signature (`KeySignature.gMajor`), so no sharp is drawn next to the note.
 public struct StaffPosition: Hashable, Codable, Sendable {
     public static let bottomLineStep = 0
     public static let middleLineStep = 4
@@ -70,4 +70,30 @@ public struct StaffPosition: Hashable, Codable, Sendable {
 
     /// Single-note stem rule: notes below the middle line get stems up.
     public var stemUp: Bool { step < Self.middleLineStep }
+}
+
+/// Sharps drawn after the clef. Lessons in G major show it on every screen, so F# is
+/// read from the key signature, not from a sign next to the note.
+public enum KeySignature: String, CaseIterable, Codable, Hashable, Sendable {
+    /// Levels 1-2: nothing after the clef, and no F in the notes.
+    case none
+    /// One sharp, F#. Levels 3-5.
+    case gMajor
+
+    /// Staff steps of the sharps on this clef, left to right: the top line F5 on the
+    /// treble staff, the F3 line on the bass staff.
+    public func sharpSteps(_ clef: Clef) -> [Int] {
+        switch self {
+        case .none: []
+        case .gMajor: [clef == .treble ? 8 : 6]
+        }
+    }
+
+    /// Pitch classes played sharp in this key (6 = F#).
+    public var sharpPitchClasses: Set<Int> {
+        switch self {
+        case .none: []
+        case .gMajor: [6]
+        }
+    }
 }

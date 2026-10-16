@@ -21,8 +21,8 @@ final class AppModel {
     var showParent = false
     /// DEBUG demo: open the parent area on this page.
     var parentPage: String?
-    /// DEBUG demo: show the staff gallery for this unit instead of the app.
-    var galleryUnit: Int?
+    /// DEBUG demo: show the staff gallery for this lesson instead of the app.
+    var galleryLesson: LessonID?
 
     let input = InputHub()
     let sounds = Sounds()
@@ -49,13 +49,14 @@ final class AppModel {
         #endif
         store = Store(inMemory: inMemory)
         muncherColors = MuncherColors(picked: store.muncherColors())
-        let (state, settings) = store.loadMastery() ?? (MasteryState(), ParentSettings())
+        // first launch: his own seed, so which notes he starts with is his own draw
+        let (state, settings) = store.loadMastery() ?? (MasteryState(seed: UInt64.random(in: 0...UInt64.max)), ParentSettings())
         let config = settings.config
         self.config = config
         engine = MasteryEngine(config: config, state: state)
         #if DEBUG
         let counts = store.counts()
-        print("store: loaded unit \(engine.unit.number), \(engine.allProgress.count) items played, \(counts.attempts) attempts, \(counts.sessions) sessions, colours \(muncherColors.picked.sorted { $0.key < $1.key })\(store.isTemporary ? " (temporary)" : "")")
+        print("store: loaded lesson \(engine.lesson.id), \(engine.allProgress.count) notes played, \(counts.attempts) attempts, \(counts.sessions) sessions, colours \(muncherColors.picked.sorted { $0.key < $1.key })\(store.isTemporary ? " (temporary)" : "")")
         #endif
     }
 
@@ -86,8 +87,8 @@ final class AppModel {
             engine: MasteryEngine(config: config, state: engine.state),
             input: input, sounds: sounds, voice: voice, seed: seed
         )
-        controller.onItemDone = { [weak self] attempt, state in
-            self?.itemDone(attempt, state: state)
+        controller.onScreenDone = { [weak self] screen, state in
+            self?.screenDone(screen, state: state)
         }
         controller.onSessionDone = { [weak self] summary, state in
             self?.sessionDone(summary, state: state)
@@ -100,8 +101,7 @@ final class AppModel {
             self?.store.saveMuncherColor(index, for: id)
         }
         #if DEBUG
-        // the hatch script screenshots a mid-session hatch: eggs at the start pick quickly
-        if demo.isActive { controller.demoAutoPick = demo.script == "hatch" ? 0.8 : demo.autoPick }
+        if demo.isActive { controller.demoAutoPick = demo.autoPick }
         #endif
         practice = controller
         screen = .practice
@@ -115,7 +115,7 @@ final class AppModel {
         guard let practice else { return }
         practice.stop()
         let summary = practice.session.summary
-        if summary.itemsPlayed > 0 {
+        if summary.screensPlayed > 0 {
             store.addSession(summary, startedAt: sessionStartedAt)
         }
         lastSummary = summary
@@ -134,10 +134,13 @@ final class AppModel {
         screen = .home
     }
 
-    private func itemDone(_ attempt: AttemptResult, state: MasteryState) {
+    private func screenDone(_ screen: ScreenResult, state: MasteryState) {
         engine = MasteryEngine(config: config, state: state)
         store.saveMastery(state, settings: ParentSettings(config))
-        store.addAttempt(attempt)
+        // one row per note, so the dashboard's per-note trends work as before
+        for (i, note) in screen.notes.enumerated() {
+            store.addAttempt(note, commit: i == screen.notes.count - 1)
+        }
     }
 
     private func sessionDone(_ summary: SessionSummary, state: MasteryState) {
@@ -158,9 +161,15 @@ final class AppModel {
         store.saveMastery(engine.state, settings: ParentSettings(config))
     }
 
-    func moveToUnit(_ number: Int) {
+    func moveToLesson(_ id: LessonID) {
         guard practice == nil else { return }
-        engine.moveToUnit(number)
+        engine.moveToLesson(id)
+        store.saveMastery(engine.state, settings: ParentSettings(config))
+    }
+
+    func moveToLevel(_ number: Int) {
+        guard practice == nil else { return }
+        engine.moveToLevel(number)
         store.saveMastery(engine.state, settings: ParentSettings(config))
     }
 
