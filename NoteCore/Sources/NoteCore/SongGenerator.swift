@@ -327,7 +327,7 @@ public enum SongGenerator {
             let notes = range.map { WrittenNote(slots[$0].clef, [melody[$0]], slots[$0].value) }
             bars.append(SongBar(notes, chords: chords[bar]))
         }
-        if request.level >= 4 {
+        if request.level == 4 {
             bars = addDyads(bars, request: request, using: &rng)
         }
         return Song(seed: seed, level: request.level, meter: request.meter, keySignature: request.keySignature, form: form,
@@ -397,7 +397,7 @@ public enum SongGenerator {
 
     // MARK: two at once (level 4)
 
-    /// Level 4: phrase ends and some first beats get a second note from the bar's chord, a
+    /// Level 4 (not 5, which is about eighths): phrase ends and some first beats get a second note from the bar's chord, a
     /// 3rd to a 5th apart. Melody on top, except the last G, which gets a B over it.
     private static func addDyads(_ bars: [SongBar], request: SongRequest, using rng: inout SeededRandom) -> [SongBar] {
         let n = bars.count
@@ -450,7 +450,7 @@ public enum SongGenerator {
 
         // what he can play at his level
         if song.level < 5, notes.contains(where: { $0.value == .eighth }) { out.append("eighths before level 5") }
-        if song.level < 4, notes.contains(where: \.isChord) { out.append("two at once before level 4") }
+        if song.level != 4, notes.contains(where: \.isChord) { out.append("two at once outside level 4") }
         if song.level < 3, notes.contains(where: { $0.pitches.contains { !$0.isWhiteKey } }) { out.append("F# before level 3") }
         for (b, bar) in song.bars.enumerated() where bar.chords.count > 1 {
             if b != song.phraseOneEnd, b < song.bars.count - 2 { out.append("bar \(b + 1): a chord change away from a cadence") }
@@ -554,6 +554,10 @@ public enum SongGenerator {
         }
         let counts = Dictionary(grouping: line, by: { $0 }).values.map(\.count)
         if let most = counts.max(), Double(most) / Double(n) > 0.35 { s -= 1 }
+        // a bar that's one key all through (A A) stands still, except the last bar
+        s -= 0.5 * Double(song.bars.dropLast().filter { bar in bar.notes.count > 1 && Set(bar.notes.map(\.pitches)).count == 1 }.count)
+        // level 5 is about eighths
+        if song.level >= 5, song.notes.contains(where: { $0.value == .eighth }) { s += 1.5 }
         return s
     }
 

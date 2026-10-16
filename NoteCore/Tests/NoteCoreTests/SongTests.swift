@@ -117,7 +117,7 @@ import Testing
     // MARK: the hard rules, everywhere
 
     /// Seeds x level x meter x hands x his notes: every song keeps every hard rule, nothing
-    /// he hasn't learned (eighths before 5, two at once before 4, F# before 3), and the
+    /// he hasn't learned (eighths before 5, two at once outside 4, F# before 3), and the
     /// fallback almost never.
     @Test(arguments: 1...5)
     func hardRulesHold(level: Int) async {
@@ -148,7 +148,7 @@ import Testing
             #expect(broken.isEmpty, "\(song.signature): \(broken)")
             let values = Set(song.notes.map(\.value))
             #expect(level >= 5 || !values.contains(.eighth))
-            #expect(level >= 4 || !song.notes.contains(where: \.isChord))
+            #expect(level == 4 || !song.notes.contains(where: \.isChord))
             #expect(level >= 3 || song.notes.allSatisfy { $0.pitches.allSatisfy(\.isWhiteKey) })
             #expect(song.bars.count == request.bars)
             #expect(song.keySignature == (level >= 3 ? .gMajor : .none))
