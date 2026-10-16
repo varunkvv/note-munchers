@@ -34,6 +34,16 @@ import NoteCore
 ///                          optionally answer it (read in ParentGate.swift)
 ///     -renderSongs <dir>   write one song per level with its backing (the Listen track) to
 ///                          <dir> as m4a, then quit. Not a demo, works best on the mac build
+///     -demoSolid YES       every note in his level's song range is solid (box 4), so song
+///                          time shows up (home, end screen) and the song scripts can run
+///   song time scripts (with -demoSolid YES, -demoLevel n):
+///     -demoScript song     a kid playing a song: the title card, then one note at a time
+///                          (~1s each x -demoSlow), a wrong key now and then, the play
+///                          button once, to the end card, then Listen
+///     -demoScript songTitle  stays on the title card
+///     -demoSongPage <n>    the song script stops when page n (1 = first) comes up
+///     -demoSongStop <n>    ...or after n notes
+///     -demoSongEnd YES     ...or jumps straight to the end card
 struct DemoOptions {
     var script: String?
     var screen: String?
@@ -54,6 +64,10 @@ struct DemoOptions {
     var autoPick = 0.8
     /// write the song renders here and quit
     var renderSongs: String?
+    var solid = false
+    var songPage: Int?
+    var songStop: Int?
+    var songEnd = false
 
     init(defaults: UserDefaults = .standard) {
         script = defaults.string(forKey: "demoScript")
@@ -73,6 +87,10 @@ struct DemoOptions {
         logMIDI = defaults.bool(forKey: "logMIDI")
         autoPick = defaults.string(forKey: "demoAutoPick").flatMap(Double.init) ?? 0.8
         renderSongs = defaults.string(forKey: "renderSongs")
+        solid = defaults.bool(forKey: "demoSolid")
+        songPage = defaults.string(forKey: "demoSongPage").flatMap(Int.init)
+        songStop = defaults.string(forKey: "demoSongStop").flatMap(Int.init)
+        songEnd = defaults.bool(forKey: "demoSongEnd")
     }
 
     var isActive: Bool { script != nil || screen != nil }
@@ -107,6 +125,7 @@ final class DemoRunner {
         if let level = options.level { engine.moveToLevel(level) }
         if let lesson = options.lesson { engine.moveToLesson(lesson) }
         if options.met { engine = Self.meetEverything(engine) }
+        if options.solid { engine = Self.solidEverything(engine) }
         if let size = options.size {
             var state = engine.state
             state.screenSize = size
@@ -152,6 +171,10 @@ final class DemoRunner {
             return
         }
         guard let script = options.script else { return }
+        if script.hasPrefix("song") {
+            await runSong(script)
+            return
+        }
         model.startPractice()
         guard let c = model.practice else { return }
         // setup steps run fast. the slow factor is for the state being screenshotted.
@@ -486,6 +509,89 @@ final class DemoRunner {
             await sleep(1.6 * options.slow)
             c.demoReplay(kind, column: column)
         }
+    }
+
+    // MARK: song time
+
+    private func runSong(_ script: String) async {
+        model.startSong()
+        guard let c = model.song else {
+            log("song: no song (does he have 3 solid notes with G and A? try -demoSolid YES)")
+            return
+        }
+        c.timeScale = options.slow
+        log("song: \(c.song.title), \(c.pages.count) pages, \(c.song.notes.count) notes")
+        guard script == "song" else { return }
+        await sleep(2.5 * options.slow)
+        c.start()
+        log("song: let's play")
+        if options.songEnd {
+            await sleep(0.5)
+            c.demoSkipToEnd()
+            log("song: end card")
+            return
+        }
+        await sleep(1.6 * options.slow)
+        var heard = false
+        var played = 0
+        while c.phase == .playing {
+            if let page = options.songPage, c.page + 1 >= page {
+                log("song: on page \(c.page + 1)")
+                return
+            }
+            if let stop = options.songStop, played >= stop {
+                log("song: stopped after \(played) notes")
+                return
+            }
+            if !heard, played == 2 {
+                heard = true
+                c.hearIt()
+                log("song: play button")
+                await waitUntil(seconds: 30) { !c.isPlayingBack }
+                await sleep(0.8 * options.slow)
+            }
+            if played % 7 == 5 {
+                let wrong = c.expected.map { whiteKey($0, steps: 2) }
+                await press(wrong)
+                log("song: wrong \(wrong.map(\.name))")
+                await sleep(0.9 * options.slow)
+            }
+            let page = c.page
+            let keys = c.expected
+            await press(keys)
+            played += 1
+            log("song: right \(keys.map(\.name)) (note \(played))")
+            // a look at a new page before playing on, like reading it
+            await sleep((c.page != page ? 1.6 : 0.85) * options.slow)
+        }
+        await waitUntil(seconds: 30) { c.phase == .end }
+        log("song: end card")
+        await sleep(2.5 * options.slow)
+        c.listen()
+        log("song: listen")
+        await waitUntil(seconds: 90) { c.phase == .end }
+        log("song: listen over")
+    }
+
+    /// Every note in his level's song range at box 4 with a few right answers (`-demoSolid`).
+    static func solidEverything(_ engine: MasteryEngine) -> MasteryEngine {
+        var state = engine.state
+        for clef in Clef.allCases {
+            for pitch in MasteryEngine.songRange(level: engine.lesson.level, clef: clef) {
+                let id = NoteKey(clef, pitch).id
+                var stats = state.stats[id] ?? ItemStats()
+                stats.box = max(stats.box, 4)
+                stats.attempts = max(stats.attempts, 6)
+                stats.firstTryCount = max(stats.firstTryCount, 6)
+                stats.recent = Array(repeating: AttemptSample(firstTry: true, responseTime: 1.5), count: 6)
+                stats.peakFluency = max(stats.peakFluency, 0.55)
+                state.stats[id] = stats
+                state.unlocked.insert(id)
+                state.introduced.insert(id)
+            }
+        }
+        state.newest = [:]
+        return MasteryEngine(config: engine.config, state: state)
     }
 
     /// Every note waiting for its intro gets one, as if he'd met them all (`-demoMet`).
