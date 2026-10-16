@@ -81,6 +81,20 @@ import Testing
         }
     }
 
+    /// Level 3 adds F#: every F there is F#, read from the G major key signature.
+    @Test func levelThreeIsInGMajorWithFSharp() {
+        let level = curriculum.level(3)!
+        #expect(level.lessons.allSatisfy { $0.keySignature == .gMajor })
+        let fs = Set(level.lessons.flatMap(\.keys).filter { $0.pitch.naturalLetter == .f }.map(\.id))
+        #expect(fs == ["treble:F#4", "treble:F#5", "bass:F#3"], "F#2 is below bass G2, out of range")
+        #expect(curriculum.lessons.allSatisfy { lesson in
+            lesson.keys.allSatisfy { $0.pitch.isWhiteKey || lesson.keySignature.sharpPitchClasses.contains($0.pitch.pitchClass) }
+        }, "no black key without a key signature that sharps it")
+        #expect(level.lessons.filter { !$0.newKeys.isEmpty }.allSatisfy { lesson in
+            lesson.newKeys.contains { !$0.pitch.isWhiteKey } || lesson.id == "3.4"
+        }, "each lesson that widens a staff past an F brings its F# in")
+    }
+
     @Test func levelThreeReachesMiddleCFromBothSides() {
         let notes = Set(curriculum.level(3)!.lessons.flatMap(\.keys).map(\.id))
         #expect(notes.contains("treble:C4") && notes.contains("bass:C4"))
@@ -202,8 +216,8 @@ import Testing
         var engine = MasteryEngine(state: MasteryState(seed: 4))
         engine.moveToLesson("3.1")
         let pending = engine.pendingIntros
-        #expect(pending.count == 1, "one of E5 / G5 starts")
-        #expect(pending.allSatisfy { ["treble:E5", "treble:G5"].contains($0.id) })
+        #expect(pending.count == 1, "one of E5 / F#5 / G5 starts")
+        #expect(pending.allSatisfy { ["treble:E5", "treble:F#5", "treble:G5"].contains($0.id) })
         #expect(engine.screenSize == 4)
     }
 

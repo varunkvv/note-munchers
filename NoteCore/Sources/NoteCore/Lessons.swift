@@ -215,31 +215,33 @@ extension Curriculum {
                 sizes: 4...6, octavePolicy: .lenient
             ),
         ]),
-        Level(number: 3, title: "Around G position", lessons: [
+        // G major from here on: the key signature's sharp is on every screen, and F is
+        // read as F# from it (F#4 and F#5 in treble, F#3 in bass)
+        Level(number: 3, title: "Around G position, in G major", lessons: [
             Lesson(
                 "3.1", level: 3, title: "Treble up to G5", focus: .treble,
-                treble: ClefNotes(known: trebleG, new: [e5, g5], start: 1), bass: ClefNotes(known: bassG),
-                sizes: 4...8, octavePolicy: .strict
+                treble: ClefNotes(known: trebleG, new: [e5, fs5, g5], start: 1), bass: ClefNotes(known: bassG),
+                sizes: 4...8, octavePolicy: .strict, keySignature: .gMajor
             ),
             Lesson(
                 "3.2", level: 3, title: "Bass up to G3", focus: .bass,
-                treble: ClefNotes(known: trebleUp), bass: ClefNotes(known: bassG, new: [e3, g3], start: 1),
-                sizes: 4...8, octavePolicy: .strict
+                treble: ClefNotes(known: trebleUp), bass: ClefNotes(known: bassG, new: [e3, fs3, g3], start: 1),
+                sizes: 4...8, octavePolicy: .strict, keySignature: .gMajor
             ),
             Lesson(
                 "3.3", level: 3, title: "Middle C from the treble side", focus: .treble,
-                treble: ClefNotes(known: trebleUp, new: [c4, d4, e4], start: 1), bass: ClefNotes(known: bassUp),
-                sizes: 4...8, octavePolicy: .strict
+                treble: ClefNotes(known: trebleUp, new: [c4, d4, e4, fs4], start: 1), bass: ClefNotes(known: bassUp),
+                sizes: 4...8, octavePolicy: .strict, keySignature: .gMajor
             ),
             Lesson(
                 "3.4", level: 3, title: "Middle C from the bass side", focus: .bass,
                 treble: ClefNotes(known: trebleWide), bass: ClefNotes(known: bassUp, new: [a3, b3, c4], start: 1),
-                sizes: 4...8, octavePolicy: .strict
+                sizes: 4...8, octavePolicy: .strict, keySignature: .gMajor
             ),
             Lesson(
                 "3.5", level: 3, title: "Grand staff, the whole range", focus: .both, layout: .grand,
                 treble: ClefNotes(known: trebleWide), bass: ClefNotes(known: bassWide),
-                sizes: 6...8, octavePolicy: .strict
+                sizes: 6...8, octavePolicy: .strict, keySignature: .gMajor
             ),
         ]),
     ])
@@ -251,13 +253,14 @@ extension Curriculum {
     static let c4 = Pitch(.c, 4), d4 = Pitch(.d, 4), e4 = Pitch(.e, 4)
     static let g4 = Pitch(.g, 4), a4 = Pitch(.a, 4), b4 = Pitch(.b, 4)
     static let c5 = Pitch(.c, 5), d5 = Pitch(.d, 5), e5 = Pitch(.e, 5), g5 = Pitch(.g, 5)
+    static let fs3 = Pitch("F#3")!, fs4 = Pitch("F#4")!, fs5 = Pitch("F#5")!
 
     /// G position.
     static let trebleG = [g4, a4, b4, c5, d5]
     static let bassG = [g2, a2, b2, c3, d3]
     /// Level 3: up to G5 / G3, then down / up to middle C.
-    static let trebleUp = trebleG + [e5, g5]
-    static let bassUp = bassG + [e3, g3]
-    static let trebleWide = [c4, d4, e4] + trebleUp
+    static let trebleUp = trebleG + [e5, fs5, g5]
+    static let bassUp = bassG + [e3, fs3, g3]
+    static let trebleWide = [c4, d4, e4, fs4] + trebleUp
     static let bassWide = bassUp + [a3, b3, c4]
 }

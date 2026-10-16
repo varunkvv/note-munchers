@@ -4,7 +4,8 @@ import NoteCore
 
 /// DEBUG launch arguments for driving the app without a piano (simulator, agents).
 ///
-///     -demoScript <name>   play a scripted sequence through InputHub.emit (see DemoRunner.run)
+///     -demoScript <name>   play a scripted sequence through InputHub.emit (see DemoRunner.run).
+///                          sharpPrompt / sharp stop on the next F# (sharp also presses F natural)
 ///     -demoScreen <name>   open a screen directly: home, parent, parent#levels, parent#staff,
 ///                          parent#history, levels (the level picker), monitor, gallery
 ///                          (generated screens of -demoLesson)
@@ -208,6 +209,25 @@ final class DemoRunner {
         case "almost":
             await skipIntros(c)
             await wrongOctave(c)
+        case "sharp", "sharpPrompt":
+            // right notes until an F# is next, then (sharp) the F natural next to it:
+            // "that's F - this one is F sharp, the black key"
+            await skipIntros(c)
+            for _ in 0..<200 {
+                guard let item = c.item, c.phase.isPlaying else { break }
+                if !item.notes[c.session.noteIndex].pitches[0].isWhiteKey { break }
+                let shown = c.itemsShown
+                await right(c)
+                if c.phase == .success { await waitForNext(c, after: shown) }
+            }
+            c.timeScale = options.slow
+            guard script == "sharp", let item = c.item, c.phase.isPlaying else {
+                log("on an F#", c)
+                break
+            }
+            let natural = Pitch(midi: item.notes[c.session.noteIndex].pitches[0].midi - 1)
+            await press([natural])
+            log("natural \(natural.name) on an F#", c)
         case "success":
             await skipIntros(c)
             c.holdAfterSuccess = true

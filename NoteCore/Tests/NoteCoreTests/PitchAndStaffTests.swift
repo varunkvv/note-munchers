@@ -102,6 +102,8 @@ import Testing
         "C3": -9, "D3": -8, "E3": -7, "F3": -6, "G3": -5, "A3": -4, "B3": -3,
         "C4": -2, "D4": -1, "E4": 0, "F4": 1, "G4": 2, "A4": 3, "B4": 4,
         "C5": 5, "D5": 6, "E5": 7, "F5": 8, "G5": 9, "A5": 10, "B5": 11, "C6": 12,
+        // F# sits on F's line or space; the key signature makes it sharp
+        "F#2": -13, "F#3": -6, "F#4": 1, "F#5": 8,
     ]
 
     @Test func everyCurriculumNoteInBothClefs() throws {
@@ -143,6 +145,15 @@ import Testing
         #expect(Clef.treble.position(of: Pitch("G4")!).stemUp)
         #expect(!Clef.treble.position(of: Pitch("B4")!).stemUp, "middle line gets stem down")
         #expect(!Clef.treble.position(of: Pitch("D5")!).stemUp)
+    }
+
+    @Test func gMajorKeySignature() {
+        #expect(KeySignature.gMajor.sharpSteps(.treble) == [8], "top line F5")
+        #expect(KeySignature.gMajor.sharpSteps(.bass) == [6], "the F3 line")
+        #expect(KeySignature.none.sharpSteps(.treble).isEmpty)
+        #expect(Clef.treble.position(of: Pitch("F#5")!).step == KeySignature.gMajor.sharpSteps(.treble)[0])
+        #expect(Clef.bass.position(of: Pitch("F#3")!).step == KeySignature.gMajor.sharpSteps(.bass)[0])
+        #expect(KeySignature.gMajor.sharpPitchClasses == [Pitch("F#4")!.pitchClass])
     }
 
     @Test func layouts() {
