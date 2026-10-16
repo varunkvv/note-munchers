@@ -59,6 +59,16 @@ public struct Lesson: Identifiable, Hashable, Sendable {
     public enum Texture: Hashable, Sendable {
         /// One key at a time.
         case single
+        /// Lines mixing single notes and two notes at once: about half the columns get
+        /// a second note this many letters above (2 = a third, 3 = a fourth, 4 = a
+        /// fifth), from notes he already has. Sizes count columns.
+        case dyads(intervals: [Int])
+        /// Rhythm lines in 4/4 from these lengths (eighths come as a beamed pair, at most
+        /// one pair a bar). Sizes count bars. `oneNote`: every note on a screen is the
+        /// same key, so only the rhythm is new.
+        case rhythm(values: [NoteValue], oneNote: Bool)
+
+        public var isRhythm: Bool { if case .rhythm = self { true } else { false } }
     }
 
     public let id: LessonID
@@ -242,6 +252,62 @@ extension Curriculum {
                 "3.5", level: 3, title: "Grand staff, the whole range", focus: .both, layout: .grand,
                 treble: ClefNotes(known: trebleWide), bass: ClefNotes(known: bassWide),
                 sizes: 6...8, octavePolicy: .strict, keySignature: .gMajor
+            ),
+        ]),
+        Level(number: 4, title: "Two notes at once", lessons: [
+            Lesson(
+                "4.1", level: 4, title: "Treble: thirds and fifths", focus: .treble,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 3...5, octavePolicy: .strict, keySignature: .gMajor, texture: .dyads(intervals: [2, 4])
+            ),
+            Lesson(
+                "4.2", level: 4, title: "Bass: thirds and fifths", focus: .bass,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 3...5, octavePolicy: .strict, keySignature: .gMajor, texture: .dyads(intervals: [2, 4])
+            ),
+            Lesson(
+                "4.3", level: 4, title: "Thirds, fourths and fifths", focus: .both,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 3...6, octavePolicy: .strict, keySignature: .gMajor, texture: .dyads(intervals: [2, 3, 4])
+            ),
+            Lesson(
+                "4.4", level: 4, title: "Grand staff, two at once", focus: .both, layout: .grand,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor, texture: .dyads(intervals: [2, 3, 4])
+            ),
+        ]),
+        // rhythm on notes he knows (G position). 2 bars at most: wider lines don't fit
+        // the landscape staff at the fixed line gap
+        Level(number: 5, title: "Rhythm", lessons: [
+            Lesson(
+                "5.1", level: 5, title: "Quarters and halves on one note", focus: .both,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 1...2, octavePolicy: .strict, keySignature: .gMajor,
+                texture: .rhythm(values: [.quarter, .half], oneNote: true)
+            ),
+            Lesson(
+                "5.2", level: 5, title: "Eighths on one note", focus: .both,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 1...2, octavePolicy: .strict, keySignature: .gMajor,
+                texture: .rhythm(values: [.eighth, .quarter, .half], oneNote: true)
+            ),
+            Lesson(
+                "5.3", level: 5, title: "Treble lines", focus: .treble,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 1...2, octavePolicy: .strict, keySignature: .gMajor,
+                texture: .rhythm(values: [.quarter, .half], oneNote: false)
+            ),
+            Lesson(
+                "5.4", level: 5, title: "Bass lines with eighths", focus: .bass,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 1...2, octavePolicy: .strict, keySignature: .gMajor,
+                texture: .rhythm(values: [.eighth, .quarter, .half], oneNote: false)
+            ),
+            Lesson(
+                "5.5", level: 5, title: "Grand staff lines", focus: .both, layout: .grand,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 2...2, octavePolicy: .strict, keySignature: .gMajor,
+                texture: .rhythm(values: [.eighth, .quarter, .half], oneNote: false)
             ),
         ]),
     ])

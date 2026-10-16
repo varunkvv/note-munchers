@@ -16,11 +16,19 @@ struct StaffSpec: Hashable {
         width = Metrics.notesStart(keySignature) + noteWidth + Metrics.rightPad
     }
 
-    /// Room for the biggest screen a lesson can show (its largest size plus a stretch note).
+    /// Room for the biggest screen a lesson can show: its largest size plus a stretch
+    /// note, or its most bars of the busiest rhythm (an eighth pair and three quarters).
     init(lesson: Lesson, layout: StaffLayout) {
-        let columns = lesson.sizes.upperBound + 1
-        let bars = MasteryEngine.bars(columns).count
-        let noteWidth = Double(columns) * Metrics.columnWidth(nil) + Double(bars - 1) * Metrics.barGap
+        let noteWidth: Double
+        if lesson.texture.isRhythm {
+            let bars = lesson.sizes.upperBound
+            let busiest = 2 * Metrics.columnWidth(.eighth) + 3 * Metrics.columnWidth(.quarter)
+            noteWidth = Double(bars) * busiest + Double(bars - 1) * Metrics.barGap
+        } else {
+            let columns = lesson.sizes.upperBound + 1
+            let bars = MasteryEngine.bars(columns).count
+            noteWidth = Double(columns) * Metrics.columnWidth(nil) + Double(bars - 1) * Metrics.barGap
+        }
         self.init(layout: layout, keySignature: lesson.keySignature, noteWidth: noteWidth)
     }
 
@@ -110,13 +118,14 @@ enum Metrics {
         return up
     }
 
-    /// Width of one column in line gaps, before stretching to fill the staff.
+    /// Width of one column in line gaps, before stretching to fill the staff. Rhythm
+    /// columns are a little tighter than engraving so two busy bars fit at 30pt.
     static func columnWidth(_ value: NoteValue?) -> Double {
         switch value {
         case nil: 3
-        case .eighth: 2.3
-        case .quarter: 2.9
-        case .half: 3.9
+        case .eighth: 1.9
+        case .quarter: 2.4
+        case .half: 3.2
         }
     }
 

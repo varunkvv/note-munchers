@@ -314,7 +314,7 @@ public struct MasteryEngine: Sendable {
         if !screen.wasIntro, !screen.wasLessonIntro {
             state.lessonScreens += 1
         }
-        if let rhythm = screen.rhythm {
+        if let rhythm = screen.rhythm, !screen.wasLessonIntro {
             state.rhythmRecent = Array((state.rhythmRecent + [rhythm.isOK]).suffix(config.solidWindow))
         }
         if screen.reason == .normal, !screen.wasIntro, !screen.wasLessonIntro, screen.size == state.screenSize {
@@ -355,7 +355,7 @@ public struct MasteryEngine: Sendable {
         // a screen never needs every note he has on a clef, or it's only a reshuffle:
         // 3 notes on a clef allow 2 a screen, 5 allow 4. grand staff screens put half on each
         let perClef = lesson.clefs.map { playable($0).count - 1 }.min() ?? 1
-        let room = lesson.layout == .grand ? perClef * 2 : perClef
+        let room = lesson.texture.isRhythm ? Int.max : lesson.layout == .grand ? perClef * 2 : perClef
         if state.sizeRecent.count >= config.sizeWindow, rate >= config.sizeUpRate, state.screenSize < sizes.upperBound,
            state.screenSize < room {
             state.screenSize += 1
@@ -404,7 +404,10 @@ public struct MasteryEngine: Sendable {
               Double(window.filter(\.firstTry).count) / Double(window.count) >= config.lessonRate,
               median(window.map(\.responseTime)) < config.solidMedianResponse
         else { return false }
-        return true
+        // rhythm lessons: the rhythm track too (a rhythm slip never holds back notes,
+        // but a rhythm lesson is about the rhythm)
+        if lesson.texture.isRhythm, !isRhythmSolid { return false }
+        return state.introduced.contains(lessonIntroID) || lesson.texture == .single
     }
 
     /// Starts a lesson: fresh windows, then its notes.

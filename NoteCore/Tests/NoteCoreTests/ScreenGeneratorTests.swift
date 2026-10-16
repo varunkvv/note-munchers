@@ -2,6 +2,13 @@ import Testing
 @testable import NoteCore
 
 @Suite struct ScreenGeneratorTests {
+    /// In `lesson` with every note met, staying there however well he plays.
+    func stayIn(_ lesson: LessonID) -> MasteryEngine {
+        var config = NoteCoreConfig()
+        config.lessonMinScreens = 10_000
+        return engine(in: lesson, config: config)
+    }
+
     /// Picks `count` screens, playing each one right (intros as intros).
     func run(_ engine: inout MasteryEngine, _ count: Int, seed: UInt64 = 1, style: PickStyle = .normal,
              right: (PracticeItem) -> Bool = { _ in true }) -> [Pick] {
@@ -10,17 +17,13 @@ import Testing
         for _ in 0..<count {
             let pick = engine.pickScreen(style, using: &rng)
             picks.append(pick)
-            if let intro = pick.intro {
-                engine.intro(intro)
-            } else {
-                engine.play(pick.item.notes.flatMap(\.keys), right: right(pick.item), time: 1.2, reason: pick.isStretch ? .stretch : .normal)
-            }
+            engine.playPick(pick, right: right(pick.item), time: 1.2)
         }
         return picks
     }
 
     @Test func screensUseHisSizeAndOnlyNotesHeHasMet() {
-        var engine = engine(in: "1.2")
+        var engine = stayIn("1.2")
         var rng = SeededRandom(seed: 2)
         for _ in 0..<100 {
             let pick = engine.pickScreen(using: &rng)
@@ -36,7 +39,7 @@ import Testing
 
     @Test func neverTheSameKeyThreeTimesInARow() {
         for seed: UInt64 in 1...5 {
-            var engine = engine(in: "1.4")
+            var engine = stayIn("1.4")
             let picks = run(&engine, 300, seed: seed)
             let columns = picks.flatMap { $0.item.notes.map(MasteryEngine.columnID) }
             #expect(maxRun(columns) <= 2, "seed \(seed)")
@@ -44,7 +47,7 @@ import Testing
     }
 
     @Test func noScreenComesBackWhileItsRecent() {
-        var engine = engine(in: "1.2")
+        var engine = stayIn("1.2")
         let ids = run(&engine, 300).map(\.item.id)
         for (i, id) in ids.enumerated() where i >= 1 {
             // 5 notes a clef, 2-3 per screen: 25+ screens per clef, so the full window of 10
@@ -54,7 +57,7 @@ import Testing
 
     @Test func aTinyPoolOnlyAvoidsTheLastScreen() {
         // 1.1 at 1 note per screen with 3 notes per clef: only 3 screens per clef exist
-        var engine = engine(in: "1.1")
+        var engine = stayIn("1.1")
         let picks = run(&engine, 40)
         let ids = picks.prefix(8).map(\.item.id)
         for (a, b) in zip(ids, ids.dropFirst()) {
@@ -63,7 +66,7 @@ import Testing
     }
 
     @Test func contourMixesStepsSkipsAndRepeats() {
-        var engine = engine(in: "1.4")
+        var engine = stayIn("1.4")
         var steps = 0, skips = 0, repeats = 0
         for pick in run(&engine, 300) {
             let keys = pick.item.notes.flatMap(\.keys)
@@ -77,13 +80,13 @@ import Testing
     }
 
     @Test func screensVaryInShape() {
-        var engine = engine(in: "1.4")
+        var engine = stayIn("1.4")
         let ids = Set(run(&engine, 200).map(\.item.id))
         #expect(ids.count > 80, "\(ids.count) different screens in 200")
     }
 
     @Test func clefsAlternateNeverThreeInARow() {
-        var engine = engine(in: "1.4")
+        var engine = stayIn("1.4")
         let clefs = run(&engine, 400).map { $0.item.clefs[0] }
         #expect(maxRun(clefs) <= 2)
         let treble = clefs.filter { $0 == .treble }.count
@@ -91,7 +94,7 @@ import Testing
     }
 
     @Test func theWeakerClefGetsMoreScreens() {
-        var engine = engine(in: "1.4")
+        var engine = stayIn("1.4")
         for key in engine.pool(.treble) { for _ in 0..<4 { engine.play(key, time: 1) } } // treble box 5, bass box 1
         let clefs = run(&engine, 30, right: { _ in false }).map { $0.item.clefs[0] }
         let bass = clefs.filter { $0 == .bass }.count
@@ -99,10 +102,8 @@ import Testing
         #expect(bass >= 16, "bass is weaker: \(bass) of 30")
     }
 
-    @Test func theFocusClefGetsAboutTwoThirds() {
-        var config = NoteCoreConfig()
-        config.lessonMinScreens = 10_000 // stay in 1.2
-        var engine = engine(in: "1.2", config: config)
+    @Test func theFocusClefGetsAboutFiveInEight() {
+        var engine = stayIn("1.2")
         let clefs = run(&engine, 300).map { $0.item.clefs[0] }
         let treble = clefs.filter { $0 == .treble }.count
         #expect(treble > 170 && treble < 240, "treble focus: \(treble) of 300")
@@ -128,7 +129,7 @@ import Testing
     }
 
     @Test func newestNotesGetAboutOneNoteInFour() {
-        var engine = engine(in: "1.1")
+        var engine = stayIn("1.1")
         // open the treble gate: the pair comes in
         for key in engine.pool(.treble) { for _ in 0..<3 { engine.play(key, time: 1) } }
         let pair = engine.newestBatch(.treble)
@@ -149,18 +150,18 @@ import Testing
     }
 
     @Test func stretchOnlyWhenHesDoingWell() {
-        var good = engine(in: "1.2")
+        var good = stayIn("1.2")
         let stretches = run(&good, 400).filter(\.isStretch)
         #expect(stretches.count > 15 && stretches.count < 80, "about 1 in 8 once he's doing well: \(stretches.count)")
         #expect(stretches.allSatisfy { $0.item.notes.count <= good.lesson.sizes.upperBound + 1 })
 
-        var struggling = engine(in: "1.2")
+        var struggling = stayIn("1.2")
         let none = run(&struggling, 200, right: { _ in false }).filter(\.isStretch)
         #expect(none.isEmpty)
     }
 
     @Test func strongestUsesHisTopBoxes() {
-        var engine = engine(in: "1.4")
+        var engine = stayIn("1.4")
         let strong = [key("treble:G4"), key("treble:A4"), key("bass:B2"), key("bass:C3")]
         for key in strong { for _ in 0..<4 { engine.play(key, time: 1) } }
         for key in engine.pool where !strong.contains(key) { engine.play(key, time: 1) } // box 2
@@ -173,16 +174,16 @@ import Testing
     }
 
     @Test func strongestFallsBackWhenNothingIsPlayedYet() {
-        var engine = engine(in: "1.4")
+        var engine = stayIn("1.4")
         var rng = SeededRandom(seed: 3)
         let pick = engine.pickScreen(.strongest, using: &rng)
         #expect(!pick.usedStrongest)
     }
 
     @Test func sameSeedSameScreens() {
-        var a = engine(in: "1.1"), b = engine(in: "1.1")
+        var a = stayIn("1.1"), b = stayIn("1.1")
         #expect(run(&a, 60, seed: 8) == run(&b, 60, seed: 8))
-        var c = engine(in: "1.1")
+        var c = stayIn("1.1")
         #expect(run(&c, 60, seed: 9) != run(&a, 60, seed: 8))
     }
 

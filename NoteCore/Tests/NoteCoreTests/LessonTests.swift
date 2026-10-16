@@ -238,12 +238,7 @@ import Testing
         var lessons: [LessonID] = []
         for _ in 0..<3000 where !engine.isCurriculumComplete {
             if lessons.last != engine.lesson.id { lessons.append(engine.lesson.id) }
-            let pick = engine.pickScreen(using: &rng)
-            if let intro = pick.intro {
-                engine.intro(intro)
-            } else {
-                engine.play(pick.item.notes.flatMap(\.keys), time: 1, reason: pick.isStretch ? .stretch : .normal)
-            }
+            engine.playPick(engine.pickScreen(using: &rng))
         }
         #expect(engine.isCurriculumComplete)
         #expect(lessons == Curriculum.standard.lessons.map(\.id), "every lesson, in order")

@@ -8,11 +8,30 @@ extension MasteryEngine {
     /// Records one normal screen of these notes, every one right (or every one wrong)
     /// at `time` each.
     @discardableResult
-    mutating func play(_ keys: [NoteKey], right: Bool = true, time: Double = 1.5, reason: PickReason = .normal) -> MasteryUpdate {
+    mutating func play(_ keys: [NoteKey], right: Bool = true, time: Double = 1.5, reason: PickReason = .normal,
+                       rhythmOK: Bool? = nil, size: Int? = nil) -> MasteryUpdate {
         let notes = keys.map {
             AttemptResult(itemID: $0.id, lesson: lesson.id, level: lesson.level, firstTry: right, wrongPresses: right ? 0 : 1, responseTime: time)
         }
-        return record(ScreenResult(screenID: "test", lesson: lesson.id, reason: reason, notes: notes, size: keys.count))
+        let rhythm = rhythmOK.map { ok in RhythmResult(verdicts: keys.map { _ in ok ? .ok : .tooShort }, beat: 0.6) }
+        return record(ScreenResult(screenID: "test", lesson: lesson.id, reason: reason, notes: notes, rhythm: rhythm, size: size ?? keys.count))
+    }
+
+    /// Plays whatever was picked, right first try: intros as intros, lesson intros as
+    /// lesson intros, rhythm screens with good rhythm, at the pick's size.
+    @discardableResult
+    mutating func playPick(_ pick: Pick, right: Bool = true, time: Double = 1) -> MasteryUpdate {
+        if let key = pick.intro {
+            intro(key)
+            return MasteryUpdate()
+        }
+        let keys = pick.item.notes.flatMap(\.keys)
+        if pick.isLessonIntro {
+            let notes = keys.map { AttemptResult(itemID: $0.id, lesson: lesson.id, level: lesson.level, wasIntro: true, firstTry: true, responseTime: 2) }
+            return record(ScreenResult(screenID: pick.item.id, lesson: lesson.id, wasLessonIntro: true, notes: notes, size: pick.size))
+        }
+        return play(keys, right: right, time: time, reason: pick.isStretch ? .stretch : .normal,
+                    rhythmOK: pick.item.isRhythm ? true : nil, size: pick.size)
     }
 
     @discardableResult

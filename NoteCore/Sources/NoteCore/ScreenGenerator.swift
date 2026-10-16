@@ -32,6 +32,10 @@ extension MasteryEngine {
             style = .normal // nothing played here yet
         }
         let clef = chooseClef(style, using: &rng)
+        // a lesson with a new texture opens by showing him one (two at once, a rhythm)
+        if style == .normal, lesson.texture != .single, !state.introduced.contains(lessonIntroID), !playable(clef).isEmpty {
+            return remember(lessonIntro(on: clef, using: &rng))
+        }
         if style == .normal || playable(clef).isEmpty, let intro = introDue(on: clef, using: &rng) {
             let item = PracticeItem(intro, layout: lesson.staff(for: clef), keySignature: lesson.keySignature)
             return remember(Pick(item: item, intro: intro, isLessonIntro: false, usedStrongest: false, isStretch: false, size: 1))
@@ -109,7 +113,8 @@ extension MasteryEngine {
     private func generate(on clef: Clef, strongest: Bool, using rng: inout some RandomNumberGenerator) -> Pick {
         var size = state.screenSize
         var stretch = false
-        if !strongest, isDoingWell, unitInterval(&rng) < config.stretchChance, size < lesson.sizes.upperBound + 1 {
+        // no stretch on rhythm screens: a third bar wouldn't fit the staff
+        if !strongest, !lesson.texture.isRhythm, isDoingWell, unitInterval(&rng) < config.stretchChance, size < lesson.sizes.upperBound + 1 {
             size += 1
             stretch = true
         }
@@ -149,10 +154,11 @@ extension MasteryEngine {
 
     private func build(on clef: Clef, size: Int, notes: (Clef) -> [NoteKey], withNewest: Bool, using rng: inout some RandomNumberGenerator) -> PracticeItem {
         let lesson = self.lesson
-        func bar(_ count: Int, _ c: Clef, newest include: Bool, after: [ItemID], using rng: inout some RandomNumberGenerator) -> [NoteKey] {
+        let rhythm = lesson.texture.isRhythm
+        func bar(_ count: Int, _ c: Clef, after: [ItemID], using rng: inout some RandomNumberGenerator) -> [WrittenNote] {
             let all = notes(c)
             let (newest, others) = split(c, all)
-            return line(count, from: others, newest: include ? newest : [], fallback: all, after: after, using: &rng)
+            return columns(count, on: c, from: others, newest: withNewest ? newest : [], fallback: all, after: after, using: &rng)
         }
         if lesson.layout == .grand {
             // a bar on one staff, then a bar on the other. falls back to one staff
@@ -160,16 +166,125 @@ extension MasteryEngine {
             let other: Clef = clef == .treble ? .bass : .treble
             if size >= 2, !notes(clef).isEmpty, !notes(other).isEmpty {
                 let a = (size + 1) / 2, b = size - a
-                let barA = bar(a, clef, newest: withNewest, after: state.recentColumns, using: &rng)
-                let barB = bar(b, other, newest: withNewest, after: barA.map(\.id), using: &rng)
-                return PracticeItem((barA + barB).map { WrittenNote($0) }, layout: .grand, keySignature: lesson.keySignature, bars: [a, b])
+                let barA = bar(a, clef, after: state.recentColumns, using: &rng)
+                let barB = bar(b, other, after: barA.map(Self.columnID), using: &rng)
+                return PracticeItem(barA + barB, layout: .grand, keySignature: lesson.keySignature,
+                                    bars: rhythm ? nil : [barA.count, barB.count])
             }
             let only = notes(clef).isEmpty ? other : clef
-            let keys = bar(size, only, newest: withNewest, after: state.recentColumns, using: &rng)
-            return PracticeItem(keys.map { WrittenNote($0) }, layout: .grand, keySignature: lesson.keySignature, bars: Self.bars(size))
+            let line = bar(size, only, after: state.recentColumns, using: &rng)
+            return PracticeItem(line, layout: .grand, keySignature: lesson.keySignature, bars: rhythm ? nil : Self.bars(line.count))
         }
-        let keys = bar(size, clef, newest: withNewest, after: state.recentColumns, using: &rng)
-        return PracticeItem(keys.map { WrittenNote($0) }, layout: lesson.staff(for: clef), keySignature: lesson.keySignature, bars: Self.bars(size))
+        let line = bar(size, clef, after: state.recentColumns, using: &rng)
+        return PracticeItem(line, layout: lesson.staff(for: clef), keySignature: lesson.keySignature, bars: rhythm ? nil : Self.bars(line.count))
+    }
+
+    /// One bar's worth (or `count` columns) in the lesson's texture.
+    private func columns(_ count: Int, on clef: Clef, from pool: [NoteKey], newest: [NoteKey], fallback: [NoteKey],
+                         after: [ItemID], using rng: inout some RandomNumberGenerator) -> [WrittenNote] {
+        switch lesson.texture {
+        case .single:
+            return line(count, from: pool, newest: newest, fallback: fallback, after: after, using: &rng).map { WrittenNote($0) }
+        case .dyads(let intervals):
+            var keys = line(count, from: pool, newest: newest, fallback: fallback, after: after, using: &rng)
+            // a line along the top of the range has nothing to put above it: swap one
+            // note for the nearest one that can carry a second note
+            let carriers = fallback.filter { low in fallback.contains { intervals.contains($0.pitch.diatonicIndex - low.pitch.diatonicIndex) } }
+            let canCarry = { (k: NoteKey) in carriers.contains(k) }
+            if !keys.contains(where: canCarry), !carriers.isEmpty {
+                let i = min(keys.count - 1, Int(unitInterval(&rng) * Double(keys.count)))
+                keys[i] = carriers.min { abs($0.pitch.diatonicIndex - keys[i].pitch.diatonicIndex) < abs($1.pitch.diatonicIndex - keys[i].pitch.diatonicIndex) }!
+            }
+            return dyads(keys, intervals: intervals, uppers: fallback, using: &rng)
+        case .rhythm(let values, let oneNote):
+            let lengths = Self.rhythm(bars: count, from: values, using: &rng)
+            let keys = oneNote
+                ? Array(repeating: line(1, from: pool, newest: newest, fallback: fallback, after: after, using: &rng)[0], count: lengths.count)
+                : line(lengths.count, from: pool, newest: newest, fallback: fallback, after: after, using: &rng)
+            return zip(keys, lengths).map { WrittenNote($0, $1) }
+        }
+    }
+
+    /// About half the notes get a second note above them, `intervals` letters up, from
+    /// `uppers` (notes he has). At least one dyad when any note can take one.
+    private func dyads(_ keys: [NoteKey], intervals: [Int], uppers: [NoteKey], using rng: inout some RandomNumberGenerator) -> [WrittenNote] {
+        let options = keys.map { key in
+            uppers.filter { intervals.contains($0.pitch.diatonicIndex - key.pitch.diatonicIndex) }
+        }
+        func dyad(_ i: Int, using rng: inout some RandomNumberGenerator) -> WrittenNote {
+            let weights = options[i].map { Double(config.boxCount + 1 - stats(for: $0).box) }
+            let upper = options[i][weightedIndex(weights, using: &rng)]
+            return WrittenNote(keys[i].clef, [keys[i].pitch, upper.pitch])
+        }
+        var out = keys.map { WrittenNote($0) }
+        for i in keys.indices where !options[i].isEmpty && unitInterval(&rng) < 0.5 {
+            out[i] = dyad(i, using: &rng)
+        }
+        let eligible = keys.indices.filter { !options[$0].isEmpty }
+        if !out.contains(where: \.isChord), !eligible.isEmpty {
+            let i = eligible[min(eligible.count - 1, Int(unitInterval(&rng) * Double(eligible.count)))]
+            out[i] = dyad(i, using: &rng)
+        }
+        return out
+    }
+
+    /// `bars` bars of 4/4 from quarters, halves and beamed eighth pairs (at most one pair
+    /// a bar, on a beat). Always 3+ notes and at least two different lengths, or the
+    /// rhythm judge can't tell anything at his tempo (context/notecore-design.md).
+    static func rhythm(bars: Int, from allowed: [NoteValue], using rng: inout some RandomNumberGenerator) -> [NoteValue] {
+        for _ in 0..<40 {
+            var values: [NoteValue] = []
+            for _ in 0..<max(1, bars) { values += rhythmBar(allowed, using: &rng) }
+            if values.count >= 3, Set(values).count >= 2 { return values }
+        }
+        return Array([[NoteValue]](repeating: [.quarter, .quarter, .half], count: max(1, bars)).joined())
+    }
+
+    private static func rhythmBar(_ allowed: [NoteValue], using rng: inout some RandomNumberGenerator) -> [NoteValue] {
+        var beats = 0.0
+        var out: [NoteValue] = []
+        var pair = false
+        while beats < 4 {
+            var cells: [[NoteValue]] = []
+            var weights: [Double] = []
+            if allowed.contains(.quarter) { cells.append([.quarter]); weights.append(0.45) }
+            if allowed.contains(.half), beats + 2 <= 4 { cells.append([.half]); weights.append(0.3) }
+            if allowed.contains(.eighth), !pair { cells.append([.eighth, .eighth]); weights.append(0.25) }
+            if cells.isEmpty { cells = [[.quarter]]; weights = [1] }
+            let cell = cells[weightedIndex(weights, using: &rng)]
+            pair = pair || cell.first == .eighth
+            out += cell
+            beats += cell.reduce(0) { $0 + $1.beats }
+        }
+        return out
+    }
+
+    /// The first screen of a lesson with a new texture, shown to him before he plays:
+    /// one dyad (a third when there is one), or one bar of rhythm.
+    private func lessonIntro(on clef: Clef, using rng: inout some RandomNumberGenerator) -> Pick {
+        let notes = playable(clef)
+        let layout = lesson.staff(for: clef)
+        var columns: [WrittenNote]
+        switch lesson.texture {
+        case .dyads(let intervals):
+            let pairs = notes.flatMap { low in
+                notes.filter { $0.pitch.diatonicIndex - low.pitch.diatonicIndex == (intervals.min() ?? 2) }.map { (low, $0) }
+            }
+            if let (low, high) = pairs.isEmpty ? nil : pairs[min(pairs.count - 1, Int(unitInterval(&rng) * Double(pairs.count)))] {
+                columns = [WrittenNote(clef, [low.pitch, high.pitch])]
+            } else {
+                columns = [WrittenNote(notes[0])]
+            }
+        case .rhythm(let values, let oneNote):
+            let lengths = Self.rhythm(bars: 1, from: values, using: &rng)
+            let keys = oneNote ? Array(repeating: notes[min(notes.count - 1, Int(unitInterval(&rng) * Double(notes.count)))], count: lengths.count)
+                : line(lengths.count, from: notes, newest: [], fallback: notes, after: state.recentColumns, using: &rng)
+            columns = zip(keys, lengths).map { WrittenNote($0, $1) }
+        case .single:
+            columns = [WrittenNote(notes[0])]
+        }
+        let item = PracticeItem(columns, layout: layout, keySignature: lesson.keySignature, bars: lesson.texture.isRhythm ? nil : [columns.count])
+        return Pick(item: item, intro: nil, isLessonIntro: true, usedStrongest: false, isStretch: false, size: 1)
     }
 
     /// Up to 4 notes in one bar, more split into even bars: 5 -> 3 + 2, 8 -> 4 + 4.

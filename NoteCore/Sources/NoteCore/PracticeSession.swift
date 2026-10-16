@@ -441,6 +441,13 @@ public struct PracticeSession: Sendable {
             if let name = intro.name {
                 cues.append(.say(.meetNote(name)))
             }
+        } else if pick.isLessonIntro {
+            // a new texture: say what's coming, then play it (sound before symbol)
+            if next.isRhythm {
+                cues += [.say(.listen), .playPhrase(beat: config.demoBeat)]
+            } else {
+                cues += [.say(.twoAtOnce), .playPitches(next.notes[0].pitches)]
+            }
         }
         return cues
     }
@@ -557,7 +564,7 @@ public struct PracticeSession: Sendable {
             let time = item.isRhythm ? readingTime : correctTimes[i] - startTimes[i]
             for key in column.keys {
                 notes.append(AttemptResult(
-                    itemID: key.id, lesson: lesson.id, level: lesson.level, wasIntro: introNote == key,
+                    itemID: key.id, lesson: lesson.id, level: lesson.level, wasIntro: introNote == key || isLessonIntro,
                     firstTry: wrongs[i] == 0 && stucks[i] == 0, wrongPresses: wrongs[i], almostPresses: almosts[i],
                     stuckSteps: stucks[i], hints: hints[i], responseTime: max(0, time)
                 ))
