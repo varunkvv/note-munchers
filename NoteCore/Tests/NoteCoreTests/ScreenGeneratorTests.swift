@@ -85,28 +85,14 @@ import Testing
         #expect(ids.count > 80, "\(ids.count) different screens in 200")
     }
 
-    @Test func clefsAlternateNeverThreeInARow() {
-        var engine = stayIn("1.4")
-        let clefs = run(&engine, 400).map { $0.item.clefs[0] }
-        #expect(maxRun(clefs) <= 2)
-        let treble = clefs.filter { $0 == .treble }.count
-        #expect(treble > 120 && treble < 280, "about even when he's even: \(treble) of 400")
-    }
-
+    /// Asked for no clef (engine-only callers), one-clef lessons lean to the weaker clef.
+    /// Sessions ask for a clef: ClefRunTests.
     @Test func theWeakerClefGetsMoreScreens() {
         var engine = stayIn("1.4")
         for key in engine.pool(.treble) { for _ in 0..<4 { engine.play(key, time: 1) } } // treble box 5, bass box 1
         let clefs = run(&engine, 30, right: { _ in false }).map { $0.item.clefs[0] }
         let bass = clefs.filter { $0 == .bass }.count
-        // never 3 in a row caps bass at 20 of 30
-        #expect(bass >= 16, "bass is weaker: \(bass) of 30")
-    }
-
-    @Test func theFocusClefGetsAboutFiveInEight() {
-        var engine = stayIn("1.2")
-        let clefs = run(&engine, 300).map { $0.item.clefs[0] }
-        let treble = clefs.filter { $0 == .treble }.count
-        #expect(treble > 170 && treble < 240, "treble focus: \(treble) of 300")
+        #expect(bass >= 18, "bass is weaker: \(bass) of 30")
     }
 
     @Test func introsAreOneNoteAndSpacedOut() {

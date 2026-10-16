@@ -11,6 +11,10 @@ import NoteCore
 ///                          play taps the play button after the first note and holds there,
 ///                          playAlong then finishes the screen while it's still playing
 ///                          show plays like a kid at -demoSlow from the start, for screen recordings
+///                          kid plays a whole session like the scripted kid in QuietVoiceTests: about
+///                          65% right first try, wrong keys (now and then three, so the keyboard
+///                          picture comes up), the wrong octave, stuck past 15s now and then.
+///                          Prints the clefs of the session (TTTBBB) at the end
 ///     -demoScreen <name>   open a screen directly: home, parent, parent#levels, parent#staff,
 ///                          parent#history, levels (the level picker), monitor, gallery
 ///                          (generated screens of -demoLesson)
@@ -18,6 +22,8 @@ import NoteCore
 ///     -demoLevel <n>       start in level n (its first lesson)
 ///     -demoMet YES         every note in the lesson already met (no intros or hatches)
 ///     -demoSize <n>        notes per screen to start at (kept inside the lesson's range)
+///     -demoFirstClef <c>   treble|bass: the clef the session's first run is on (one-clef lessons
+///                          without a focus clef)
 ///     -demoSeed <n>        fixed seed (screens and the kid's note draw), for repeatable screenshots
 ///     -demoSlow <x>        stretch animations and delays x times
 ///     -demoProgress YES    fake a few weeks of history first
@@ -53,6 +59,7 @@ struct DemoOptions {
     var level: Int?
     var met = false
     var size: Int?
+    var firstClef: Clef?
     var seed: UInt64?
     var slow = 1.0
     var progress = false
@@ -79,6 +86,7 @@ struct DemoOptions {
         level = defaults.string(forKey: "demoLevel").flatMap(Int.init)
         met = defaults.bool(forKey: "demoMet")
         size = defaults.string(forKey: "demoSize").flatMap(Int.init)
+        firstClef = defaults.string(forKey: "demoFirstClef").flatMap(Clef.init(rawValue:))
         seed = defaults.string(forKey: "demoSeed").flatMap { UInt64($0) }
         slow = defaults.string(forKey: "demoSlow").flatMap(Double.init) ?? 1
         progress = defaults.bool(forKey: "demoProgress")
@@ -133,6 +141,12 @@ final class DemoRunner {
         if let size = options.size {
             var state = engine.state
             state.screenSize = size
+            engine = MasteryEngine(config: engine.config, state: state)
+        }
+        if let first = options.firstClef {
+            // the session starts on the clef the last one didn't
+            var state = engine.state
+            state.lastFirstClef = first == .treble ? .bass : .treble
             engine = MasteryEngine(config: engine.config, state: state)
         }
         if let path = options.path {
@@ -357,6 +371,7 @@ final class DemoRunner {
                 await waitForNext(c, after: shown)
             }
             log("learn finished after \(rounds) rounds", c)
+            logClefs(c)
         case "show":
             // a kid playing, for screen recordings: a look at each screen, then one note
             // at a time at his pace, now and then a wrong key first. hatches pick by
@@ -382,9 +397,59 @@ final class DemoRunner {
                 await waitForNext(c, after: shown)
             }
             log("show finished after \(round) rounds", c)
+            logClefs(c)
+        case "kid":
+            await kid(c)
         default:
             log("unknown script \(script)")
         }
+    }
+
+    /// One full session played like QuietVoiceTests' scripted kid, at a kid's pace. The
+    /// voice log (`voice: ...`) shows every line she says.
+    private func kid(_ c: PracticeController) async {
+        var dice = SeededRandom(seed: (options.seed ?? 1) &+ 0xD1CE)
+        var round = 0
+        while c.phase != .done, round < 80 {
+            round += 1
+            let shown = c.itemsShown
+            await waitUntil(seconds: 60) { !c.isHatching }
+            await sleep(0.8)
+            while c.phase.isPlaying, c.itemsShown == shown {
+                guard !c.session.isIntro else {
+                    await right(c)
+                    continue
+                }
+                let roll = Double(dice.next() >> 11) * 0x1p-53
+                if roll < 0.65 {
+                    // right first try
+                } else if roll < 0.80 {
+                    let tries = dice.next() % 3 == 0 ? 3 : 1
+                    for _ in 0..<tries { await wrong(c) }
+                } else if roll < 0.90 {
+                    await wrongOctave(c)
+                } else {
+                    log("stuck", c)
+                    await sleep(c.session.engine.config.stuckAfter + 0.5)
+                }
+                await right(c)
+                await sleep(0.4)
+            }
+            await waitForNext(c, after: shown)
+        }
+        log("kid finished after \(round) rounds", c)
+        logClefs(c)
+    }
+
+    /// The session's clefs, one letter a screen (lower case for a new note's intro), e.g.
+    /// `TtTTT...BBB`.
+    private func logClefs(_ c: PracticeController) {
+        let screens = c.session.summary.screens
+        let clefs = screens.map { screen -> String in
+            let letter = screen.screenID.hasPrefix("bass") ? "B" : "T"
+            return screen.wasIntro ? letter.lowercased() : letter
+        }.joined()
+        log("clefs \(clefs) (\(screens.count) screens, lesson \(c.session.summary.startLesson) -> \(c.session.summary.endLesson))")
     }
 
     /// One full session with wrong keys, a wrong octave, a dropped piano and right keys,
@@ -421,6 +486,7 @@ final class DemoRunner {
             await waitForNext(c, after: shown)
         }
         log("tour finished after \(round) rounds", c)
+        logClefs(c)
     }
 
     // MARK: steps

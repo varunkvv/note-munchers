@@ -32,15 +32,16 @@ public struct ClefNotes: Hashable, Sendable {
 /// One lesson: which notes, how many per screen, which staves. Lessons are data; the
 /// mastery engine generates every screen from them.
 public struct Lesson: Identifiable, Hashable, Sendable {
-    /// What the parent sees the lesson as. Every session mixes both clefs anyway; the
-    /// focus clef gets about 5 screens in 8 (the other clef never comes twice in a row).
+    /// What the parent sees the lesson as. Every session has both clefs anyway: on one
+    /// clef per screen the focus clef's run goes first and gets about 2/3 of the session
+    /// (`PracticeSession`), on the grand staff it starts about 5 screens in 8.
     public enum Focus: String, Codable, Hashable, Sendable {
         case treble, bass, both
     }
 
     public enum Layout: String, Codable, Hashable, Sendable {
-        /// One clef per screen. A session alternates treble and bass screens, weighted
-        /// toward the weaker clef.
+        /// One clef per screen. A session is two runs, one on each clef, with one switch
+        /// half way (`PracticeSession`).
         case alternating
         /// Grand staff screens: a bar on one staff, then a bar on the other.
         case grand

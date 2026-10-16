@@ -217,6 +217,10 @@ public struct PracticeSession: Sendable {
     public private(set) var rhythmLine: RhythmLine?
     /// Rhythm retries used on this screen.
     public private(set) var retries = 0
+    /// The clef this part of the session is on, in one-clef lessons (nil on the grand
+    /// staff). A session is two runs: the first clef for half of it (2/3 for a lesson's
+    /// focus clef), then the other clef for the rest, extras included. One switch.
+    public private(set) var runClef: Clef?
     /// Waiting for the last note's key-up (its hold counts).
     public var isAwaitingRelease: Bool { awaitingRelease }
 
@@ -239,6 +243,8 @@ public struct PracticeSession: Sendable {
     /// Last few notes: true when it wasn't right first try.
     private var struggles: [Bool] = []
     private var limitReached: SessionSummary.EndReason?
+    /// The two runs, set up at the first one-clef screen.
+    private var runs: (first: Clef, screens: Int, seconds: Double)?
     /// The one earned line this session has been said.
     private var praised = false
     /// Screens in a row all right first try (intros don't count either way).
@@ -475,7 +481,7 @@ public struct PracticeSession: Sendable {
                 reason = .easing
             }
         }
-        let pick = engine.pickScreen(reason == .normal ? .normal : .strongest, using: &rng)
+        let pick = engine.pickScreen(reason == .normal ? .normal : .strongest, clef: run(at: t), using: &rng)
         if reason == .warmUp {
             warmUpLeft -= pick.item.notes.count
         }
@@ -536,6 +542,29 @@ public struct PracticeSession: Sendable {
             cues.append(.playPhrase(beat: config.demoBeat))
         }
         return cues
+    }
+
+    /// The clef for the next screen. The first run lasts half the session's screens or
+    /// half its time, whichever comes first (2/3 when its clef is the lesson's focus),
+    /// then the session switches once and stays. The first clef alternates from session
+    /// to session (saved with his state); a focus lesson always starts on its focus clef.
+    private mutating func run(at t: Double) -> Clef? {
+        let lesson = engine.lesson
+        guard lesson.layout == .alternating, lesson.clefs.count == 2 else {
+            runClef = nil
+            return nil
+        }
+        if runs == nil {
+            let first = engine.firstRunClef
+            engine.startedRun(on: first)
+            let share = lesson.focus == .both ? 0.5 : 2.0 / 3
+            runs = (first, Int((Double(config.sessionMaxItems) * share).rounded()), config.sessionMaxDuration * share)
+        }
+        let runs = runs!
+        let second: Clef = runs.first == .treble ? .bass : .treble
+        let switched = runClef == second || summary.screensPlayed >= runs.screens || t >= runs.seconds
+        runClef = switched ? second : runs.first
+        return runClef
     }
 
     /// Back to the screen's first note for another go (a rhythm retry).

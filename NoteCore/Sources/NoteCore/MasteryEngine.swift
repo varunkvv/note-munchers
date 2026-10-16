@@ -83,6 +83,9 @@ public struct MasteryState: Hashable, Codable, Sendable {
     /// The most his current lesson's stone on the level path has shown (`lessonProgress`),
     /// so his path never goes backwards. Reset when the lesson changes.
     public var lessonPeak = 0.0
+    /// The clef his last session started on (its first run), so the next one starts on
+    /// the other. nil before his first session.
+    public var lastFirstClef: Clef?
     /// The engine's own dice for curriculum choices: which notes a lesson starts with
     /// and which come next. Seeded once per kid (the app seeds it at first launch),
     /// saved with everything else, so the same state always makes the same choice.
@@ -261,6 +264,18 @@ public struct MasteryEngine: Sendable {
 
     public var isCurriculumComplete: Bool {
         curriculum.lessons.allSatisfy { state.completedLessons.contains($0.id) }
+    }
+
+    /// The clef a session's first run is on (one-clef lessons): the lesson's focus clef,
+    /// otherwise the clef his last session didn't start on (treble the very first time).
+    public var firstRunClef: Clef {
+        if let focus = Clef(rawValue: lesson.focus.rawValue) { return focus }
+        return state.lastFirstClef == .treble ? .bass : .treble
+    }
+
+    /// A session started its first run on `clef`.
+    mutating func startedRun(on clef: Clef) {
+        state.lastFirstClef = clef
     }
 
     public func progress(for key: NoteKey) -> NoteProgress {
@@ -548,6 +563,7 @@ extension MasteryState {
         lastScreenWasIntro = try c.value(.lastScreenWasIntro, or: d.lastScreenWasIntro)
         recentSongs = try c.value(.recentSongs, or: d.recentSongs)
         lessonPeak = try c.value(.lessonPeak, or: d.lessonPeak)
+        lastFirstClef = try c.decodeIfPresent(Clef.self, forKey: .lastFirstClef)
         dice = try c.value(.dice, or: d.dice)
     }
 }

@@ -16,8 +16,11 @@ public struct Pick: Hashable, Sendable {
 
 /// Screen picking: which clef, an intro or a generated screen, and the notes on it.
 ///
-/// - clef: weighted toward the weaker clef (lower boxes, notes still to come), the
-///   lesson's focus clef counts double, never 3 screens in a row on one clef
+/// - clef: one-clef lessons take the clef the session asks for (a session is two runs,
+///   one per clef, see `PracticeSession`), or the other one when that clef has nothing
+///   to show. Asked for nothing, weighted toward the weaker clef. Grand staff lessons:
+///   which staff goes first, weighted toward the weaker clef, the focus clef counts
+///   double, never 3 screens in a row starting on one clef
 /// - a new note's intro is one note on its own. Once a clef has 2 notes he has met,
 ///   intros on it never come back to back, so there's reading in between
 /// - a generated screen has `screenSize` notes, weighted toward low boxes, moving by
@@ -28,12 +31,17 @@ public struct Pick: Hashable, Sendable {
 /// - every screen is whole bars of 3/4 or 4/4 (Bars.swift): the meter is rolled per
 ///   screen, the notes are written first, then each bar gets a rhythm that holds them
 extension MasteryEngine {
-    public mutating func pickScreen(_ style: PickStyle = .normal, using rng: inout some RandomNumberGenerator) -> Pick {
+    /// `clef`: the clef this part of the session is on (one-clef lessons). Ignored on
+    /// the grand staff.
+    public mutating func pickScreen(_ style: PickStyle = .normal, clef wanted: Clef? = nil,
+                                    using rng: inout some RandomNumberGenerator) -> Pick {
         var style = style
-        if style == .strongest, lesson.clefs.allSatisfy({ strongestNotes($0).isEmpty }) {
-            style = .normal // nothing played here yet
+        let wanted = lesson.layout == .alternating ? wanted : nil
+        if style == .strongest, wanted.map({ strongestNotes($0).isEmpty }) ?? lesson.clefs.allSatisfy({ strongestNotes($0).isEmpty }) {
+            // nothing played here yet: a normal screen, on the same clef
+            style = .normal
         }
-        let clef = chooseClef(style, using: &rng)
+        let clef = chooseClef(style, wanted: wanted, using: &rng)
         // a lesson with a new texture opens by showing him one (two at once, a rhythm)
         if style == .normal, lesson.texture != .single, !state.introduced.contains(lessonIntroID), !playable(clef).isEmpty {
             return remember(lessonIntro(on: clef, using: &rng))
@@ -64,7 +72,7 @@ extension MasteryEngine {
 
     // MARK: clef and intros
 
-    private func chooseClef(_ style: PickStyle, using rng: inout some RandomNumberGenerator) -> Clef {
+    private func chooseClef(_ style: PickStyle, wanted: Clef?, using rng: inout some RandomNumberGenerator) -> Clef {
         let lesson = self.lesson
         var candidates = lesson.clefs.filter { clef in
             style == .strongest ? !strongestNotes(clef).isEmpty : !playable(clef).isEmpty || !pendingIntros(clef).isEmpty
@@ -73,18 +81,22 @@ extension MasteryEngine {
             candidates = lesson.clefs.filter { !pool($0).isEmpty }
         }
         precondition(!candidates.isEmpty, "lesson \(lesson.id) has nothing unlocked")
+        // the session's run: its clef, or the other one when it has nothing to show
         guard candidates.count > 1 else { return candidates[0] }
+        if let wanted, candidates.contains(wanted) { return wanted }
         let last = state.recentScreens.suffix(2).compactMap(Self.leadingClef)
-        if let focus = Clef(rawValue: lesson.focus.rawValue), let previous = last.last {
-            // focus lessons: the other clef never twice in a row, the focus clef never 3
-            // times, so it gets about 5 screens in 8
-            if previous != focus { return focus }
-            if last.count == 2, last[0] == focus, let other = candidates.first(where: { $0 != focus }) { return other }
-        } else if last.count == 2, last[0] == last[1], let other = candidates.first(where: { $0 != last[0] }) {
-            return other
-        }
-        if style == .strongest {
-            return candidates.first { $0 != last.last } ?? candidates[0]
+        if lesson.layout == .grand {
+            // which staff goes first on the grand staff. focus lessons: the other clef never
+            // twice in a row, the focus clef never 3 times, so it gets about 5 screens in 8
+            if let focus = Clef(rawValue: lesson.focus.rawValue), let previous = last.last {
+                if previous != focus { return focus }
+                if last.count == 2, last[0] == focus, let other = candidates.first(where: { $0 != focus }) { return other }
+            } else if last.count == 2, last[0] == last[1], let other = candidates.first(where: { $0 != last[0] }) {
+                return other
+            }
+            if style == .strongest {
+                return candidates.first { $0 != last.last } ?? candidates[0]
+            }
         }
         let weights = candidates.map { clef in
             weakness(clef) * (lesson.focus.rawValue == clef.rawValue ? 2 : 1)

@@ -129,7 +129,7 @@ import Testing
             var bench = Bench(engine(in: id), seed: 3)
             _ = bench.start()
             var clefs = Set<Clef>()
-            for _ in 0..<6 {
+            while bench.session.phase != .done {
                 clefs.formUnion(bench.session.item!.clefs)
                 _ = bench.playScreen()
                 _ = bench.next()
