@@ -188,6 +188,60 @@ extension Curriculum {
                 sizes: 2...3, octavePolicy: .lenient
             ),
         ]),
+        Level(number: 2, title: "G position, steps and skips", lessons: [
+            Lesson(
+                "2.1", level: 2, title: "Treble steps", focus: .treble,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 3...4, octavePolicy: .lenient, contour: .steps
+            ),
+            Lesson(
+                "2.2", level: 2, title: "Bass steps", focus: .bass,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 3...4, octavePolicy: .lenient, contour: .steps
+            ),
+            Lesson(
+                "2.3", level: 2, title: "Treble skips", focus: .treble,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 3...4, octavePolicy: .lenient, contour: .skips
+            ),
+            Lesson(
+                "2.4", level: 2, title: "Bass skips", focus: .bass,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 3...4, octavePolicy: .lenient, contour: .skips
+            ),
+            Lesson(
+                "2.5", level: 2, title: "Grand staff: a treble bar, then a bass bar", focus: .both, layout: .grand,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 4...6, octavePolicy: .lenient
+            ),
+        ]),
+        Level(number: 3, title: "Around G position", lessons: [
+            Lesson(
+                "3.1", level: 3, title: "Treble up to G5", focus: .treble,
+                treble: ClefNotes(known: trebleG, new: [e5, g5], start: 1), bass: ClefNotes(known: bassG),
+                sizes: 4...8, octavePolicy: .strict
+            ),
+            Lesson(
+                "3.2", level: 3, title: "Bass up to G3", focus: .bass,
+                treble: ClefNotes(known: trebleUp), bass: ClefNotes(known: bassG, new: [e3, g3], start: 1),
+                sizes: 4...8, octavePolicy: .strict
+            ),
+            Lesson(
+                "3.3", level: 3, title: "Middle C from the treble side", focus: .treble,
+                treble: ClefNotes(known: trebleUp, new: [c4, d4, e4], start: 1), bass: ClefNotes(known: bassUp),
+                sizes: 4...8, octavePolicy: .strict
+            ),
+            Lesson(
+                "3.4", level: 3, title: "Middle C from the bass side", focus: .bass,
+                treble: ClefNotes(known: trebleWide), bass: ClefNotes(known: bassUp, new: [a3, b3, c4], start: 1),
+                sizes: 4...8, octavePolicy: .strict
+            ),
+            Lesson(
+                "3.5", level: 3, title: "Grand staff, the whole range", focus: .both, layout: .grand,
+                treble: ClefNotes(known: trebleWide), bass: ClefNotes(known: bassWide),
+                sizes: 6...8, octavePolicy: .strict
+            ),
+        ]),
     ])
 
     // typed pitch constants, so a typo is a compile error rather than a crash
@@ -201,4 +255,9 @@ extension Curriculum {
     /// G position.
     static let trebleG = [g4, a4, b4, c5, d5]
     static let bassG = [g2, a2, b2, c3, d3]
+    /// Level 3: up to G5 / G3, then down / up to middle C.
+    static let trebleUp = trebleG + [e5, g5]
+    static let bassUp = bassG + [e3, g3]
+    static let trebleWide = [c4, d4, e4] + trebleUp
+    static let bassWide = bassUp + [a3, b3, c4]
 }

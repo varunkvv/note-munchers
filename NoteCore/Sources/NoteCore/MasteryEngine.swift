@@ -353,8 +353,9 @@ public struct MasteryEngine: Sendable {
         let rate = Double(state.sizeRecent.reduce(0) { $0 + $1.firstTry }) / Double(notes)
         let sizes = lesson.sizes
         // a screen never needs every note he has on a clef, or it's only a reshuffle:
-        // 3 notes on a clef allow 2 a screen, 5 allow 4
-        let room = lesson.clefs.map { playable($0).count - 1 }.min() ?? 1
+        // 3 notes on a clef allow 2 a screen, 5 allow 4. grand staff screens put half on each
+        let perClef = lesson.clefs.map { playable($0).count - 1 }.min() ?? 1
+        let room = lesson.layout == .grand ? perClef * 2 : perClef
         if state.sizeRecent.count >= config.sizeWindow, rate >= config.sizeUpRate, state.screenSize < sizes.upperBound,
            state.screenSize < room {
             state.screenSize += 1

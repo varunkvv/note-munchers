@@ -90,8 +90,8 @@ import Testing
         for log in logs.dropFirst() {
             #expect(log.firstTryRate > 0.75, "\(log.firstTryRate)")
         }
-        let last = logs[logs.count - 1]
-        #expect(last.treble == 5 && last.bass == 5, "all of G position within 8 sessions")
-        #expect(last.size >= 2)
+        #expect(logs[4].treble >= 5 && logs[4].bass >= 5, "all of G position within 5 sessions")
+        #expect(logs[logs.count - 1].lesson.hasPrefix("2.") || logs[logs.count - 1].lesson.hasPrefix("3."), "past level 1 within 8 sessions")
+        #expect(logs[logs.count - 1].size >= 3)
     }
 }

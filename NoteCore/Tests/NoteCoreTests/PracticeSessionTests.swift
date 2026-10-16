@@ -246,9 +246,11 @@ import Testing
             _ = bench.press(bench.wrongKey)
             _ = bench.playCurrent()
             missed += 1
-            if bench.session.phase == .success { _ = bench.next() }
+            if bench.session.phase == .success, missed < 3 { _ = bench.next() }
         }
-        if bench.session.phase.isPlaying { _ = bench.playScreen(); _ = bench.next() }
+        // finish the screen with the third miss, then the easy ones come
+        if bench.session.phase.isPlaying { _ = bench.playScreen() }
+        _ = bench.next()
         #expect(bench.session.pickReason == .easing)
         _ = bench.playScreen()
         _ = bench.next()
