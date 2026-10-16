@@ -28,14 +28,20 @@ struct PracticeView: View {
                 if landscape {
                     HStack(spacing: 0) {
                         staffColumn(height: proxy.size.height)
-                        MuncherLane(controller: controller)
+                        MuncherLane(controller: controller, reserved: ListenButton.room)
                             .frame(width: laneWidth(screen: proxy.size.width))
+                            .overlay(alignment: .bottom) {
+                                ListenButton(controller: controller).padding(.bottom, 30)
+                            }
                     }
                 } else {
                     VStack(spacing: 0) {
                         staffColumn(height: proxy.size.height * 0.8)
-                        MuncherLane(controller: controller)
+                        MuncherLane(controller: controller, reserved: ListenButton.room)
                             .frame(height: proxy.size.height * 0.2)
+                            .overlay(alignment: .trailing) {
+                                ListenButton(controller: controller).padding(.trailing, 30)
+                            }
                     }
                 }
             }
@@ -109,17 +115,6 @@ struct HintBand: View {
                     .padding(.vertical, 14)
                     .transition(.opacity)
             }
-            if controller.session.engine.lesson.texture.isRhythm {
-                // sound before symbol: he can hear the line again whenever he wants
-                Button(action: controller.playPhrase) {
-                    Image(systemName: "speaker.wave.2.circle.fill")
-                        .font(.system(size: 64))
-                        .foregroundStyle(Theme.button)
-                }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                .padding(.trailing, 28)
-            }
             if showEar {
                 Image(systemName: "ear.fill")
                     .font(.system(size: 54, weight: .semibold))
@@ -138,6 +133,36 @@ struct HintBand: View {
             try? await Task.sleep(for: .seconds(1.6 * controller.timeScale))
             showEar = false
         }
+    }
+}
+
+/// The play button, on every screen, at the foot of the munchers' lane away from the
+/// staff. Picture only. Tapping it plays the screen with the keyboard lighting up; it
+/// fades back while something is playing or there's nothing to play.
+struct ListenButton: View {
+    let controller: PracticeController
+
+    static let size: CGFloat = 96
+    /// Room the lane keeps clear for it, so a muncher never sits under it.
+    static let room: CGFloat = size + 46
+
+    var body: some View {
+        Button(action: controller.listen) {
+            ZStack {
+                Circle()
+                    .fill(Theme.button)
+                    .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+                Image(systemName: "play.fill")
+                    .font(.system(size: 42, weight: .bold))
+                    .foregroundStyle(.white)
+                    .offset(x: 4) // the triangle's weight sits left of its box
+            }
+            .frame(width: Self.size, height: Self.size)
+        }
+        .buttonStyle(.plain)
+        .opacity(controller.canListen ? 1 : 0.35)
+        .disabled(!controller.canListen)
+        .animation(.easeInOut(duration: 0.2), value: controller.canListen)
     }
 }
 

@@ -277,12 +277,17 @@ final class PracticeController {
         return max(0.6, min(4, value.beats * (beat > 0 ? beat : 0.75)))
     }
 
-    /// Kid taps the speaker on a rhythm line: hear it at his own last tempo (or the demo tempo).
-    func playPhrase() {
-        guard session.item != nil, session.engine.lesson.texture.isRhythm, !isPlayingBack else { return }
-        let lastBeat = session.summary.screens.last { $0.rhythm != nil }?.rhythm?.beat
-        let beat = lastBeat.flatMap { $0 > 0 ? min(1.5, max(0.35, $0)) : nil } ?? session.engine.config.demoBeat
-        playScreen(beat: beat, keys: false, delay: 0)
+    /// The play button can be tapped: he's reading a screen and nothing is playing.
+    var canListen: Bool {
+        session.phase.isPlaying && !isPlayingBack && !isHatching && !session.isAwaitingRelease
+    }
+
+    /// Kid taps the play button: the screen plays at a gentle tempo, each key lighting
+    /// up on the keyboard picture as it sounds. The notes he hasn't played yet count as
+    /// hinted (NoteCore decides that).
+    func listen() {
+        guard canListen else { return }
+        play(session.listen(at: HostClock.now))
     }
 
     /// Plays the screen that's up at `beat` seconds a quarter, after `delay`: the sound,

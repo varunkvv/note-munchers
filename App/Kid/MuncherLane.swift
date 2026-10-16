@@ -7,6 +7,9 @@ import SwiftUI
 /// movement stays in the lane, never on the staff.
 struct MuncherLane: View {
     let controller: PracticeController
+    /// Room kept clear at the far end of the lane (the play button): the bottom in the
+    /// landscape side lane, the trailing end in the portrait strip.
+    var reserved: CGFloat = 0
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(MuncherColors.self) private var colors
@@ -44,7 +47,12 @@ struct MuncherLane: View {
     }
 
     private func draw(_ context: inout GraphicsContext, size: CGSize, now: Date) {
-        let bounds = CGRect(origin: .zero, size: size).insetBy(dx: 10, dy: 10)
+        var bounds = CGRect(origin: .zero, size: size).insetBy(dx: 10, dy: 10)
+        if size.height >= size.width {
+            bounds.size.height = max(bounds.width * 0.6, bounds.height - reserved)
+        } else {
+            bounds.size.width = max(bounds.height * 0.6, bounds.width - reserved)
+        }
         var t = 1.0
         if let swapStart {
             t = min(1, now.timeIntervalSince(swapStart) / (Self.popLength * scale))

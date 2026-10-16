@@ -7,6 +7,7 @@ import NoteCore
 ///     -demoScript <name>   play a scripted sequence through InputHub.emit (see DemoRunner.run).
 ///                          sharpPrompt / sharp stop on the next F# (sharp also presses F natural).
 ///                          wrongValue plays a rhythm screen's halves as quarters (the retry).
+///                          play taps the play button after the first note and holds there
 ///                          show plays like a kid at -demoSlow from the start, for screen recordings
 ///     -demoScreen <name>   open a screen directly: home, parent, parent#levels, parent#staff,
 ///                          parent#history, levels (the level picker), monitor, gallery
@@ -229,6 +230,13 @@ final class DemoRunner {
             await playItem(c)
             await sleep(1.0)
             log("retry played: retries \(c.session.summary.screens.last?.rhythmRetries ?? -1)", c)
+        case "play":
+            // the play button after his first note: the screen plays with the keyboard
+            await skipIntros(c)
+            await right(c)
+            await sleep(0.6)
+            c.listen()
+            log("play button", c)
         case "almost":
             await skipIntros(c)
             await wrongOctave(c)

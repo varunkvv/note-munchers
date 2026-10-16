@@ -243,6 +243,8 @@ public struct PracticeSession: Sendable {
     private var stucks: [Int] = []
     private var almosts: [Int] = []
     private var hints: [HintLevel] = []
+    /// Notes he hadn't played yet when he tapped play: he heard and saw them first.
+    private var listened: [Bool] = []
     /// Steps up the hint ladder on the current note (wrong keys and stuck steps).
     private var ladder = 0
     private var onsets: [Double] = []
@@ -380,6 +382,27 @@ public struct PracticeSession: Sendable {
         return showNext(at: t)
     }
 
+    /// He tapped the play button: the whole screen is played to him at a gentle tempo,
+    /// each key lighting up on the keyboard as it sounds. It's help, so the notes he
+    /// hasn't played yet on this screen count as hinted (not first try, the box holds,
+    /// "kept trying" can follow) - no other penalty. Tapped mid-screen, the rest of the
+    /// line isn't rhythm-judged (he stopped to listen). The stuck clock and the current
+    /// note's time start again once it's over.
+    public mutating func listen(at time: Double) -> [Cue] {
+        guard phase.isPlaying, let item, !awaitingRelease else { return [] }
+        let t = activeTime(at: time)
+        for i in noteIndex..<item.notes.count {
+            listened[i] = true
+            hints[i] = .keyboard
+        }
+        if !onsets.isEmpty { rhythmJudgeable = false }
+        let beat = config.demoBeat
+        let over = t + item.totalBeats * beat
+        startTimes[noteIndex] = over
+        lastActivity = over
+        return [.showAndPlay(beat: beat)]
+    }
+
     /// The play back after a wrong value is over: he plays the screen again from its
     /// first note. A rhythm retry only: pitch from the first go counts as it was.
     public mutating func replayFinished(at time: Double) -> [Cue] {
@@ -470,6 +493,7 @@ public struct PracticeSession: Sendable {
         stucks = Array(repeating: 0, count: columns)
         almosts = Array(repeating: 0, count: columns)
         hints = Array(repeating: .none, count: columns)
+        listened = Array(repeating: false, count: columns)
         ladder = 0
         onsets = []
         rhythmJudgeable = true
@@ -635,7 +659,7 @@ public struct PracticeSession: Sendable {
                 for key in column.keys {
                     notes.append(AttemptResult(
                         itemID: key.id, lesson: lesson.id, level: lesson.level, wasIntro: introNote == key || isLessonIntro,
-                        firstTry: wrongs[i] == 0 && stucks[i] == 0, wrongPresses: wrongs[i], almostPresses: almosts[i],
+                        firstTry: wrongs[i] == 0 && stucks[i] == 0 && !listened[i], wrongPresses: wrongs[i], almostPresses: almosts[i],
                         stuckSteps: stucks[i], hints: hints[i], responseTime: max(0, time)
                     ))
                 }
