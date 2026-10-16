@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 /// Short-lived drawing effects on the staff: wobble (wrong key), sparkle (right key),
-/// glow (rhythm nudge). The staff view animates only while one is live, so the Canvas
+/// glow (rhythm nudge), follow (the note or rest sounding while the screen is played). The staff view animates only while one is live, so the Canvas
 /// isn't redrawn every frame the rest of the time.
 @MainActor @Observable
 final class StaffEffects {
@@ -10,6 +10,10 @@ final class StaffEffects {
         case wobble
         case sparkle
         case glow
+        /// the note in `column` is sounding: a soft highlight to follow along
+        case follow
+        /// the rest at index `column` of the screen's rests (left to right) is sounding
+        case followRest
     }
 
     struct Effect: Identifiable, Equatable {

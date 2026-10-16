@@ -1,40 +1,52 @@
 import CoreGraphics
 import NoteCore
 
-/// What the staff has to make room for: which staves, the key signature, and the
-/// widest screen it will show. The vertical room on each staff is fixed, so the staff
-/// sits in the same place on every screen and in every lesson.
+/// What the staff has to make room for: which staves, the key signature, whether
+/// there's a time signature, and the widest screen it will show. The vertical room on
+/// each staff is fixed, so the staff sits in the same place on every screen and in
+/// every lesson.
 struct StaffSpec: Hashable {
     var layout: StaffLayout
     var keySignature: KeySignature
+    /// Room for a time signature after the key signature (every practice screen).
+    var hasMeter: Bool
     /// Widest screen it has to fit, in line gaps, left margin to right margin.
     var width: Double
 
-    init(layout: StaffLayout, keySignature: KeySignature = .none, noteWidth: Double) {
+    init(layout: StaffLayout, keySignature: KeySignature = .none, hasMeter: Bool = false, noteWidth: Double) {
         self.layout = layout
         self.keySignature = keySignature
-        width = Metrics.systemLeft(layout) + Metrics.notesStart(keySignature) + noteWidth + Metrics.rightPad
+        self.hasMeter = hasMeter
+        width = Metrics.systemLeft(layout) + Metrics.notesStart(keySignature, meter: hasMeter) + noteWidth + Metrics.rightPad
     }
 
-    /// Room for the biggest screen a lesson can show: its largest size plus a stretch
-    /// note, or its most bars of the busiest rhythm (an eighth pair and three quarters).
+    /// Room for the biggest screen a lesson can show, in either meter: its largest size
+    /// plus a stretch note in the widest way the bars can be written, or its most bars
+    /// of the busiest rhythm.
     init(lesson: Lesson, layout: StaffLayout) {
-        let noteWidth: Double
-        if lesson.texture.isRhythm {
-            let bars = lesson.sizes.upperBound
-            let busiest = 2 * Metrics.columnWidth(.eighth) + 3 * Metrics.columnWidth(.quarter)
-            noteWidth = Double(bars) * busiest + Double(bars - 1) * Metrics.barGap
-        } else {
-            // two bars of quarters at most (8 in 4/4, 6 in 3/4)
-            let columns = min(lesson.sizes.upperBound + 1, MasteryEngine.maxNotes(.fourFour))
-            noteWidth = Double(columns) * Metrics.columnWidth(.quarter) + Metrics.barGap
+        var widest = 0.0
+        for meter in Meter.allCases {
+            if case .rhythm(let values, _) = lesson.texture {
+                let bars = layout == .grand ? 2 : lesson.sizes.upperBound
+                widest = max(widest, Double(bars) * Metrics.busiestBar(meter, values: values) + Metrics.barsExtra(bars))
+            } else {
+                let n = min(lesson.sizes.upperBound + 1, MasteryEngine.maxNotes(meter))
+                var splits: [[Int]] = n <= meter.beats ? [[n]] : []
+                for first in 1..<max(1, n) where first <= meter.beats && n - first <= meter.beats && n - first >= 1 {
+                    splits.append([first, n - first])
+                }
+                for split in splits {
+                    let width = split.reduce(0) { $0 + Metrics.widestBar(notes: $1, meter: meter) } + Metrics.barsExtra(split.count)
+                    widest = max(widest, width)
+                }
+            }
         }
-        self.init(layout: layout, keySignature: lesson.keySignature, noteWidth: noteWidth)
+        self.init(layout: layout, keySignature: lesson.keySignature, hasMeter: true, noteWidth: widest)
     }
 
     /// Exactly one screen (galleries, the collection's tiny staffs, parent previews).
     init(item: PracticeItem) {
-        self.init(layout: item.layout, keySignature: item.keySignature, noteWidth: Metrics.notesWidth(item))
+        self.init(layout: item.layout, keySignature: item.keySignature, hasMeter: item.meter != nil, noteWidth: Metrics.notesWidth(item))
     }
 
     /// Staves top to bottom (grand staff: treble over bass).
@@ -70,8 +82,15 @@ enum Metrics {
     static let headTilt = -20.0 // degrees
     /// half width of the tilted head, for ledger lines and stems
     static let headHalfWidth = 0.61
+    /// a whole note's head is wider and rounder, like engraved ones
+    static let wholeRX = 0.8
+    static let wholeRY = 0.54
+    static func headHalfWidth(_ value: NoteValue?) -> Double { value == .whole ? wholeRX : headHalfWidth }
     /// ledger lines stick out this far past the head on each side
     static let ledgerOverhang = 0.42
+    /// the augmentation dot: its centre this far right of the head's edge, and its radius
+    static let dotOffset = 0.42
+    static let dotRadius = 0.21
 
     static let leftPad = 0.5
     /// room for the grand staff's brace in front of the system line. Everything else
@@ -82,12 +101,22 @@ enum Metrics {
     static let clefWidth = 2.8
     /// one sharp in the key signature
     static let sharpWidth = 1.1
+    /// the time signature's digits (Bravura's are about 1.8 spaces wide)
+    static let meterWidth = 1.8
     static let rightPad = 1.0
-    /// extra room on each side of a bar line
-    static let barGap = 1.2
+    /// room on each side of a bar line, and before the final one
+    static let barGap = 1.1
+    static let endGap = 0.7
 
-    static func notesStart(_ key: KeySignature) -> Double {
-        clefX + clefWidth + Double(key.sharpSteps(.treble).count) * sharpWidth + 1.3
+    /// Left edge of the time signature: past the key signature's sharps (which start
+    /// half a gap after the clef), or that half gap after the clef.
+    static func meterX(_ key: KeySignature) -> Double {
+        let sharps = Double(key.sharpSteps(.treble).count)
+        return clefX + clefWidth + 0.5 + sharps * sharpWidth + (sharps > 0 ? 0.35 : 0)
+    }
+
+    static func notesStart(_ key: KeySignature, meter: Bool) -> Double {
+        meter ? meterX(key) + meterWidth + 1.2 : clefX + clefWidth + Double(key.sharpSteps(.treble).count) * sharpWidth + 1.3
     }
 
     /// Space between the treble staff's bottom line and the bass staff's top line, in
@@ -103,46 +132,104 @@ enum Metrics {
         }
     }
 
-    // stems, flags and beams (rhythm screens), in line gaps
+    // stems, flags and beams, in line gaps
     static let stemLength = 3.5
     static let stemWidth = 0.16
     static let beamThickness = 0.5
 
-    /// Stem direction per column. Single notes: below the middle line stems go up.
-    /// A beamed pair shares one direction, set by the note farther from the middle line.
+    /// Stem direction per column, from the note farthest from the middle line (below it:
+    /// stems up). A beamed pair shares one direction, set the same way over both notes.
     static func stemsUp(_ item: PracticeItem) -> [Bool] {
-        var up = item.notes.indices.map { item.positions(ofNote: $0).first.map(\.stemUp) ?? true }
-        for start in item.beamedPairStarts {
-            let steps = [start, start + 1].map { item.positions(ofNote: $0)[0].step }
-            let farthest = steps.max { abs($0 - StaffPosition.middleLineStep) < abs($1 - StaffPosition.middleLineStep) }!
-            let pairUp = farthest < StaffPosition.middleLineStep
-            up[start] = pairUp
-            up[start + 1] = pairUp
+        func up(_ steps: [Int]) -> Bool {
+            let farthest = steps.max { abs($0 - StaffPosition.middleLineStep) < abs($1 - StaffPosition.middleLineStep) }
+            return (farthest ?? 0) < StaffPosition.middleLineStep
         }
-        return up
+        var ups = item.notes.indices.map { up(item.positions(ofNote: $0).map(\.step)) }
+        for start in item.beamedPairStarts {
+            let pairUp = up((item.positions(ofNote: start) + item.positions(ofNote: start + 1)).map(\.step))
+            ups[start] = pairUp
+            ups[start + 1] = pairUp
+        }
+        return ups
     }
 
-    /// Width of one column in line gaps, before stretching to fill the staff. Rhythm
-    /// columns are a little tighter than engraving so two busy bars fit at 30pt.
+    /// Width of a note's column in line gaps, before stretching to fill the staff:
+    /// roughly by length so a half takes more room than a quarter, but roomy, not
+    /// engraving-tight. nil: a plain head with no rhythm (tiny staffs).
     static func columnWidth(_ value: NoteValue?) -> Double {
         switch value {
         case nil: 3
-        case .eighth: 1.9
-        case .quarter: 2.4
-        case .half: 3.2
-        case .dottedHalf: 3.6
-        case .whole: 4.0
+        case .eighth: 1.8
+        case .quarter: 2.3
+        case .half: 3.0
+        case .dottedHalf: 3.5
+        case .whole: 3.7
         }
     }
 
-    static func columnWidths(_ item: PracticeItem) -> [Double] {
-        item.notes.map { columnWidth(item.meter == nil ? nil : $0.value) }
+    /// A rest's column. Rests are drawn smaller than the room their length would get as
+    /// a note, so a bar with a rest isn't wider than the same bar full of notes.
+    static func restWidth(_ value: NoteValue) -> Double {
+        value == .quarter ? 2.0 : 2.4
     }
 
-    /// Notes plus the room around bar lines.
-    static func notesWidth(_ item: PracticeItem) -> Double {
-        columnWidths(item).reduce(0, +) + Double(item.barLinesAfter.count) * barGap
+    /// A bar with one long note still gets some room, so the note doesn't sit on the bar line.
+    static let minBar = 5.4
+
+    /// Width of one bar's notes and rests.
+    static func barWidth(_ notes: some Collection<WrittenNote>) -> Double {
+        max(minBar, notes.reduce(0) { $0 + columnWidth($1.value) + $1.restsAfter.reduce(0) { $0 + restWidth($1) } })
     }
+
+    static func barWidth(_ rhythm: BarRhythm) -> Double {
+        max(minBar, rhythm.values.reduce(0) { $0 + columnWidth($1) } + rhythm.rests.reduce(0) { $0 + restWidth($1) })
+    }
+
+    /// The widest way a reading screen can write `notes` notes in one bar.
+    static func widestBar(notes: Int, meter: Meter) -> Double {
+        MasteryEngine.readingBars(notes: notes, meter: meter).map { barWidth($0.rhythm) }.max() ?? 0
+    }
+
+    /// The busiest bar a rhythm lesson can write: an eighth pair and quarters.
+    static func busiestBar(_ meter: Meter, values: [NoteValue]) -> Double {
+        let pair = values.contains(.eighth) ? 2 * columnWidth(.eighth) - columnWidth(.quarter) : 0
+        return Double(meter.beats) * columnWidth(.quarter) + pair
+    }
+
+    /// Bar lines between `bars` bars and the gap before the final bar line.
+    static func barsExtra(_ bars: Int) -> Double {
+        Double(max(0, bars - 1)) * barGap + endGap
+    }
+
+    /// Notes, rests and the room around bar lines.
+    static func notesWidth(_ item: PracticeItem) -> Double {
+        guard item.meter != nil else {
+            return Double(item.notes.count) * columnWidth(nil) + Double(item.barLinesAfter.count) * barGap
+        }
+        return item.barRanges.reduce(0) { $0 + barWidth(item.notes[$1]) } + barsExtra(item.bars.count)
+    }
+}
+
+/// Where everything on a screen goes, left to right.
+struct ScreenLayout {
+    struct Rest {
+        var value: NoteValue
+        var clef: Clef
+        var x: CGFloat
+        /// the note it follows, and which of that note's rests it is
+        var note: Int
+        var index: Int
+    }
+
+    /// Centre x of each note's column.
+    var notes: [CGFloat] = []
+    var rests: [Rest] = []
+    /// Bar lines between bars.
+    var barLines: [CGFloat] = []
+    /// Each bar's span, bar line to bar line (for a whole-bar rest on an idle staff).
+    var bars: [ClosedRange<CGFloat>] = []
+    /// The final bar line, where the staff ends. nil without a meter (the staff runs on).
+    var end: CGFloat?
 }
 
 /// Concrete positions for one staff area size.
@@ -203,27 +290,69 @@ struct StaffGeometry {
 
     var clefX: CGFloat { systemLeft + CGFloat(Metrics.clefX) * g }
     var keySignatureX: CGFloat { systemLeft + CGFloat(Metrics.clefX + Metrics.clefWidth + 0.5) * g }
-    var notesLeft: CGFloat { systemLeft + CGFloat(Metrics.notesStart(spec.keySignature)) * g }
+    /// Left edge of the time signature's digits.
+    var meterX: CGFloat { systemLeft + CGFloat(Metrics.meterX(spec.keySignature)) * g }
+    var notesLeft: CGFloat { systemLeft + CGFloat(Metrics.notesStart(spec.keySignature, meter: spec.hasMeter)) * g }
     var notesRight: CGFloat { size.width - CGFloat(Metrics.rightPad) * g }
 
     /// Top line of the highest staff to the bottom line of the lowest, for bar lines.
     var systemTop: CGFloat { y(8, on: spec.clefs[0]) }
     var systemBottom: CGFloat { y(0, on: spec.clefs[spec.clefs.count - 1]) }
 
-    /// Center x of each column. Columns stretch up to 1.4x their natural width to use
-    /// the room, then the screen is centered in what's left. Bar lines get room on both sides.
-    func columnCenters(_ item: PracticeItem) -> [CGFloat] {
-        let widths = Metrics.columnWidths(item).map { CGFloat($0) * g }
-        let bars = Set(item.barLinesAfter)
-        let barRoom = CGFloat(Metrics.barGap) * g
-        let natural = widths.reduce(0, +) + CGFloat(bars.count) * barRoom
-        let room = max(natural, notesRight - notesLeft)
-        let stretch = min(1.4, room / natural)
-        let used = natural * stretch
-        var x = notesLeft + (room - used) / 2
-        return widths.enumerated().map { i, w in
-            defer { x += (w + (bars.contains(i) ? barRoom : 0)) * stretch }
-            return x + w * stretch / 2
+    /// Where each column, rest and bar line goes. Screens with a meter start right after
+    /// the time signature and stretch up to 1.4x their natural width to use the room;
+    /// the staff ends at the final bar line. Screens without one (tiny staffs) are
+    /// centred in the room and the staff runs on.
+    func layout(_ item: PracticeItem) -> ScreenLayout {
+        var result = ScreenLayout()
+        let room = notesRight - notesLeft
+        guard item.meter != nil else {
+            let widths = item.notes.map { _ in CGFloat(Metrics.columnWidth(nil)) * g }
+            let bars = Set(item.barLinesAfter)
+            let barRoom = CGFloat(Metrics.barGap) * g
+            let natural = widths.reduce(0, +) + CGFloat(bars.count) * barRoom
+            let stretch = min(1.4, max(natural, room) / natural)
+            var x = notesLeft + (max(natural, room) - natural * stretch) / 2
+            for (i, w) in widths.enumerated() {
+                result.notes.append(x + w * stretch / 2)
+                x += w * stretch
+                if bars.contains(i) {
+                    result.barLines.append(x + barRoom * stretch / 2)
+                    x += barRoom * stretch
+                }
+            }
+            return result
         }
+        let natural = CGFloat(Metrics.notesWidth(item)) * g
+        let k = min(1.4, max(1, room / natural))
+        var x = notesLeft
+        var barStart = notesLeft - CGFloat(Metrics.barGap) * g * k / 2
+        for (b, range) in item.barRanges.enumerated() {
+            if b > 0 {
+                let line = x + CGFloat(Metrics.barGap) * g * k / 2
+                result.bars.append(barStart...line)
+                result.barLines.append(line)
+                barStart = line
+                x += CGFloat(Metrics.barGap) * g * k
+            }
+            let start = x
+            for i in range {
+                let note = item.notes[i]
+                let w = CGFloat(Metrics.columnWidth(note.value)) * g * k
+                result.notes.append(x + w / 2)
+                x += w
+                for (j, rest) in note.restsAfter.enumerated() {
+                    let rw = CGFloat(Metrics.restWidth(rest)) * g * k
+                    result.rests.append(.init(value: rest, clef: note.clef, x: x + rw / 2, note: i, index: j))
+                    x += rw
+                }
+            }
+            // a short bar (one whole note) takes the bar's minimum room after its notes
+            x = max(x, start + CGFloat(Metrics.barWidth(item.notes[range])) * g * k)
+        }
+        let end = x + CGFloat(Metrics.endGap) * g * k
+        result.bars.append(barStart...end)
+        result.end = end
+        return result
     }
 }

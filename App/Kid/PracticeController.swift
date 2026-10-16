@@ -170,8 +170,14 @@ final class PracticeController {
                 itemsShown += 1
                 effects.clear()
                 let lesson = session.engine.lesson
+                let old = spec
                 spec = StaffSpec(lesson: lesson, layout: session.item?.layout ?? spec.layout)
                 keyboardRange = KeyboardRange.forLesson(lesson)
+                #if DEBUG
+                if spec != old || itemsShown == 1 {
+                    print(String(format: "staff: lesson %@ needs %.1f gaps (%.0fpt at 30pt)", lesson.id, spec.width, spec.width * 30))
+                }
+                #endif
             case .wobble(let note):
                 effects.add(.wobble, column: note, duration: 0.6)
             case .playPitches(let pitches):
@@ -314,6 +320,7 @@ final class PracticeController {
             effects.add(.sparkle, column: column, duration: 0.7)
             gobbleCount += 1
         case .glow: effects.add(.glow, column: column, duration: glowLength(column))
+        case .follow, .followRest: effects.add(kind, column: column, duration: 1)
         }
     }
 
