@@ -22,7 +22,7 @@ final class Voice {
         if logs { print("voice: \(parts.map(\.text).joined())") }
         guard !isMuted else { return }
         switch speech {
-        case .almost, .sharpHint, .hintListen, .hintShow, .hintLook:
+        case .almost, .sharpHint, .hintListen, .hintShow, .hintLook, .oops:
             // feedback on the key he just pressed: the newest one wins
             synth.stopSpeaking(at: .immediate)
         default:
@@ -91,6 +91,9 @@ final class Voice {
             return [Part(text: "this one is ")] + namePart(name) + [Part(text: ". here it is")]
         case .hintLook:
             return [Part(text: "here they are")]
+        case .oops:
+            // his teacher's phrase, affectionate. rare: NoteCore decides when
+            return [Part(text: "oops, silly goose! let's look again")]
         // process praise: what he did, never what he is. no "smart", "genius",
         // "talented", "good boy" or empty "great job" (mueller & dweck)
         case .keptTrying:

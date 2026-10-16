@@ -260,6 +260,82 @@ import Testing
         #expect(bench.session.pickReason != .easing)
     }
 
+    /// Plays `count` screens right first try.
+    func cruise(_ bench: inout Bench, _ count: Int) {
+        for _ in 0..<count {
+            _ = bench.playScreen()
+            _ = bench.next()
+        }
+    }
+
+    func roomy() -> NoteCoreConfig {
+        var config = NoteCoreConfig()
+        config.sessionMaxItems = 100
+        config.sessionMaxDuration = 10_000
+        return config
+    }
+
+    @Test func oopsOnAWrongKeyAfterAGoodRun() {
+        var bench = twoNoteBench(config: roomy())
+        _ = bench.start()
+        cruise(&bench, 5)
+        let cues = bench.press(bench.wrongKey)
+        #expect(cues == [.wobble(note: bench.session.noteIndex), .say(.oops)], "goes with the wobble")
+        #expect(bench.session.phase == .waiting, "the ladder carries on as usual")
+        #expect(!speeches(bench.press(bench.wrongKey)).contains(.oops), "never after another miss on the same screen")
+    }
+
+    @Test func oopsAtMostOncePerSession() {
+        var bench = twoNoteBench(config: roomy())
+        _ = bench.start()
+        var oops = 0
+        for _ in 0..<6 {
+            cruise(&bench, 6)
+            oops += speeches(bench.press(bench.wrongKey)).filter { $0 == .oops }.count
+            _ = bench.playScreen()
+            _ = bench.next()
+        }
+        #expect(oops == 1)
+    }
+
+    @Test func noOopsAfterARunOfMisses() {
+        var bench = twoNoteBench(config: roomy())
+        _ = bench.start()
+        var said: [Speech] = []
+        for _ in 0..<12 {
+            said += speeches(bench.press(bench.wrongKey))
+            said += speeches(bench.playScreen())
+            _ = bench.next()
+        }
+        #expect(!said.contains(.oops))
+    }
+
+    @Test func noOopsOnceEasingHasKickedIn() {
+        var bench = twoNoteBench(config: roomy())
+        _ = bench.start()
+        // three missed notes in a row bring easing, then a long good run
+        for _ in 0..<3 {
+            _ = bench.press(bench.wrongKey)
+            _ = bench.playCurrent()
+            if bench.session.phase == .success { _ = bench.next() }
+        }
+        if bench.session.phase.isPlaying { _ = bench.playScreen() }
+        _ = bench.next()
+        #expect(bench.session.pickReason == .easing)
+        cruise(&bench, 10)
+        #expect(!speeches(bench.press(bench.wrongKey)).contains(.oops))
+    }
+
+    @Test func noOopsWhenStuckOrAlmost() {
+        var bench = Bench(engine(in: "1.4", config: roomy()))
+        _ = bench.start()
+        cruise(&bench, 5)
+        let expected = bench.expected[0]
+        #expect(!speeches(bench.press(Pitch(midi: expected.midi + 12))).contains(.oops), "an almost isn't a wrong key")
+        let deadline = bench.session.nextDeadline!
+        #expect(!speeches(bench.tick(at: deadline)).contains(.oops), "being stuck isn't a wrong key")
+    }
+
     @Test func stuckClimbsTheLadderAndStops() throws {
         var bench = twoNoteBench()
         _ = bench.start()

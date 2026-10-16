@@ -58,6 +58,12 @@ public enum Speech: Hashable, Codable, Sendable {
     case hintShow(NoteName)
     /// Hint ladder, third step, on two notes at once: "here they are"
     case hintLook
+    /// A wrong key when he's been doing well: "oops, silly goose! let's look again" (his
+    /// teacher's phrase, said with a smile). Rare: the first miss on a screen, only when
+    /// 4 of his last 5 screens this session were right first try, at most once a
+    /// session, never once easing has kicked in. Goes with the wobble, the hint ladder
+    /// carries on as usual
+    case oops
     /// Now and then after a screen that needed a hint: "you kept trying and found it!"
     case keptTrying
     /// Now and then after a screen he read right first try: "you looked carefully!"
@@ -200,6 +206,8 @@ public struct PracticeSession: Sendable {
     private var struggles: [Bool] = []
     private var limitReached: SessionSummary.EndReason?
     private var praisedLast = false
+    private var saidOops = false
+    private var eased = false
 
     // the current screen, per column
     private var pickSize = 1
@@ -478,8 +486,22 @@ public struct PracticeSession: Sendable {
                 keyboardHint = expected
                 return cues + [.say(.sharpHint(sharp))]
             }
-            return climbLadder(speak: true)
+            let firstMiss = wrongs.reduce(0, +) == 1 && stucks.reduce(0, +) == 0
+            let cues = climbLadder(speak: true)
+            if firstMiss, oopsFits {
+                saidOops = true
+                return cues + [.say(.oops)]
+            }
+            return cues
         }
+    }
+
+    /// "oops, silly goose" only while he's on a roll: 4 of his last 5 screens this
+    /// session right first try, once a session, never after easing or on an intro.
+    private var oopsFits: Bool {
+        guard !saidOops, !eased, !isIntro, pickReason != .easing else { return false }
+        let recent = summary.screens.filter { !$0.wasIntro && !$0.wasLessonIntro }.suffix(5)
+        return recent.count == 5 && recent.filter(\.firstTry).count >= 4
     }
 
     /// One step up the hint ladder for the current note: wobble, then the sound, then
@@ -582,6 +604,7 @@ public struct PracticeSession: Sendable {
             struggles = Array((struggles + [!note.firstTry]).suffix(config.easingWindow))
             if easingLeft == 0, struggles.filter({ $0 }).count >= config.easingTrigger {
                 easingLeft = config.easingItems
+                eased = true
                 struggles = []
             }
         }
