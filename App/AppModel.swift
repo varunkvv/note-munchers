@@ -65,6 +65,10 @@ final class AppModel {
         #if DEBUG
         // logs go to a file in agent runs. line buffered so a killed app still wrote them
         setvbuf(stdout, nil, _IOLBF, 0)
+        if let folder = demo.renderSongs {
+            SongRenders.write(to: folder)
+            exit(0)
+        }
         if demo.isActive {
             DemoRunner(model: self, options: demo).begin()
             return

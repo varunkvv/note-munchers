@@ -32,6 +32,8 @@ import NoteCore
 ///     -demoAutoPick <s>    pick a hatching muncher's colour after s seconds (default 0.8)
 ///     -demoGate <how>      open|right|wrong: open the parent gate on home by itself and
 ///                          optionally answer it (read in ParentGate.swift)
+///     -renderSongs <dir>   write one song per level with its backing (the Listen track) to
+///                          <dir> as m4a, then quit. Not a demo, works best on the mac build
 struct DemoOptions {
     var script: String?
     var screen: String?
@@ -50,6 +52,8 @@ struct DemoOptions {
     var logMIDI = false
     /// seconds before a demo picks a muncher colour by itself
     var autoPick = 0.8
+    /// write the song renders here and quit
+    var renderSongs: String?
 
     init(defaults: UserDefaults = .standard) {
         script = defaults.string(forKey: "demoScript")
@@ -68,6 +72,7 @@ struct DemoOptions {
         debugKeyboard = defaults.bool(forKey: "debugKeyboard")
         logMIDI = defaults.bool(forKey: "logMIDI")
         autoPick = defaults.string(forKey: "demoAutoPick").flatMap(Double.init) ?? 0.8
+        renderSongs = defaults.string(forKey: "renderSongs")
     }
 
     var isActive: Bool { script != nil || screen != nil }

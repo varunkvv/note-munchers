@@ -1,0 +1,12 @@
+Piano samples: Salamander Grand Piano by Alexander Holm (a Yamaha C5)
+License: Creative Commons Attribution 3.0 (CC BY 3.0)
+https://creativecommons.org/licenses/by/3.0/
+
+Taken from the Tone.js copy of the samples (one velocity layer, sampled every
+minor third): https://github.com/Tonejs/audio/tree/master/salamander
+The original README there names the author and the license (CC-by).
+
+Changed for Note Munchers: the notes C2 to C6 only, the left channel only (mono),
+leading silence removed, cut to 4.5 seconds with a 1.3 second fade out, each
+note's peak set to -3 dBFS, saved as 96 kbps AAC. File names are the note the
+sample was played at (Ds = D sharp, Fs = F sharp).

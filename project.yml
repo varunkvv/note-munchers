@@ -19,8 +19,13 @@ targets:
       - path: App
         excludes:
           - "Resources/Voice"
+          - "Resources/Piano"
       # the voice clips as one folder, so a new clip from tools/voice needs no project change
       - path: App/Resources/Voice
+        type: folder
+        buildPhase: resources
+      # song time's piano samples (Salamander Grand, CC BY 3.0) with their license, one folder
+      - path: App/Resources/Piano
         type: folder
         buildPhase: resources
     dependencies:

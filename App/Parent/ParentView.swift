@@ -50,6 +50,11 @@ struct ParentView: View {
                     Text("The three picture cards that explain the game. They stay on the home screen until he taps \"Let's go!\".")
                 }
                 historySection.id("history")
+                Section("Credits") {
+                    Text("Song time's piano: Salamander Grand Piano by Alexander Holm, CC BY 3.0 (creativecommons.org/licenses/by/3.0). Music symbols: Bravura, SIL Open Font License.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
                 #if DEBUG
                 Section("Debug") {
                     Toggle("On-screen keyboard", isOn: Binding(

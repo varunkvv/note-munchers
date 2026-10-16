@@ -15,14 +15,32 @@ final class Sounds {
     private var nextPlayer = 0
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
     private var cache: [String: AVAudioPCMBuffer] = [:]
+    /// Song time: short backing parts (fillers), each on its own node so one never cuts another.
+    private var backingPlayers: [AVAudioPlayerNode] = []
+    private var nextBacking = 0
+    /// Song time: the chord that rings with his key. Two, so the old one can be damped
+    /// while the new one starts.
+    private var heldPlayers: [AVAudioPlayerNode] = []
+    private var nextHeld = 0
+    /// Song time: the whole Listen track.
+    private let trackPlayer = AVAudioPlayerNode()
+    private var dampTask: Task<Void, Never>?
 
     init() {
         for _ in 0..<8 {
-            let player = AVAudioPlayerNode()
-            engine.attach(player)
-            engine.connect(player, to: engine.mainMixerNode, format: format)
-            players.append(player)
+            players.append(attach())
         }
+        for _ in 0..<10 { backingPlayers.append(attach()) }
+        for _ in 0..<2 { heldPlayers.append(attach()) }
+        engine.attach(trackPlayer)
+        engine.connect(trackPlayer, to: engine.mainMixerNode, format: format)
+    }
+
+    private func attach() -> AVAudioPlayerNode {
+        let player = AVAudioPlayerNode()
+        engine.attach(player)
+        engine.connect(player, to: engine.mainMixerNode, format: format)
+        return player
     }
 
     // MARK: what the app plays
@@ -57,6 +75,66 @@ final class Sounds {
     func play(_ phrase: [ScheduledNote]) {
         guard let buffer = Synth.phrase(phrase, format: format) else { return }
         play(buffer)
+    }
+
+    // MARK: song time
+
+    /// A moment of the song's backing (Piano + SongMix), at `time` on the host clock or
+    /// now. `held`: the chord that sounds with his key and rings while he looks for the
+    /// next one. The one before it is damped (a quick fade, like lifting the hands).
+    func playBacking(_ buffer: AVAudioPCMBuffer?, at time: Double? = nil, held: Bool) {
+        guard !isMuted, let buffer, ensureRunning() else { return }
+        let player: AVAudioPlayerNode
+        if held {
+            let old = heldPlayers[nextHeld]
+            nextHeld = (nextHeld + 1) % heldPlayers.count
+            player = heldPlayers[nextHeld]
+            damp(old)
+            player.stop()
+            player.volume = 1
+        } else {
+            player = backingPlayers[nextBacking]
+            nextBacking = (nextBacking + 1) % backingPlayers.count
+            player.stop()
+        }
+        player.scheduleBuffer(buffer, at: time.map { AVAudioTime(hostTime: HostClock.hostTime(seconds: $0)) }, options: [])
+        player.play()
+    }
+
+    /// Fades a node out over ~0.15s, then stops it.
+    private func damp(_ player: AVAudioPlayerNode) {
+        guard player.isPlaying else { return }
+        dampTask?.cancel()
+        dampTask = Task { @MainActor in
+            for step in 1...6 {
+                try? await Task.sleep(for: .milliseconds(25))
+                guard !Task.isCancelled else { break }
+                player.volume = Float(1 - Double(step) / 6)
+            }
+            player.stop()
+            player.volume = 1
+        }
+    }
+
+    /// Everything the song's backing has playing or waiting stops (leaving the song).
+    func stopBacking() {
+        dampTask?.cancel()
+        for player in backingPlayers + heldPlayers {
+            player.stop()
+            player.volume = 1
+        }
+    }
+
+    /// Listen: the whole song as one track.
+    func playTrack(_ buffer: AVAudioPCMBuffer?) {
+        guard !isMuted, let buffer, ensureRunning() else { return }
+        trackPlayer.stop()
+        trackPlayer.scheduleBuffer(buffer, at: nil, options: [])
+        trackPlayer.play()
+    }
+
+    func stopTrack() {
+        trackPlayer.stop()
     }
 
     /// Call when the app comes back to the foreground.

@@ -16,4 +16,9 @@ enum HostClock {
     }
 
     static var now: Double { seconds(hostTime: mach_absolute_time()) }
+
+    /// The other way: seconds on this clock as mach host time (for scheduling audio).
+    static func hostTime(seconds: Double) -> UInt64 {
+        UInt64(max(0, seconds) * 1e9 * Double(timebase.denom) / Double(timebase.numer))
+    }
 }
