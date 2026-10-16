@@ -191,13 +191,19 @@ final class PracticeController {
                 // the chomp lands when the note reaches the mouth
                 later(MuncherLane.gobbleLength * 0.5) { $0.sounds.chomp() }
             case .say(let speech):
+                var talking = 0.0
                 if case .meetNote = speech, speechDelay > 0 {
                     later(speechDelay) { $0.voice.say(speech) }
                 } else {
-                    voice.say(speech)
+                    talking = voice.say(speech)
                 }
+                // "listen" / "two at once" lines vary in length: the sound waits until she's done
+                if soundDelay > 0 { soundDelay = max(soundDelay, talking + 0.15) }
                 if speech == .holdLonger { celebrate += 1.2 }
-                if speech == .keptTrying || speech == .lookedCarefully { celebrate += 0.8 }
+                if speech == .keptTrying || speech == .lookedCarefully {
+                    // the next screen waits for the praise to finish
+                    celebrate = max(celebrate + 0.8, talking + 0.3)
+                }
             case .rhythmGlow(let note):
                 let length = glowLength(note)
                 effects.add(.glow, column: note, duration: length)

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0570A901E47684B8B0A2002E /* NoteMunchersApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40A9FAADACC73984A6937F4 /* NoteMunchersApp.swift */; };
+		0F555C82371A7685D6D70D21 /* Voice in Resources */ = {isa = PBXBuildFile; fileRef = A27D579380B82A310509A2C1 /* Voice */; };
 		10CE762EB870434791DA6EC8 /* InputHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32AE2696EDC3917E40F1D23A /* InputHub.swift */; };
 		128D32BD861385A7B39347F2 /* PracticeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE8D594DCE24B32A4C800E6 /* PracticeController.swift */; };
 		12C47B9BF900D032E9EBC506 /* MIDIInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349A99AF7DACB9AA0D8A5841 /* MIDIInput.swift */; };
@@ -64,6 +65,7 @@
 		5FC4B9745E680C6A880B2EE2 /* HostClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostClock.swift; sourceTree = "<group>"; };
 		759D1542CEFCE31BBA18F2E1 /* PracticeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeView.swift; sourceTree = "<group>"; };
 		950F8DF3C16D42AB1A4C1E0D /* Sounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sounds.swift; sourceTree = "<group>"; };
+		A27D579380B82A310509A2C1 /* Voice */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Voice; path = App/Resources/Voice; sourceTree = SOURCE_ROOT; };
 		A48C29779F0D7D5DA09BC58E /* StaffGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffGeometry.swift; sourceTree = "<group>"; };
 		B12E9A5BA79CCB56BE556C81 /* Bravura.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Bravura.otf; sourceTree = "<group>"; };
 		B1A0D16CFDCBDE056B0F9D55 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
@@ -100,6 +102,7 @@
 			children = (
 				F9338F512C1757517B46A5ED /* Bravura-OFL.txt */,
 				B12E9A5BA79CCB56BE556C81 /* Bravura.otf */,
+				A27D579380B82A310509A2C1 /* Voice */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -301,6 +304,7 @@
 				5D79C07B1F1CCFBD5CBC542A /* AppIcon.icon in Resources */,
 				8D061F6EE67C6DE5FAD1A204 /* Bravura-OFL.txt in Resources */,
 				3F08083D1388D997BE5B59FC /* Bravura.otf in Resources */,
+				0F555C82371A7685D6D70D21 /* Voice in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
