@@ -171,6 +171,11 @@ struct MuncherPose {
     var noteFlight: Double?
     /// small up-down idle bob, in points
     var bob = 0.0
+    /// 0 eyes open ... 1 shut (an idle blink on home)
+    var blink = 0.0
+    /// where the pupils look: 0 the usual (a little left, toward the staff), 1 to the
+    /// right, -1 further left. Home's idle look around
+    var glance = 0.0
 }
 
 /// Draws a muncher with paths. Friendly on purpose: always smiling, big round eyes,
@@ -730,11 +735,22 @@ struct MuncherPainter {
                 context.stroke(arc, with: .color(ink), style: StrokeStyle(lineWidth: max(1.5, s * 0.035), lineCap: .round))
                 continue
             }
+            if pose.blink > 0.8 {
+                // shut for a moment in a blink: a soft downward curve, like sleeping
+                if t.eyePlacement == .stalks {
+                    context.fill(circle(c, rr), with: .color(look.body))
+                }
+                var arc = Path()
+                arc.addArc(center: CGPoint(x: c.x, y: c.y - rr * 0.45), radius: rr * 0.75, startAngle: .degrees(25), endAngle: .degrees(155), clockwise: false)
+                context.stroke(arc, with: .color(ink), style: StrokeStyle(lineWidth: max(1.5, s * 0.03), lineCap: .round))
+                continue
+            }
             let white = Path(ellipseIn: CGRect(x: c.x - rx, y: c.y - ry, width: rx * 2, height: ry * 2))
             context.fill(white, with: .color(.white))
             // pupils look left, toward the staff where the notes come from
             let pr = rr * (t.eyeStyle == .sparkle ? 0.6 : 0.5)
-            let pc = CGPoint(x: c.x - rx * 0.22, y: c.y + ry * 0.08)
+            let g = min(1, max(-1, pose.glance))
+            let pc = CGPoint(x: c.x + rx * (g < 0 ? -0.22 + 0.2 * g : -0.22 + 0.44 * g), y: c.y + ry * 0.08)
             context.fill(circle(pc, pr), with: .color(ink))
             context.fill(circle(CGPoint(x: pc.x - pr * 0.35, y: pc.y - pr * 0.4), pr * 0.38), with: .color(.white))
             if t.eyeStyle == .sparkle {
@@ -752,6 +768,19 @@ struct MuncherPainter {
                     cover.addLine(to: CGPoint(x: c.x + rx * 1.1, y: c.y + ry * 1.2))
                     cover.closeSubpath()
                     lid.fill(cover, with: .color(look.body))
+                }
+            }
+            if pose.blink > 0.02 {
+                // an upper lid in the body colour comes down over the eye
+                let b = CGFloat(min(1, pose.blink))
+                let edge = c.y - ry + 2 * ry * b
+                context.drawLayer { lid in
+                    lid.clip(to: white)
+                    lid.fill(Path(CGRect(x: c.x - rx * 1.2, y: c.y - ry * 1.2, width: rx * 2.4, height: edge - (c.y - ry * 1.2))), with: .color(look.body))
+                    var line = Path()
+                    line.move(to: CGPoint(x: c.x - rx * 1.2, y: edge))
+                    line.addLine(to: CGPoint(x: c.x + rx * 1.2, y: edge))
+                    lid.stroke(line, with: .color(ink.opacity(0.8)), lineWidth: max(1, s * 0.02))
                 }
             }
             context.stroke(white, with: .color(ink.opacity(0.8)), lineWidth: max(1, s * 0.014))
@@ -1069,6 +1098,9 @@ struct EggPainter {
     /// nil = just above the bottom shell.
     var babyRect: CGRect?
     var babyFluency = 0.0
+    /// The egg's tilt in radians, about its bottom. nil = the built-in wobble before the
+    /// crack. Home's idle wobble and the hatch's growing rocks set their own.
+    var rock: Double?
 
     private let shell = Color(red: 1, green: 0.97, blue: 0.9)
 
@@ -1080,7 +1112,7 @@ struct EggPainter {
         let eggW = s * 0.56
         let eggH = s * 0.72
         let center = CGPoint(x: cx, y: bottom - eggH / 2)
-        let wobble = p < 0.5 ? sin(p * .pi * 10) * 0.14 * (p / 0.5) : 0
+        let wobble = rock ?? (p < 0.5 ? sin(p * .pi * 10) * 0.14 * (p / 0.5) : 0)
 
         // the baby pops out of the bottom half: drawn first, so the shell is in front of it
         if p > 0.55 {

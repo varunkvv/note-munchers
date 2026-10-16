@@ -35,8 +35,8 @@ struct RootView: View {
         }
         // paper behind the screens, so a cross-fade never shows the window through
         .background(Theme.paper.ignoresSafeArea())
-        // practice -> end screen eases over instead of cutting. other moves stay instant
-        .animation(model.screen == .sessionEnd ? .easeInOut(duration: 0.5) : nil, value: model.screen)
+        // every screen change is a soft fade (practice -> end screen also grows in a little)
+        .animation(.easeInOut(duration: model.screen == .sessionEnd ? 0.5 : 0.4), value: model.screen)
         #if DEBUG
         .modifier(DemoLandscape(enabled: model.demo.landscape))
         #endif
@@ -66,6 +66,7 @@ struct RootView: View {
         switch model.screen {
         case .home:
             HomeView(model: model)
+                .transition(.opacity)
         case .practice:
             if let practice = model.practice {
                 PracticeView(controller: practice, input: model.input, onDone: model.doneForNow)
@@ -77,6 +78,7 @@ struct RootView: View {
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96)))
             } else {
                 HomeView(model: model)
+                    .transition(.opacity)
             }
         }
     }

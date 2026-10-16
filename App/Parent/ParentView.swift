@@ -14,6 +14,7 @@ struct ParentView: View {
     @AppStorage(StaffStyle.Key.size) private var staffSize = StaffStyle().size
     @AppStorage(StaffStyle.Key.lineThickness) private var lineThickness = StaffStyle().lineThickness
     @AppStorage(StaffStyle.Key.spaceTint) private var spaceTint = StaffStyle().spaceTint
+    @AppStorage(IntroCards.seenKey) private var introSeen = false
 
     private var engine: MasteryEngine { model.engine }
 
@@ -39,6 +40,14 @@ struct ParentView: View {
                 Section("Piano") {
                     NavigationLink("MIDI monitor", value: "monitor")
                     LabeledContent("Status", value: model.input.isConnected ? "Connected" : "No MIDI source")
+                }
+                Section {
+                    Button("Show the intro again") {
+                        introSeen = false
+                        dismiss()
+                    }
+                } footer: {
+                    Text("The three picture cards that explain the game. They stay on the home screen until he taps \"Let's go!\".")
                 }
                 historySection.id("history")
                 #if DEBUG

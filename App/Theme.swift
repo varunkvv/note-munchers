@@ -23,6 +23,19 @@ enum Theme {
     static let lane = Color(red: 0.95, green: 0.92, blue: 0.86)
     static let button = Color(red: 0.36, green: 0.72, blue: 0.45)
     static let parentIcon = Color(red: 0.55, green: 0.52, blue: 0.48)
+
+    /// Words on kid screens: a warm dark brown, softer than the staff's ink.
+    static let kidText = Color(red: 0.27, green: 0.2, blue: 0.16)
+    /// The one line under a heading.
+    static let kidTextSoft = Color(red: 0.45, green: 0.38, blue: 0.32)
+    /// "All done" and the parts that go with it.
+    static let homeButton = Color(red: 0.38, green: 0.62, blue: 0.95)
+
+    /// Kid screen words: SF Rounded, big and bold. A few plain words a first grader
+    /// reads on his own, never a paragraph, never a judging word.
+    static func kidFont(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {
+        .system(size: size, weight: weight, design: .rounded)
+    }
 }
 
 /// Parent settings for the staff (vision). Stored in UserDefaults.
