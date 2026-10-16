@@ -74,8 +74,8 @@ struct PracticeView: View {
 
     /// The lane takes the room the staff doesn't need at its full line gap, up to 30%
     /// of the width, so the munchers are big wherever there's room. The staff never
-    /// shrinks for them: level 3's three bars don't fit at the full gap even now, so
-    /// there the lane stays at its old 17% and the munchers at their old size.
+    /// shrinks for them. With real bars (2 at most) every lesson fits at 30pt on the 11
+    /// inch: levels 1-2 get 27-30%, level 3 23-26%, level 4 26-27%, level 5 17-20%.
     private func laneWidth(screen width: CGFloat) -> CGFloat {
         let staff = CGFloat(controller.spec.width) * Metrics.gap * CGFloat(style.size) + 16
         return max(180, min(width * 0.3, max(width * 0.17, width - staff)))

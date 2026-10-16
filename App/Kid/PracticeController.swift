@@ -188,6 +188,11 @@ final class PracticeController {
             switch cue {
             case .showItem:
                 itemsShown += 1
+                // a play back of the last screen stops with it, so no old keys or
+                // highlights land on the new one
+                playbackTask?.cancel()
+                playingKeys = nil
+                isPlayingBack = false
                 effects.clear()
                 let lesson = session.engine.lesson
                 let old = spec
@@ -296,6 +301,7 @@ final class PracticeController {
     private func playScreen(beat: Double, keys: Bool, delay: Double, done: (@MainActor (PracticeController) -> Void)? = nil) {
         guard let item = session.item else { return }
         playbackTask?.cancel()
+        playingKeys = nil
         isPlayingBack = true
         // demo runs stretch time, so screenshots can catch it mid-way
         let b = beat * timeScale

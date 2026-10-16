@@ -8,7 +8,8 @@ import NoteCore
 ///                          sharpPrompt / sharp stop on the next F# (sharp also presses F natural).
 ///                          wrongValue plays a rhythm screen's halves as quarters (the retry),
 ///                          keepGoing plays them short all three goes (then "let's keep going").
-///                          play taps the play button after the first note and holds there
+///                          play taps the play button after the first note and holds there,
+///                          playAlong then finishes the screen while it's still playing
 ///                          show plays like a kid at -demoSlow from the start, for screen recordings
 ///     -demoScreen <name>   open a screen directly: home, parent, parent#levels, parent#staff,
 ///                          parent#history, levels (the level picker), monitor, gallery
@@ -240,13 +241,20 @@ final class DemoRunner {
             await playItem(c)
             await sleep(1.0)
             log("retry played: retries \(c.session.summary.screens.last?.rhythmRetries ?? -1)", c)
-        case "play":
-            // the play button after his first note: the screen plays with the keyboard
+        case "play", "playAlong":
+            // the play button after his first note: the screen plays with the keyboard.
+            // playAlong then finishes the screen while it's still playing
             await skipIntros(c)
             await right(c)
             await sleep(0.6)
             c.listen()
             log("play button", c)
+            guard script == "playAlong" else { break }
+            let shown = c.itemsShown
+            await playItem(c)
+            await waitForNext(c, after: shown)
+            await sleep(0.5)
+            log("next screen: keys \(c.playingKeys.map { "\($0)" } ?? "none"), playing \(c.isPlayingBack)", c)
         case "almost":
             await skipIntros(c)
             await wrongOctave(c)
