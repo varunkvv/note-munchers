@@ -13,7 +13,7 @@ struct StaffSpec: Hashable {
     init(layout: StaffLayout, keySignature: KeySignature = .none, noteWidth: Double) {
         self.layout = layout
         self.keySignature = keySignature
-        width = Metrics.notesStart(keySignature) + noteWidth + Metrics.rightPad
+        width = Metrics.systemLeft(layout) + Metrics.notesStart(keySignature) + noteWidth + Metrics.rightPad
     }
 
     /// Room for the biggest screen a lesson can show: its largest size plus a stretch
@@ -74,6 +74,10 @@ enum Metrics {
     static let ledgerOverhang = 0.42
 
     static let leftPad = 0.5
+    /// room for the grand staff's brace in front of the system line. Everything else
+    /// on the grand staff moves right by this much
+    static let braceRoom = 1.2
+    static func systemLeft(_ layout: StaffLayout) -> Double { layout == .grand ? braceRoom : 0 }
     static let clefX = leftPad + 0.4
     static let clefWidth = 2.8
     /// one sharp in the key signature
@@ -147,6 +151,9 @@ struct StaffGeometry {
     let g: CGFloat
     let lineWidth: CGFloat
     private let bottomLine: [Clef: CGFloat]
+    /// where the staff starts, past the brace on the grand staff. Clef, key signature
+    /// and notes are placed from here
+    let systemLeft: CGFloat
     let staffLeft: CGFloat
     let staffRight: CGFloat
 
@@ -178,8 +185,9 @@ struct StaffGeometry {
             lines[.bass] = trebleBottom + CGFloat(Metrics.grandSpace + 8) * g / 2
         }
         bottomLine = lines
-        // the staff always spans the full width
-        staffLeft = CGFloat(Metrics.leftPad) * g
+        // the staff always spans the full width (after the brace)
+        systemLeft = CGFloat(Metrics.systemLeft(spec.layout)) * g
+        staffLeft = systemLeft + CGFloat(Metrics.leftPad) * g
         staffRight = size.width - CGFloat(Metrics.leftPad) * g
     }
 
@@ -191,9 +199,9 @@ struct StaffGeometry {
         (bottomLine[clef] ?? 0) - CGFloat(step) * g / 2
     }
 
-    var clefX: CGFloat { CGFloat(Metrics.clefX) * g }
-    var keySignatureX: CGFloat { CGFloat(Metrics.clefX + Metrics.clefWidth + 0.5) * g }
-    var notesLeft: CGFloat { CGFloat(Metrics.notesStart(spec.keySignature)) * g }
+    var clefX: CGFloat { systemLeft + CGFloat(Metrics.clefX) * g }
+    var keySignatureX: CGFloat { systemLeft + CGFloat(Metrics.clefX + Metrics.clefWidth + 0.5) * g }
+    var notesLeft: CGFloat { systemLeft + CGFloat(Metrics.notesStart(spec.keySignature)) * g }
     var notesRight: CGFloat { size.width - CGFloat(Metrics.rightPad) * g }
 
     /// Top line of the highest staff to the bottom line of the lowest, for bar lines.

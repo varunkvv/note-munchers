@@ -3,18 +3,22 @@ import CoreText
 import Foundation
 import SwiftUI
 
-/// Clef and sharp glyphs from the Bravura SMuFL font (SIL OFL, license next to the
+/// Clef, sharp and brace glyphs from the Bravura SMuFL font (SIL OFL, license next to the
 /// font file).
 ///
 /// The font is loaded straight from the bundle with CGFont, so it works the same on
-/// iOS and macOS without registering it. Only clefs and the key signature's sharp come
-/// from the font - every other mark is drawn as a path so line weights stay under our control.
+/// iOS and macOS without registering it. Only clefs, the key signature's sharp and the
+/// grand staff's brace come from the font - every other mark is drawn as a path so line
+/// weights stay under our control.
 enum Bravura {
     enum Glyph: UInt16 {
         case gClef = 0xE050
         case fClef = 0xE062
         /// accidentalSharp. Origin on the line or space it marks.
         case sharp = 0xE262
+        /// brace, one staff tall and 0.28 spaces wide. Origin at its bottom left,
+        /// stretched to the height of the grand staff.
+        case brace = 0xE000
     }
 
     private static let font: CTFont? = {

@@ -48,7 +48,10 @@ struct StaffPainter {
             drawClef(&context, clef)
             drawKeySignature(&context, clef)
         }
-        if geo.spec.clefs.count > 1 { drawSystemLine(&context) }
+        if geo.spec.clefs.count > 1 {
+            drawBrace(&context)
+            drawSystemLine(&context)
+        }
         if let item { drawItem(&context, item, doneCount: doneCount) }
     }
 
@@ -78,6 +81,18 @@ struct StaffPainter {
         path.move(to: CGPoint(x: geo.staffLeft, y: geo.y(8, on: .treble) - geo.lineWidth / 2))
         path.addLine(to: CGPoint(x: geo.staffLeft, y: geo.y(0, on: .bass) + geo.lineWidth / 2))
         context.stroke(path, with: .color(style.ink), lineWidth: geo.lineWidth * 1.3)
+    }
+
+    /// The grand staff's brace, from the top line to the bottom line, just left of the
+    /// system line. Stretched evenly, so it keeps the font's shape (thick in the middle).
+    private func drawBrace(_ context: inout GraphicsContext) {
+        guard let path = Bravura.path(.brace, staffSpace: g) else { return }
+        let top = geo.systemTop - geo.lineWidth / 2
+        let bottom = geo.systemBottom + geo.lineWidth / 2
+        let k = (bottom - top) / (4 * g)
+        let right = geo.staffLeft - 0.25 * g
+        let x = right - path.boundingRect.maxX * k
+        context.fill(path.applying(CGAffineTransform(a: k, b: 0, c: 0, d: k, tx: x, ty: bottom)), with: .color(style.ink))
     }
 
     private func drawClef(_ context: inout GraphicsContext, _ clef: Clef) {

@@ -220,7 +220,7 @@ extension Curriculum {
                 sizes: 3...4, octavePolicy: .lenient, contour: .skips
             ),
             Lesson(
-                "2.5", level: 2, title: "Grand staff: a treble bar, then a bass bar", focus: .both, layout: .grand,
+                "2.5", level: 2, title: "Grand staff: a treble bar and a bass bar", focus: .both, layout: .grand,
                 treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
                 sizes: 4...6, octavePolicy: .lenient
             ),

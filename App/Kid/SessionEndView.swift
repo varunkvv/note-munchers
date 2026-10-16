@@ -40,17 +40,23 @@ struct SessionEndView: View {
             // a session feeds at most the lesson's notes (23 in level 3), so rows shrink to fit without scrolling
             let height = min(260, max(60, (room - 40) / CGFloat(max(1, rows)) - 20))
             let button = min(150, proxy.size.width * 0.17)
+            let cell = (proxy.size.width - 64 - 20 * CGFloat(columns - 1)) / CGFloat(columns)
             ZStack {
                 Theme.paper.ignoresSafeArea()
                 VStack(spacing: 16) {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20), count: columns), spacing: 20) {
-                        ForEach(fed) { item in
-                            muncher(item).frame(height: height)
+                    // rows of equal cells, each row centred, so a short last row sits in the middle
+                    VStack(spacing: 20) {
+                        ForEach(Array(stride(from: 0, to: fed.count, by: columns)), id: \.self) { first in
+                            HStack(spacing: 20) {
+                                ForEach(fed[first..<min(first + columns, fed.count)]) { item in
+                                    muncher(item).frame(width: cell, height: height)
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal, 32)
                     .padding(.top, 24)
-                    .frame(maxHeight: room, alignment: .center)
+                    .frame(maxWidth: .infinity, maxHeight: room, alignment: .center)
 
                     HStack(spacing: button * 0.45) {
                         choiceButton(.oneMore, symbol: "arrow.clockwise", color: Theme.button, size: button)

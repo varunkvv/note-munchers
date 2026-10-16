@@ -18,6 +18,7 @@ struct NoteMunchersApp: App {
 struct RootView: View {
     @Bindable var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var launched = false
 
     var body: some View {
@@ -32,6 +33,10 @@ struct RootView: View {
             screens
             #endif
         }
+        // paper behind the screens, so a cross-fade never shows the window through
+        .background(Theme.paper.ignoresSafeArea())
+        // practice -> end screen eases over instead of cutting. other moves stay instant
+        .animation(model.screen == .sessionEnd ? .easeInOut(duration: 0.5) : nil, value: model.screen)
         #if DEBUG
         .modifier(DemoLandscape(enabled: model.demo.landscape))
         #endif
@@ -64,10 +69,12 @@ struct RootView: View {
         case .practice:
             if let practice = model.practice {
                 PracticeView(controller: practice, input: model.input, onDone: model.doneForNow)
+                    .transition(.opacity)
             }
         case .sessionEnd:
             if let summary = model.lastSummary {
                 SessionEndView(summary: summary, model: model)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96)))
             } else {
                 HomeView(model: model)
             }
