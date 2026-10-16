@@ -1,0 +1,1370 @@
+[
+ {
+  "id": "hello-01",
+  "situation": "hello",
+  "line": 1,
+  "note": null,
+  "text": "hi friend! ready to play some notes?",
+  "tag": "warmly"
+ },
+ {
+  "id": "hello-02",
+  "situation": "hello",
+  "line": 2,
+  "note": null,
+  "text": "hello hello! let's feed some munchers.",
+  "tag": "warmly"
+ },
+ {
+  "id": "hello-03",
+  "situation": "hello",
+  "line": 3,
+  "note": null,
+  "text": "hi there! the munchers are hungry. let's play.",
+  "tag": "warmly"
+ },
+ {
+  "id": "hello-04",
+  "situation": "hello",
+  "line": 4,
+  "note": null,
+  "text": "oh good, you're here! let's read some notes.",
+  "tag": "warmly"
+ },
+ {
+  "id": "hello-05",
+  "situation": "hello",
+  "line": 5,
+  "note": null,
+  "text": "hi! let's wake up those fingers.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-06-G",
+  "situation": "meetNote",
+  "line": 6,
+  "note": "G",
+  "text": "ooh, a new one! this is G.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-06-A",
+  "situation": "meetNote",
+  "line": 6,
+  "note": "A",
+  "text": "ooh, a new one! this is A.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-06-B",
+  "situation": "meetNote",
+  "line": 6,
+  "note": "B",
+  "text": "ooh, a new one! this is B.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-06-C",
+  "situation": "meetNote",
+  "line": 6,
+  "note": "C",
+  "text": "ooh, a new one! this is C.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-06-D",
+  "situation": "meetNote",
+  "line": 6,
+  "note": "D",
+  "text": "ooh, a new one! this is D.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-06-E",
+  "situation": "meetNote",
+  "line": 6,
+  "note": "E",
+  "text": "ooh, a new one! this is E.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-06-F",
+  "situation": "meetNote",
+  "line": 6,
+  "note": "F",
+  "text": "ooh, a new one! this is F.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-06-Fs",
+  "situation": "meetNote",
+  "line": 6,
+  "note": "F#",
+  "text": "ooh, a new one! this is F sharp.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-07-G",
+  "situation": "meetNote",
+  "line": 7,
+  "note": "G",
+  "text": "look at this one - this is G!",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-07-A",
+  "situation": "meetNote",
+  "line": 7,
+  "note": "A",
+  "text": "look at this one - this is A!",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-07-B",
+  "situation": "meetNote",
+  "line": 7,
+  "note": "B",
+  "text": "look at this one - this is B!",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-07-C",
+  "situation": "meetNote",
+  "line": 7,
+  "note": "C",
+  "text": "look at this one - this is C!",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-07-D",
+  "situation": "meetNote",
+  "line": 7,
+  "note": "D",
+  "text": "look at this one - this is D!",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-07-E",
+  "situation": "meetNote",
+  "line": 7,
+  "note": "E",
+  "text": "look at this one - this is E!",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-07-F",
+  "situation": "meetNote",
+  "line": 7,
+  "note": "F",
+  "text": "look at this one - this is F!",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-07-Fs",
+  "situation": "meetNote",
+  "line": 7,
+  "note": "F#",
+  "text": "look at this one - this is F sharp!",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-08-G",
+  "situation": "meetNote",
+  "line": 8,
+  "note": "G",
+  "text": "meet G! say hi to G.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-08-A",
+  "situation": "meetNote",
+  "line": 8,
+  "note": "A",
+  "text": "meet A! say hi to A.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-08-B",
+  "situation": "meetNote",
+  "line": 8,
+  "note": "B",
+  "text": "meet B! say hi to B.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-08-C",
+  "situation": "meetNote",
+  "line": 8,
+  "note": "C",
+  "text": "meet C! say hi to C.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-08-D",
+  "situation": "meetNote",
+  "line": 8,
+  "note": "D",
+  "text": "meet D! say hi to D.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-08-E",
+  "situation": "meetNote",
+  "line": 8,
+  "note": "E",
+  "text": "meet E! say hi to E.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-08-F",
+  "situation": "meetNote",
+  "line": 8,
+  "note": "F",
+  "text": "meet F! say hi to F.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-08-Fs",
+  "situation": "meetNote",
+  "line": 8,
+  "note": "F#",
+  "text": "meet F sharp! say hi to F sharp.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-09-G",
+  "situation": "meetNote",
+  "line": 9,
+  "note": "G",
+  "text": "here's a brand new note. it's G.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-09-A",
+  "situation": "meetNote",
+  "line": 9,
+  "note": "A",
+  "text": "here's a brand new note. it's A.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-09-B",
+  "situation": "meetNote",
+  "line": 9,
+  "note": "B",
+  "text": "here's a brand new note. it's B.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-09-C",
+  "situation": "meetNote",
+  "line": 9,
+  "note": "C",
+  "text": "here's a brand new note. it's C.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-09-D",
+  "situation": "meetNote",
+  "line": 9,
+  "note": "D",
+  "text": "here's a brand new note. it's D.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-09-E",
+  "situation": "meetNote",
+  "line": 9,
+  "note": "E",
+  "text": "here's a brand new note. it's E.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-09-F",
+  "situation": "meetNote",
+  "line": 9,
+  "note": "F",
+  "text": "here's a brand new note. it's F.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-09-Fs",
+  "situation": "meetNote",
+  "line": 9,
+  "note": "F#",
+  "text": "here's a brand new note. it's F sharp.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-10-G",
+  "situation": "meetNote",
+  "line": 10,
+  "note": "G",
+  "text": "this one's new. this is G. can you find it?",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-10-A",
+  "situation": "meetNote",
+  "line": 10,
+  "note": "A",
+  "text": "this one's new. this is A. can you find it?",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-10-B",
+  "situation": "meetNote",
+  "line": 10,
+  "note": "B",
+  "text": "this one's new. this is B. can you find it?",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-10-C",
+  "situation": "meetNote",
+  "line": 10,
+  "note": "C",
+  "text": "this one's new. this is C. can you find it?",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-10-D",
+  "situation": "meetNote",
+  "line": 10,
+  "note": "D",
+  "text": "this one's new. this is D. can you find it?",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-10-E",
+  "situation": "meetNote",
+  "line": 10,
+  "note": "E",
+  "text": "this one's new. this is E. can you find it?",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-10-F",
+  "situation": "meetNote",
+  "line": 10,
+  "note": "F",
+  "text": "this one's new. this is F. can you find it?",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-10-Fs",
+  "situation": "meetNote",
+  "line": 10,
+  "note": "F#",
+  "text": "this one's new. this is F sharp. can you find it?",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-11-G",
+  "situation": "meetNote",
+  "line": 11,
+  "note": "G",
+  "text": "a new friend! this is G.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-11-A",
+  "situation": "meetNote",
+  "line": 11,
+  "note": "A",
+  "text": "a new friend! this is A.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-11-B",
+  "situation": "meetNote",
+  "line": 11,
+  "note": "B",
+  "text": "a new friend! this is B.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-11-C",
+  "situation": "meetNote",
+  "line": 11,
+  "note": "C",
+  "text": "a new friend! this is C.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-11-D",
+  "situation": "meetNote",
+  "line": 11,
+  "note": "D",
+  "text": "a new friend! this is D.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-11-E",
+  "situation": "meetNote",
+  "line": 11,
+  "note": "E",
+  "text": "a new friend! this is E.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-11-F",
+  "situation": "meetNote",
+  "line": 11,
+  "note": "F",
+  "text": "a new friend! this is F.",
+  "tag": "warmly"
+ },
+ {
+  "id": "meetNote-11-Fs",
+  "situation": "meetNote",
+  "line": 11,
+  "note": "F#",
+  "text": "a new friend! this is F sharp.",
+  "tag": "warmly"
+ },
+ {
+  "id": "listen-12",
+  "situation": "listen",
+  "line": 12,
+  "note": null,
+  "text": "here's a new one. listen first!",
+  "tag": "warmly"
+ },
+ {
+  "id": "listen-13",
+  "situation": "listen",
+  "line": 13,
+  "note": null,
+  "text": "listen to this one, then you try.",
+  "tag": "warmly"
+ },
+ {
+  "id": "listen-14",
+  "situation": "listen",
+  "line": 14,
+  "note": null,
+  "text": "ears on! listen.",
+  "tag": "warmly"
+ },
+ {
+  "id": "twoAtOnce-15",
+  "situation": "twoAtOnce",
+  "line": 15,
+  "note": null,
+  "text": "two at once! listen.",
+  "tag": "warmly"
+ },
+ {
+  "id": "twoAtOnce-16",
+  "situation": "twoAtOnce",
+  "line": 16,
+  "note": null,
+  "text": "ooh, two notes together. listen first.",
+  "tag": "warmly"
+ },
+ {
+  "id": "twoAtOnce-17",
+  "situation": "twoAtOnce",
+  "line": 17,
+  "note": null,
+  "text": "this time, both at the same time. listen!",
+  "tag": "warmly"
+ },
+ {
+  "id": "almostHigher-18-G",
+  "situation": "almostHigher",
+  "line": 18,
+  "note": "G",
+  "text": "that's a G! this one is higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-18-A",
+  "situation": "almostHigher",
+  "line": 18,
+  "note": "A",
+  "text": "that's an A! this one is higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-18-B",
+  "situation": "almostHigher",
+  "line": 18,
+  "note": "B",
+  "text": "that's a B! this one is higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-18-C",
+  "situation": "almostHigher",
+  "line": 18,
+  "note": "C",
+  "text": "that's a C! this one is higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-18-D",
+  "situation": "almostHigher",
+  "line": 18,
+  "note": "D",
+  "text": "that's a D! this one is higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-18-E",
+  "situation": "almostHigher",
+  "line": 18,
+  "note": "E",
+  "text": "that's an E! this one is higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-18-F",
+  "situation": "almostHigher",
+  "line": 18,
+  "note": "F",
+  "text": "that's an F! this one is higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-18-Fs",
+  "situation": "almostHigher",
+  "line": 18,
+  "note": "F#",
+  "text": "that's an F sharp! this one is higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-19-G",
+  "situation": "almostHigher",
+  "line": 19,
+  "note": "G",
+  "text": "close! that's a G, but this one lives higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-19-A",
+  "situation": "almostHigher",
+  "line": 19,
+  "note": "A",
+  "text": "close! that's an A, but this one lives higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-19-B",
+  "situation": "almostHigher",
+  "line": 19,
+  "note": "B",
+  "text": "close! that's a B, but this one lives higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-19-C",
+  "situation": "almostHigher",
+  "line": 19,
+  "note": "C",
+  "text": "close! that's a C, but this one lives higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-19-D",
+  "situation": "almostHigher",
+  "line": 19,
+  "note": "D",
+  "text": "close! that's a D, but this one lives higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-19-E",
+  "situation": "almostHigher",
+  "line": 19,
+  "note": "E",
+  "text": "close! that's an E, but this one lives higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-19-F",
+  "situation": "almostHigher",
+  "line": 19,
+  "note": "F",
+  "text": "close! that's an F, but this one lives higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostHigher-19-Fs",
+  "situation": "almostHigher",
+  "line": 19,
+  "note": "F#",
+  "text": "close! that's an F sharp, but this one lives higher up.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-20-G",
+  "situation": "almostLower",
+  "line": 20,
+  "note": "G",
+  "text": "that's a G! this one is lower down.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-20-A",
+  "situation": "almostLower",
+  "line": 20,
+  "note": "A",
+  "text": "that's an A! this one is lower down.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-20-B",
+  "situation": "almostLower",
+  "line": 20,
+  "note": "B",
+  "text": "that's a B! this one is lower down.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-20-C",
+  "situation": "almostLower",
+  "line": 20,
+  "note": "C",
+  "text": "that's a C! this one is lower down.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-20-D",
+  "situation": "almostLower",
+  "line": 20,
+  "note": "D",
+  "text": "that's a D! this one is lower down.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-20-E",
+  "situation": "almostLower",
+  "line": 20,
+  "note": "E",
+  "text": "that's an E! this one is lower down.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-20-F",
+  "situation": "almostLower",
+  "line": 20,
+  "note": "F",
+  "text": "that's an F! this one is lower down.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-20-Fs",
+  "situation": "almostLower",
+  "line": 20,
+  "note": "F#",
+  "text": "that's an F sharp! this one is lower down.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-21-G",
+  "situation": "almostLower",
+  "line": 21,
+  "note": "G",
+  "text": "so close! that's G. this one's down lower.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-21-A",
+  "situation": "almostLower",
+  "line": 21,
+  "note": "A",
+  "text": "so close! that's A. this one's down lower.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-21-B",
+  "situation": "almostLower",
+  "line": 21,
+  "note": "B",
+  "text": "so close! that's B. this one's down lower.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-21-C",
+  "situation": "almostLower",
+  "line": 21,
+  "note": "C",
+  "text": "so close! that's C. this one's down lower.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-21-D",
+  "situation": "almostLower",
+  "line": 21,
+  "note": "D",
+  "text": "so close! that's D. this one's down lower.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-21-E",
+  "situation": "almostLower",
+  "line": 21,
+  "note": "E",
+  "text": "so close! that's E. this one's down lower.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-21-F",
+  "situation": "almostLower",
+  "line": 21,
+  "note": "F",
+  "text": "so close! that's F. this one's down lower.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostLower-21-Fs",
+  "situation": "almostLower",
+  "line": 21,
+  "note": "F#",
+  "text": "so close! that's F sharp. this one's down lower.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostMiddleC-22",
+  "situation": "almostMiddleC",
+  "line": 22,
+  "note": null,
+  "text": "that's a C! this one is the middle C.",
+  "tag": "gently"
+ },
+ {
+  "id": "almostMiddleC-23",
+  "situation": "almostMiddleC",
+  "line": 23,
+  "note": null,
+  "text": "yep, that's a C! we want the middle one.",
+  "tag": "gently"
+ },
+ {
+  "id": "sharpHint-24",
+  "situation": "sharpHint",
+  "line": 24,
+  "note": null,
+  "text": "that's F. this one is F sharp - the black key.",
+  "tag": "gently"
+ },
+ {
+  "id": "sharpHint-25",
+  "situation": "sharpHint",
+  "line": 25,
+  "note": null,
+  "text": "close! this one is F sharp. try the black key right next door.",
+  "tag": "gently"
+ },
+ {
+  "id": "sharpHint-26",
+  "situation": "sharpHint",
+  "line": 26,
+  "note": null,
+  "text": "remember the sharp at the start? that makes it F sharp.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintListen-27",
+  "situation": "hintListen",
+  "line": 27,
+  "note": null,
+  "text": "listen.",
+  "tag": "softly"
+ },
+ {
+  "id": "hintListen-28",
+  "situation": "hintListen",
+  "line": 28,
+  "note": null,
+  "text": "hmm, let's listen to it.",
+  "tag": "softly"
+ },
+ {
+  "id": "hintListen-29",
+  "situation": "hintListen",
+  "line": 29,
+  "note": null,
+  "text": "here's how it sounds.",
+  "tag": "softly"
+ },
+ {
+  "id": "hintListen-30",
+  "situation": "hintListen",
+  "line": 30,
+  "note": null,
+  "text": "listen for this one.",
+  "tag": "softly"
+ },
+ {
+  "id": "hintShow-31-G",
+  "situation": "hintShow",
+  "line": 31,
+  "note": "G",
+  "text": "this one is G. here it is!",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-31-A",
+  "situation": "hintShow",
+  "line": 31,
+  "note": "A",
+  "text": "this one is A. here it is!",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-31-B",
+  "situation": "hintShow",
+  "line": 31,
+  "note": "B",
+  "text": "this one is B. here it is!",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-31-C",
+  "situation": "hintShow",
+  "line": 31,
+  "note": "C",
+  "text": "this one is C. here it is!",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-31-D",
+  "situation": "hintShow",
+  "line": 31,
+  "note": "D",
+  "text": "this one is D. here it is!",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-31-E",
+  "situation": "hintShow",
+  "line": 31,
+  "note": "E",
+  "text": "this one is E. here it is!",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-31-F",
+  "situation": "hintShow",
+  "line": 31,
+  "note": "F",
+  "text": "this one is F. here it is!",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-31-Fs",
+  "situation": "hintShow",
+  "line": 31,
+  "note": "F#",
+  "text": "this one is F sharp. here it is!",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-32-G",
+  "situation": "hintShow",
+  "line": 32,
+  "note": "G",
+  "text": "let me show you. this is G.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-32-A",
+  "situation": "hintShow",
+  "line": 32,
+  "note": "A",
+  "text": "let me show you. this is A.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-32-B",
+  "situation": "hintShow",
+  "line": 32,
+  "note": "B",
+  "text": "let me show you. this is B.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-32-C",
+  "situation": "hintShow",
+  "line": 32,
+  "note": "C",
+  "text": "let me show you. this is C.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-32-D",
+  "situation": "hintShow",
+  "line": 32,
+  "note": "D",
+  "text": "let me show you. this is D.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-32-E",
+  "situation": "hintShow",
+  "line": 32,
+  "note": "E",
+  "text": "let me show you. this is E.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-32-F",
+  "situation": "hintShow",
+  "line": 32,
+  "note": "F",
+  "text": "let me show you. this is F.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-32-Fs",
+  "situation": "hintShow",
+  "line": 32,
+  "note": "F#",
+  "text": "let me show you. this is F sharp.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-33-G",
+  "situation": "hintShow",
+  "line": 33,
+  "note": "G",
+  "text": "it's G! see it lighting up?",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-33-A",
+  "situation": "hintShow",
+  "line": 33,
+  "note": "A",
+  "text": "it's A! see it lighting up?",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-33-B",
+  "situation": "hintShow",
+  "line": 33,
+  "note": "B",
+  "text": "it's B! see it lighting up?",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-33-C",
+  "situation": "hintShow",
+  "line": 33,
+  "note": "C",
+  "text": "it's C! see it lighting up?",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-33-D",
+  "situation": "hintShow",
+  "line": 33,
+  "note": "D",
+  "text": "it's D! see it lighting up?",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-33-E",
+  "situation": "hintShow",
+  "line": 33,
+  "note": "E",
+  "text": "it's E! see it lighting up?",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-33-F",
+  "situation": "hintShow",
+  "line": 33,
+  "note": "F",
+  "text": "it's F! see it lighting up?",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-33-Fs",
+  "situation": "hintShow",
+  "line": 33,
+  "note": "F#",
+  "text": "it's F sharp! see it lighting up?",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-34-G",
+  "situation": "hintShow",
+  "line": 34,
+  "note": "G",
+  "text": "here's G, right here.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-34-A",
+  "situation": "hintShow",
+  "line": 34,
+  "note": "A",
+  "text": "here's A, right here.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-34-B",
+  "situation": "hintShow",
+  "line": 34,
+  "note": "B",
+  "text": "here's B, right here.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-34-C",
+  "situation": "hintShow",
+  "line": 34,
+  "note": "C",
+  "text": "here's C, right here.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-34-D",
+  "situation": "hintShow",
+  "line": 34,
+  "note": "D",
+  "text": "here's D, right here.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-34-E",
+  "situation": "hintShow",
+  "line": 34,
+  "note": "E",
+  "text": "here's E, right here.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-34-F",
+  "situation": "hintShow",
+  "line": 34,
+  "note": "F",
+  "text": "here's F, right here.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintShow-34-Fs",
+  "situation": "hintShow",
+  "line": 34,
+  "note": "F#",
+  "text": "here's F sharp, right here.",
+  "tag": "gently"
+ },
+ {
+  "id": "hintLook-35",
+  "situation": "hintLook",
+  "line": 35,
+  "note": null,
+  "text": "here they are!",
+  "tag": "warmly"
+ },
+ {
+  "id": "hintLook-36",
+  "situation": "hintLook",
+  "line": 36,
+  "note": null,
+  "text": "look, these two light up.",
+  "tag": "warmly"
+ },
+ {
+  "id": "oops-37",
+  "situation": "oops",
+  "line": 37,
+  "note": null,
+  "text": "oops, silly goose! let's look again.",
+  "tag": "playfully"
+ },
+ {
+  "id": "oops-38",
+  "situation": "oops",
+  "line": 38,
+  "note": null,
+  "text": "silly goose! try again, you've got this.",
+  "tag": "playfully"
+ },
+ {
+  "id": "oops-39",
+  "situation": "oops",
+  "line": 39,
+  "note": null,
+  "text": "oopsie! look again carefully.",
+  "tag": "playfully"
+ },
+ {
+  "id": "oops-40",
+  "situation": "oops",
+  "line": 40,
+  "note": null,
+  "text": "hmm, not that one. take another look.",
+  "tag": "playfully"
+ },
+ {
+  "id": "keptTrying-41",
+  "situation": "keptTrying",
+  "line": 41,
+  "note": null,
+  "text": "you kept trying and you found it!",
+  "tag": "warmly"
+ },
+ {
+  "id": "keptTrying-42",
+  "situation": "keptTrying",
+  "line": 42,
+  "note": null,
+  "text": "you didn't give up. you found it!",
+  "tag": "warmly"
+ },
+ {
+  "id": "keptTrying-43",
+  "situation": "keptTrying",
+  "line": 43,
+  "note": null,
+  "text": "there it is! you kept going.",
+  "tag": "warmly"
+ },
+ {
+  "id": "keptTrying-44",
+  "situation": "keptTrying",
+  "line": 44,
+  "note": null,
+  "text": "that was a tricky one, and you got it.",
+  "tag": "warmly"
+ },
+ {
+  "id": "keptTrying-45",
+  "situation": "keptTrying",
+  "line": 45,
+  "note": null,
+  "text": "you worked that one out!",
+  "tag": "warmly"
+ },
+ {
+  "id": "lookedCarefully-46",
+  "situation": "lookedCarefully",
+  "line": 46,
+  "note": null,
+  "text": "you looked so carefully!",
+  "tag": "warmly"
+ },
+ {
+  "id": "lookedCarefully-47",
+  "situation": "lookedCarefully",
+  "line": 47,
+  "note": null,
+  "text": "wow, you read that right away.",
+  "tag": "warmly"
+ },
+ {
+  "id": "lookedCarefully-48",
+  "situation": "lookedCarefully",
+  "line": 48,
+  "note": null,
+  "text": "you found every one!",
+  "tag": "warmly"
+ },
+ {
+  "id": "lookedCarefully-49",
+  "situation": "lookedCarefully",
+  "line": 49,
+  "note": null,
+  "text": "you checked the lines really carefully.",
+  "tag": "warmly"
+ },
+ {
+  "id": "lookedCarefully-50",
+  "situation": "lookedCarefully",
+  "line": 50,
+  "note": null,
+  "text": "your eyes were really working on that one.",
+  "tag": "warmly"
+ },
+ {
+  "id": "lookedCarefully-51",
+  "situation": "lookedCarefully",
+  "line": 51,
+  "note": null,
+  "text": "you read that one all by yourself!",
+  "tag": "warmly"
+ },
+ {
+  "id": "holdLonger-52",
+  "situation": "holdLonger",
+  "line": 52,
+  "note": null,
+  "text": "hold this one a little longer.",
+  "tag": "gently"
+ },
+ {
+  "id": "holdLonger-53",
+  "situation": "holdLonger",
+  "line": 53,
+  "note": null,
+  "text": "this one's a long one. hold it.",
+  "tag": "gently"
+ },
+ {
+  "id": "holdLonger-54",
+  "situation": "holdLonger",
+  "line": 54,
+  "note": null,
+  "text": "let that one ring a little longer.",
+  "tag": "gently"
+ },
+ {
+  "id": "turnOnPiano-55",
+  "situation": "turnOnPiano",
+  "line": 55,
+  "note": null,
+  "text": "can you turn on the piano?",
+  "tag": "gently"
+ },
+ {
+  "id": "turnOnPiano-56",
+  "situation": "turnOnPiano",
+  "line": 56,
+  "note": null,
+  "text": "uh oh, the piano went quiet. can a grown-up help?",
+  "tag": "gently"
+ },
+ {
+  "id": "turnOnPiano-57",
+  "situation": "turnOnPiano",
+  "line": 57,
+  "note": null,
+  "text": "let's get the piano on.",
+  "tag": "gently"
+ },
+ {
+  "id": "sessionDone-58",
+  "situation": "sessionDone",
+  "line": 58,
+  "note": null,
+  "text": "look who ate well today!",
+  "tag": "delighted"
+ },
+ {
+  "id": "sessionDone-59",
+  "situation": "sessionDone",
+  "line": 59,
+  "note": null,
+  "text": "wow, look at all those happy munchers!",
+  "tag": "delighted"
+ },
+ {
+  "id": "sessionDone-60",
+  "situation": "sessionDone",
+  "line": 60,
+  "note": null,
+  "text": "the munchers are so full. you read so many notes today!",
+  "tag": "delighted"
+ },
+ {
+  "id": "sessionDone-61",
+  "situation": "sessionDone",
+  "line": 61,
+  "note": null,
+  "text": "all those notes! the munchers are stuffed.",
+  "tag": "delighted"
+ },
+ {
+  "id": "hatch-62",
+  "situation": "hatch",
+  "line": 62,
+  "note": null,
+  "text": "a new muncher! which color do you like?",
+  "tag": "delighted"
+ },
+ {
+  "id": "hatch-63",
+  "situation": "hatch",
+  "line": 63,
+  "note": null,
+  "text": "ooh, it's hatching! pick a color for it.",
+  "tag": "delighted"
+ },
+ {
+  "id": "hatch-64",
+  "situation": "hatch",
+  "line": 64,
+  "note": null,
+  "text": "look who just hatched! which one do you want?",
+  "tag": "delighted"
+ },
+ {
+  "id": "showGrownUp-65",
+  "situation": "showGrownUp",
+  "line": 65,
+  "note": null,
+  "text": "go show a grown-up!",
+  "tag": "warmly"
+ },
+ {
+  "id": "showGrownUp-66",
+  "situation": "showGrownUp",
+  "line": 66,
+  "note": null,
+  "text": "let's show a grown-up what you did!",
+  "tag": "warmly"
+ },
+ {
+  "id": "highFive-67",
+  "situation": "highFive",
+  "line": 67,
+  "note": null,
+  "text": "high five!",
+  "tag": "playfully"
+ },
+ {
+  "id": "highFive-68",
+  "situation": "highFive",
+  "line": 68,
+  "note": null,
+  "text": "up high!",
+  "tag": "playfully"
+ },
+ {
+  "id": "oneMore-69",
+  "situation": "oneMore",
+  "line": 69,
+  "note": null,
+  "text": "one more round! let's go.",
+  "tag": "delighted"
+ },
+ {
+  "id": "oneMore-70",
+  "situation": "oneMore",
+  "line": 70,
+  "note": null,
+  "text": "yay, more notes!",
+  "tag": "delighted"
+ },
+ {
+  "id": "bye-71",
+  "situation": "bye",
+  "line": 71,
+  "note": null,
+  "text": "all done! see you next time.",
+  "tag": "warmly"
+ },
+ {
+  "id": "bye-72",
+  "situation": "bye",
+  "line": 72,
+  "note": null,
+  "text": "bye bye! the munchers will be waiting.",
+  "tag": "warmly"
+ },
+ {
+  "id": "bye-73",
+  "situation": "bye",
+  "line": 73,
+  "note": null,
+  "text": "bye! see you next time, silly goose.",
+  "tag": "warmly"
+ }
+]
