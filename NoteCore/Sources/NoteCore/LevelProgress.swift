@@ -82,12 +82,12 @@ extension MasteryEngine {
     }
 
     /// A new note's part: 0 until he has met it, then up to 1 as it climbs to box 3 (and,
-    /// in a drill lesson, as he plays it toward `lessonMinNewPlays`, half each).
+    /// in a paced lesson, as he plays it toward `lessonMinNewPlays`, half each).
     private func noteFraction(_ key: NoteKey) -> Double {
         guard isUnlocked(key), state.introduced.contains(key.id) || stats(for: key).attempts > 0 else { return 0 }
         let box = Double(stats(for: key).box)
         let climbed = min(1, max(0, (box - 1) / Double(max(1, config.gateMinBox - 1))))
-        guard lesson.drill else { return 0.3 + 0.7 * climbed }
+        guard lesson.paced else { return 0.3 + 0.7 * climbed }
         let played = min(1, Double(lessonPlays(key)) / Double(max(1, config.lessonMinNewPlays)))
         return 0.3 + 0.35 * climbed + 0.35 * played
     }

@@ -160,7 +160,12 @@ public struct MasteryEngine: Sendable {
         self.config = config
         self.state = state
         if curriculum.lesson(state.lesson) == nil {
-            enter(curriculum.firstLesson.id)
+            // a lesson id this curriculum doesn't have (lessons from level 2 up were
+            // renumbered in the drills round): the first lesson of that level not done yet
+            let number = Int(state.lesson.split(separator: ".").first ?? "")
+            let level = number.flatMap(curriculum.level) ?? curriculum.levels[0]
+            let target = level.lessons.first { !state.completedLessons.contains($0.id) } ?? level.lessons[0]
+            enter(target.id)
         } else {
             prepareLesson()
         }
@@ -197,7 +202,7 @@ public struct MasteryEngine: Sendable {
     }
 
     /// The most recent batch to unlock on this clef in this lesson (or the start set; in
-    /// a drill lesson its new notes). Empty when the lesson started with everything
+    /// a paced lesson its new notes). Empty when the lesson started with everything
     /// already unlocked. Only notes in this lesson's pool: an old save can hold notes the
     /// lesson doesn't use (round 3 shrank level 1).
     public func newestBatch(_ clef: Clef) -> [NoteKey] {
@@ -208,9 +213,9 @@ public struct MasteryEngine: Sendable {
     /// Plays of this note in the current lesson (not intros).
     public func lessonPlays(_ key: NoteKey) -> Int { state.lessonPlays[key.id] ?? 0 }
 
-    /// A drill lesson's new note that has had its `lessonMinNewPlays`.
-    public func isDrilled(_ key: NoteKey) -> Bool {
-        lesson.drill && lessonPlays(key) >= config.lessonMinNewPlays
+    /// A paced lesson's new note that has had its `lessonMinNewPlays`.
+    public func hasMinPlays(_ key: NoteKey) -> Bool {
+        lesson.paced && lessonPlays(key) >= config.lessonMinNewPlays
     }
 
     /// Does this note get its intro (keyboard picture up front, "this is D") next time?
@@ -234,9 +239,12 @@ public struct MasteryEngine: Sendable {
     public func isSolid(_ key: NoteKey) -> Bool { isSolid(stats(for: key).recent) }
 
     /// The unlock gate for one clef: the newest batch solid AND nothing on this clef
-    /// below box 3.
+    /// below box 3. In levels 1-2 the fast track doesn't count here, only 7 of 8: a few
+    /// quick ones aren't "really drilled in" (a piano teacher's review).
     public func isGateOpen(_ clef: Clef) -> Bool {
-        newestBatch(clef).allSatisfy(isSolid) && pool(clef).allSatisfy { stats(for: $0).box >= config.gateMinBox }
+        let fastTrack = lesson.level > 2
+        return newestBatch(clef).allSatisfy { isSolid(stats(for: $0).recent, fastTrack: fastTrack) }
+            && pool(clef).allSatisfy { stats(for: $0).box >= config.gateMinBox }
     }
 
     /// His notes in this lesson are going well: the size can grow and stretch screens
@@ -409,9 +417,9 @@ public struct MasteryEngine: Sendable {
         let sizes = lesson.sizes
         // a screen never needs every note he has on a clef, or it's only a reshuffle:
         // 3 notes on a clef allow 2 a screen, 5 allow 4. grand staff screens put half on
-        // each. drill lessons (level 1) repeat on purpose: 2 notes make 2-note screens,
+        // each. paced lessons (level 1) repeat on purpose: 2 notes make 2-note screens,
         // 3 notes allow 3
-        let perClef = lesson.clefs.map { playable($0).count - (lesson.drill ? 0 : 1) }.min() ?? 1
+        let perClef = lesson.clefs.map { playable($0).count - (lesson.paced ? 0 : 1) }.min() ?? 1
         let room = lesson.texture.isRhythm ? Int.max : lesson.layout == .grand ? perClef * 2 : perClef
         if state.sizeRecent.count >= config.sizeWindow, rate >= config.sizeUpRate, state.screenSize < sizes.upperBound,
            state.screenSize < room {
@@ -448,7 +456,7 @@ public struct MasteryEngine: Sendable {
 
     /// Every note out and met, every note at box 3 or more, enough screens in this
     /// lesson, and his recent notes here right first try (and rhythm solid in rhythm
-    /// lessons, and every new note played `lessonMinNewPlays` times in drill lessons, so
+    /// lessons, and every new note played `lessonMinNewPlays` times in paced lessons, so
     /// the fast track can't end one early). The newest batch doesn't need its own 7 of 8
     /// here: that rule paces unlocks, and with nothing left to unlock the lesson window
     /// covers it.
@@ -457,7 +465,7 @@ public struct MasteryEngine: Sendable {
         guard lesson.clefs.allSatisfy({ lockedNew($0).isEmpty && pendingIntros($0).isEmpty }),
               pool.allSatisfy({ stats(for: $0).box >= config.gateMinBox }),
               state.lessonScreens >= config.lessonMinScreens,
-              !lesson.drill || lesson.newKeys.allSatisfy(isDrilled)
+              !lesson.paced || lesson.newKeys.allSatisfy(hasMinPlays)
         else { return false }
         let window = state.lessonRecent.suffix(config.lessonWindow)
         guard window.count >= config.lessonWindow,
@@ -485,7 +493,7 @@ public struct MasteryEngine: Sendable {
     }
 
     /// Unlocks the lesson's known notes and tops its new notes up to the start count.
-    /// A drill lesson's new notes are its newest even when they were out already (an old
+    /// A paced lesson's new notes are its newest even when they were out already (an old
     /// save, a parent move), so they still get their share.
     /// Safe to call again: a lesson that's already set up doesn't change.
     @discardableResult
@@ -503,7 +511,7 @@ public struct MasteryEngine: Sendable {
                 unlock(batch, clef: clef)
                 unlocked += batch.map(\.id)
             }
-            if lesson.drill, newestBatch(clef).isEmpty {
+            if lesson.paced, newestBatch(clef).isEmpty {
                 state.newest[clef.rawValue] = notes.new.map { NoteKey(clef, $0).id }.filter(state.unlocked.contains)
             }
         }
@@ -517,12 +525,12 @@ public struct MasteryEngine: Sendable {
     }
 
     /// `count` notes at random from `locked`, so that the pool they join has at least
-    /// one line note and one space note when that's possible. In a drill lesson, the
+    /// one line note and one space note when that's possible. In a paced lesson, the
     /// first `count` in the lesson's order (G first).
     private mutating func chooseBatch(from locked: [NoteKey], count: Int, joining pool: [NoteKey]) -> [NoteKey] {
         let n = min(count, locked.count)
         guard n > 0 else { return [] }
-        if lesson.drill { return Array(locked.prefix(n)) }
+        if lesson.paced { return Array(locked.prefix(n)) }
         var first: [NoteKey]?
         for _ in 0..<40 {
             let pick = Array(shuffled(locked, using: &state.dice).prefix(n))
@@ -535,12 +543,14 @@ public struct MasteryEngine: Sendable {
         return first!.sorted()
     }
 
-    func isSolid(_ recent: [AttemptSample]) -> Bool {
+    /// `fastTrack`: the last 3 quick and right count too.
+    func isSolid(_ recent: [AttemptSample], fastTrack: Bool = true) -> Bool {
         let window = recent.suffix(config.solidWindow)
         let firstTries = window.filter(\.firstTry).count
         if firstTries >= config.solidRequired, median(window.map(\.responseTime)) < config.solidMedianResponse {
             return true
         }
+        guard fastTrack else { return false }
         let streak = window.suffix(config.fastTrackCount)
         return streak.count == config.fastTrackCount
             && streak.allSatisfy { $0.firstTry && $0.responseTime < config.fastTrackResponse }

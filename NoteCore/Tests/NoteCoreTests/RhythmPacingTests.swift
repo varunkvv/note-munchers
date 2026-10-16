@@ -131,7 +131,7 @@ import Testing
     @Test func jitteryButRoughlyRightAlwaysPasses() {
         var rng = SeededRandom(seed: 21)
         var judged = 0
-        for id in ["3.1", "3.5", "4.1", "4.4", "5.1", "5.2", "5.3", "5.5"] {
+        for id in ["3.1", "3.6", "4.1", "4.4", "5.1", "5.2", "5.3", "5.5"] {
             var engine = engine(in: id)
             let check = engine.lesson.texture.isRhythm ? RhythmCheck.all : engine.lesson.rhythmCheck
             var picks = SeededRandom(seed: 4)

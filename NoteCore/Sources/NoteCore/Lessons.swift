@@ -17,7 +17,8 @@ public struct ClefNotes: Hashable, Sendable {
     /// Notes this lesson brings in. A set, not an order: `start` of them unlock when the
     /// lesson starts, picked at random with at least one line and one space in the
     /// pool, the rest come one batch at a time through the gate, also at random. In a
-    /// drill lesson (`Lesson.drill`, level 1) the listed order is the order.
+    /// paced lesson (`Lesson.paced`: level 1, and level 3's middle C lessons) the listed
+    /// order is the order.
     public let new: [Pitch]
     public let start: Int
 
@@ -100,17 +101,19 @@ public struct Lesson: Identifiable, Hashable, Sendable {
     /// How much of the rhythm is listened to: off in levels 1-2, "half longer than
     /// quarter" in level 3, everything (rests counted) from level 4.
     public let rhythmCheck: RhythmCheck
-    /// Level 1 (plans/2026-10-16-round-3-feedback.md): new notes come in the listed order
-    /// (G first), each one gets at least `lessonMinNewPlays` plays in the lesson before
-    /// it can finish, the newest notes are about 1 in 3 (`drillNewestShare`) of the
-    /// notes on their clef, and 2 notes on a clef already make 2-note screens.
-    public let drill: Bool
+    /// New notes are paced (round 3's level 1, and level 3's middle C lessons from a
+    /// piano teacher's review): they come in the listed order (G first, middle C first),
+    /// each one gets at least `lessonMinNewPlays` plays in the lesson before it can
+    /// finish, the newest notes are about 1 in 3 (`pacedNewestShare`) of the notes on
+    /// their clef, and 2 notes on a clef already make 2-note screens. (Round 3 called
+    /// this `drill`. Drill screens are something else: `Drill`.)
+    public let paced: Bool
 
     public init(
         _ id: LessonID, level: Int, title: String, focus: Focus, layout: Layout = .alternating,
         treble: ClefNotes?, bass: ClefNotes?, sizes: ClosedRange<Int>, unlockBatch: Int = 1,
         octavePolicy: OctavePolicy, keySignature: KeySignature = .none, texture: Texture = .single,
-        contour: Contour = .mixed, rhythmCheck: RhythmCheck? = nil, drill: Bool = false
+        contour: Contour = .mixed, rhythmCheck: RhythmCheck? = nil, paced: Bool = false
     ) {
         self.id = id
         self.level = level
@@ -126,7 +129,7 @@ public struct Lesson: Identifiable, Hashable, Sendable {
         self.texture = texture
         self.contour = contour
         self.rhythmCheck = rhythmCheck ?? (level <= 2 ? .off : level == 3 ? .halves : .all)
-        self.drill = drill
+        self.paced = paced
     }
 
     public func notes(_ clef: Clef) -> ClefNotes? { clef == .treble ? treble : bass }
@@ -202,22 +205,22 @@ extension Curriculum {
             Lesson(
                 "1.1", level: 1, title: "G and A, both clefs", focus: .both,
                 treble: ClefNotes(new: [g4, a4], start: 2), bass: ClefNotes(new: [g2, a2], start: 2),
-                sizes: 2...3, octavePolicy: .lenient, contour: .gentle, drill: true
+                sizes: 2...3, octavePolicy: .lenient, contour: .gentle, paced: true
             ),
             Lesson(
                 "1.2", level: 1, title: "Add B", focus: .both,
                 treble: ClefNotes(known: [g4, a4], new: [b4], start: 1), bass: ClefNotes(known: [g2, a2], new: [b2], start: 1),
-                sizes: 2...3, octavePolicy: .lenient, contour: .gentle, drill: true
+                sizes: 2...3, octavePolicy: .lenient, contour: .gentle, paced: true
             ),
             Lesson(
                 "1.3", level: 1, title: "Add C", focus: .both,
                 treble: ClefNotes(known: [g4, a4, b4], new: [c5], start: 1), bass: ClefNotes(known: [g2, a2, b2], new: [c3], start: 1),
-                sizes: 2...3, octavePolicy: .lenient, contour: .gentle, drill: true
+                sizes: 2...3, octavePolicy: .lenient, contour: .gentle, paced: true
             ),
             Lesson(
                 "1.4", level: 1, title: "Add D: the whole G position", focus: .both,
                 treble: ClefNotes(known: [g4, a4, b4, c5], new: [d5], start: 1), bass: ClefNotes(known: [g2, a2, b2, c3], new: [d3], start: 1),
-                sizes: 2...3, octavePolicy: .lenient, contour: .gentle, drill: true
+                sizes: 2...3, octavePolicy: .lenient, contour: .gentle, paced: true
             ),
         ]),
         Level(number: 2, title: "G position, steps and skips", lessons: [
@@ -252,6 +255,9 @@ extension Curriculum {
         // most: real bars of quarters wider than that don't fit the staff at the 30pt
         // line gap (round 2's plan said "4 notes per screen, 2 bars")
         Level(number: 3, title: "Around G position, in G major", lessons: [
+            // each screen stays inside one hand position (HandPosition), so his hand stays
+            // put. 3.3-3.5 bring their notes in the listed order, middle C first, a
+            // landmark like Faber's guide notes (artifacts/reviews/2026-10-16-piano-teacher-review.md)
             Lesson(
                 "3.1", level: 3, title: "Treble up to G5", focus: .treble,
                 treble: ClefNotes(known: trebleG, new: [e5, fs5, g5], start: 1), bass: ClefNotes(known: bassG),
@@ -263,17 +269,22 @@ extension Curriculum {
                 sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor
             ),
             Lesson(
-                "3.3", level: 3, title: "Middle C from the treble side", focus: .treble,
-                treble: ClefNotes(known: trebleUp, new: [c4, d4, e4, fs4], start: 1), bass: ClefNotes(known: bassUp),
-                sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor
+                "3.3", level: 3, title: "Middle C and D from the treble side", focus: .treble,
+                treble: ClefNotes(known: trebleUp, new: [c4, d4], start: 1), bass: ClefNotes(known: bassUp),
+                sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor, paced: true
             ),
             Lesson(
-                "3.4", level: 3, title: "Middle C from the bass side", focus: .bass,
-                treble: ClefNotes(known: trebleWide), bass: ClefNotes(known: bassUp, new: [a3, b3, c4], start: 1),
-                sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor
+                "3.4", level: 3, title: "E and F sharp under G", focus: .treble,
+                treble: ClefNotes(known: [c4, d4] + trebleUp, new: [e4, fs4], start: 1), bass: ClefNotes(known: bassUp),
+                sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor, paced: true
             ),
             Lesson(
-                "3.5", level: 3, title: "Grand staff, the whole range", focus: .both, layout: .grand,
+                "3.5", level: 3, title: "Middle C from the bass side", focus: .bass,
+                treble: ClefNotes(known: trebleWide), bass: ClefNotes(known: bassUp, new: [c4, b3, a3], start: 1),
+                sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor, paced: true
+            ),
+            Lesson(
+                "3.6", level: 3, title: "Grand staff, the whole range", focus: .both, layout: .grand,
                 treble: ClefNotes(known: trebleWide), bass: ClefNotes(known: bassWide),
                 sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor
             ),

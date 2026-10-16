@@ -27,9 +27,10 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// screen, 1 screen in 4). The rest are weighted toward low boxes. Small steps,
     /// aiming for ~80% first-try success (rosenshine).
     public var newestShare = 0.25
-    /// Drill lessons (level 1): the newest notes get this share of the notes on their
-    /// clef instead (round 3: "more repetition so that a note is really drilled in").
-    public var drillNewestShare = 1.0 / 3
+    /// Paced lessons (level 1, level 3's middle C lessons): the newest notes get this
+    /// share of the notes on their clef instead (round 3: "more repetition so that a
+    /// note is really drilled in").
+    public var pacedNewestShare = 1.0 / 3
     /// The same key never comes up more than this many times in a row (inside a screen
     /// and across screens). A clef with one note (G on its own) can't hold to it.
     public var maxRepeats = 2
@@ -62,8 +63,8 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// try, with a median under `solidMedianResponse`.
     public var lessonWindow = 10
     public var lessonRate = 0.8
-    /// Drill lessons (level 1): each of the lesson's new notes is played at least this
-    /// many times in it before it can finish, however fast he finds them.
+    /// Paced lessons: each of the lesson's new notes is played at least this many times
+    /// in it before it can finish, however fast he finds them.
     public var lessonMinNewPlays = 10
 
     // MARK: session shape
@@ -153,7 +154,7 @@ extension NoteCoreConfig {
         boxCount = try c.value(.boxCount, or: d.boxCount)
         gateMinBox = try c.value(.gateMinBox, or: d.gateMinBox)
         newestShare = try c.value(.newestShare, or: d.newestShare)
-        drillNewestShare = try c.value(.drillNewestShare, or: d.drillNewestShare)
+        pacedNewestShare = try c.value(.pacedNewestShare, or: d.pacedNewestShare)
         maxRepeats = try c.value(.maxRepeats, or: d.maxRepeats)
         introSpacing = try c.value(.introSpacing, or: d.introSpacing)
         recentScreens = try c.value(.recentScreens, or: d.recentScreens)

@@ -91,8 +91,9 @@ import Testing
         #expect(curriculum.lessons.allSatisfy { lesson in
             lesson.keys.allSatisfy { $0.pitch.isWhiteKey || lesson.keySignature.sharpPitchClasses.contains($0.pitch.pitchClass) }
         }, "no black key without a key signature that sharps it")
-        #expect(level.lessons.filter { !$0.newKeys.isEmpty }.allSatisfy { lesson in
-            lesson.newKeys.contains { !$0.pitch.isWhiteKey } || lesson.id == "3.4"
+        // 3.3 (middle C and D) stops short of F, 3.5 (bass to middle C) has no F in it
+        #expect(level.lessons.filter { !$0.newKeys.isEmpty && !["3.3", "3.5"].contains($0.id) }.allSatisfy { lesson in
+            lesson.newKeys.contains { !$0.pitch.isWhiteKey }
         }, "each lesson that widens a staff past an F brings its F# in")
     }
 
@@ -100,7 +101,7 @@ import Testing
         let notes = Set(curriculum.level(3)!.lessons.flatMap(\.keys).map(\.id))
         #expect(notes.contains("treble:C4") && notes.contains("bass:C4"))
         #expect(notes.contains("treble:G5") && notes.contains("bass:G3"))
-        #expect(curriculum.lesson("3.5")!.layout == .grand)
+        #expect(curriculum.lesson("3.6")!.layout == .grand)
     }
 
     @Test func mixedLessonsUseTheGrandStaffFromLevelTwo() {
@@ -223,7 +224,7 @@ import Testing
     }
 
     @Test func middleCOnBothStaves() {
-        var engine = engine(in: "3.5")
+        var engine = engine(in: "3.6")
         var rng = SeededRandom(seed: 8)
         var both = Set<ItemID>()
         for _ in 0..<300 {

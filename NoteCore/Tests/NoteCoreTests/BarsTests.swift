@@ -120,7 +120,7 @@ import Testing
     }
 
     @Test func grandStaffBarsAreOneStaffEach() {
-        for id in ["2.5", "3.5", "4.4", "5.5"] {
+        for id in ["2.5", "3.6", "4.4", "5.5"] {
             for pick in screens(id, count: 60) where pick.intro == nil && !pick.isLessonIntro {
                 let item = pick.item
                 #expect(item.layout == .grand)

@@ -299,7 +299,7 @@ import Testing
         config.lessonMinScreens = 12
         config.keptTryingChance = 0.7
         config.lessonMinNewPlays = 12
-        config.drillNewestShare = 0.4
+        config.pacedNewestShare = 0.4
         config.introSpacing = 3
         config.praiseStreak = 5
         let decoded = try JSONDecoder().decode(NoteCoreConfig.self, from: JSONEncoder().encode(config))
@@ -416,7 +416,7 @@ import Testing
         #expect(engine.pool.map(\.id) == ["treble:G4", "treble:A4", "treble:B4", "bass:G2", "bass:A2", "bass:B2"])
         #expect(engine.pendingIntros.isEmpty)
         #expect(engine.newestBatch(.treble) == [key("treble:B4")], "B still gets its share")
-        #expect(!engine.isDrilled(key("treble:B4")))
+        #expect(!engine.hasMinPlays(key("treble:B4")))
         for screen in Self.firstScreens(state) {
             #expect(!screen.contains("C5") && !screen.contains("D5") && !screen.contains("C3") && !screen.contains("D3"), "\(screen)")
         }

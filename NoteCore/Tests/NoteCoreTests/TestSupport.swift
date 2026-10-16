@@ -126,13 +126,14 @@ struct Bench {
 
 /// Round 2's lesson 1.1, for gate tests: 3 of 5 notes a clef at random to start, then
 /// pairs through the gate. Level 1 unlocks everything at a lesson's start since round 3.
-func gateCurriculum() -> Curriculum {
+/// Level 3 by default: in levels 1-2 the gate doesn't take the fast track.
+func gateCurriculum(level: Int = 3) -> Curriculum {
     let lesson = Lesson(
-        "1.1", level: 1, title: "gate", focus: .both,
+        "\(level).1", level: level, title: "gate", focus: .both,
         treble: ClefNotes(new: Curriculum.trebleG, start: 3), bass: ClefNotes(new: Curriculum.bassG, start: 3),
         sizes: 1...3, unlockBatch: 2, octavePolicy: .lenient
     )
-    return Curriculum(levels: [Level(number: 1, title: "gate", lessons: [lesson])])
+    return Curriculum(levels: [Level(number: level, title: "gate", lessons: [lesson])])
 }
 
 /// An engine in `lesson` with every note met (no intros pending), so screens are normal ones.

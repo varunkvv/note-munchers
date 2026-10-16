@@ -69,7 +69,7 @@ import Testing
         engine.moveToLesson("1.2")
         #expect(!engine.canPlaySongs, "B is the newest note until it's drilled")
         for _ in 0..<10 { engine.play(key("treble:B4")) }
-        #expect(engine.isDrilled(key("treble:B4")))
+        #expect(engine.hasMinPlays(key("treble:B4")))
         #expect(engine.solidNotes(.treble).map(\.id) == ["treble:G4", "treble:A4", "treble:B4"])
         #expect(engine.songClefs == [.treble])
     }
@@ -134,7 +134,7 @@ import Testing
 
     /// Level 3: five notes a song, the upper five with the F# or G position.
     @Test func levelThreeTakesFiveOfTheOctave() {
-        var engine = engine("3.5")
+        var engine = engine("3.6")
         let all = MasteryEngine.songRange(level: 3, clef: .treble).map { "treble:\($0.name)" } + MasteryEngine.songRange(level: 3, clef: .bass).map { "bass:\($0.name)" }
         solid(&engine, all)
         var upper = 0
