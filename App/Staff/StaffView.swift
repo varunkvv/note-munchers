@@ -284,22 +284,29 @@ struct StaffPainter {
         }
 
         // a glowing (rhythm nudge) note stays in full ink so it stands out from the played ones
-        var color = done && glow == nil ? Theme.doneInk : style.ink
-        var headAlpha = 1.0
-        if let sparkle {
-            // the head turns into a little sparkle
-            let p = sparkle.progress(at: now)
-            color = style.ink
-            headAlpha = max(0, 1 - p / 0.35)
-            if !reduceMotion {
-                drawSparkle(&context, at: heads.map(\.0), progress: p)
-            }
-        }
+        let color = done && glow == nil ? Theme.doneInk : style.ink
         let filled = !(item.notes[index].value?.hasOpenHead ?? false)
-        for (center, _) in heads {
-            drawHead(&context, at: center, filled: filled, color: color.opacity(headAlpha))
+        guard let sparkle else {
+            for (center, _) in heads {
+                drawHead(&context, at: center, filled: filled, color: color)
+            }
+            drawChordGaps(&context, heads: heads, alpha: 1)
+            return
         }
-        drawChordGaps(&context, heads: heads, alpha: headAlpha)
+        // the head turns into a little sparkle, and its played (grey) self fades in under
+        // the stars, so it never blinks out
+        let p = sparkle.progress(at: now)
+        let inkAlpha = max(0, 1 - p / 0.35)
+        let x = min(1, max(0, (p - 0.05) / 0.3))
+        let restAlpha = x * x * (3 - 2 * x)
+        for (center, _) in heads {
+            drawHead(&context, at: center, filled: filled, color: color.opacity(restAlpha))
+            drawHead(&context, at: center, filled: filled, color: style.ink.opacity(inkAlpha))
+        }
+        drawChordGaps(&context, heads: heads, alpha: max(inkAlpha, restAlpha))
+        if !reduceMotion {
+            drawSparkle(&context, at: heads.map(\.0), progress: p)
+        }
     }
 
     /// Heads a third apart touch. A thin paper-colored gap between them keeps a chord

@@ -42,15 +42,14 @@ struct HatchView: View {
             let gap = size.width * 0.05
             let side = min(size.height * 0.62, (size.width - 3 * gap) / 2)
             ZStack {
-                Theme.paper.opacity(0.97).ignoresSafeArea()
+                // fully opaque: the note he's about to meet must not show through
+                Theme.paper.ignoresSafeArea()
                 if hatched {
                     ForEach(Array(offered.enumerated()), id: \.element) { slot, color in
                         choice(color, slot: slot, side: side, gap: gap, in: size)
                     }
                 } else {
-                    egg
-                        .frame(width: min(size.width, size.height) * 0.42, height: min(size.width, size.height) * 0.42)
-                        .position(x: size.width / 2, y: size.height / 2)
+                    egg(side: side, in: size)
                 }
             }
         }
@@ -86,16 +85,33 @@ struct HatchView: View {
         }
     }
 
-    private var egg: some View {
-        TimelineView(.animation(paused: hatched)) { timeline in
-            Canvas { context, size in
+    /// The egg stands on the same floor as the two munchers he picks from, and the baby
+    /// grows into exactly the spot where they start (both together, small, in the
+    /// middle), so the hand-over doesn't jump.
+    private func egg(side: CGFloat, in size: CGSize) -> some View {
+        let floor = size.height / 2 + side / 2
+        let small = side * Self.startScale
+        // the choice's canvas scaled about its bottom: the muncher is drawn in its top 96%
+        let baby = CGRect(x: size.width / 2 - small / 2, y: floor - small, width: small, height: small * 0.96)
+        let e = min(size.width, size.height) * 0.42
+        let eggRect = CGRect(x: size.width / 2 - e / 2, y: baby.maxY + e * 0.04 - e, width: e, height: e)
+        return TimelineView(.animation(paused: hatched)) { timeline in
+            Canvas { context, _ in
                 let p = timeline.date.timeIntervalSince(start) / hatchLength
                 // spots in the two colours he'll pick between, and a pale baby inside
-                EggPainter(look: .uncolored(id: id), progress: min(1, p), spotColors: offered.map(MuncherLook.swatch))
-                    .draw(in: &context, rect: CGRect(origin: .zero, size: size), id: id)
+                EggPainter(
+                    look: .uncolored(id: id), progress: min(1, p), spotColors: offered.map(MuncherLook.swatch),
+                    babyRect: baby, babyFluency: Self.fluency
+                )
+                .draw(in: &context, rect: eggRect, id: id)
             }
         }
     }
+
+    /// how big the two munchers are before they step out to the sides
+    private static let startScale = 0.45
+    /// hatch munchers show who they are from day one
+    private static let fluency = 0.15
 
     private func choice(_ color: Int, slot: Int, side: CGFloat, gap: CGFloat, in size: CGSize) -> some View {
         let isChosen = chosen == color
@@ -110,7 +126,7 @@ struct HatchView: View {
                     // a soft shadow on the floor
                     let floor = CGRect(x: canvas.width * 0.24, y: canvas.height * 0.93, width: canvas.width * 0.52, height: canvas.height * 0.05)
                     context.fill(Path(ellipseIn: floor), with: .color(.black.opacity(0.06)))
-                    var pose = MuncherPose(fluency: 0.15, mouthOpen: isChosen ? 0.55 : 0)
+                    var pose = MuncherPose(fluency: Self.fluency, mouthOpen: isChosen ? 0.55 : 0)
                     if !reduceMotion, chosen == nil {
                         // the two take turns bobbing, as if each is saying "me!"
                         let phase = timeline.date.timeIntervalSinceReferenceDate * 2 * .pi / 1.6 + Double(slot) * .pi
@@ -124,7 +140,7 @@ struct HatchView: View {
         }
         .buttonStyle(.plain)
         .allowsHitTesting(chosen == nil)
-        .scaleEffect(spread ? (hop && isChosen ? 1.1 : 1) : 0.45, anchor: .bottom)
+        .scaleEffect(spread ? (hop && isChosen ? 1.1 : 1) : Self.startScale, anchor: .bottom)
         .offset(y: hop && isChosen ? -side * 0.06 : 0)
         .scaleEffect(chosen != nil && !isChosen ? 0.85 : 1)
         .opacity(chosen == nil || isChosen ? 1 : 0)

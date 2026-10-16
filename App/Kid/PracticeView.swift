@@ -29,7 +29,7 @@ struct PracticeView: View {
                     HStack(spacing: 0) {
                         staffColumn(height: proxy.size.height)
                         MuncherLane(controller: controller)
-                            .frame(width: max(180, proxy.size.width * 0.17))
+                            .frame(width: laneWidth(screen: proxy.size.width))
                     }
                 } else {
                     VStack(spacing: 0) {
@@ -64,6 +64,15 @@ struct PracticeView: View {
             }
         }
         #endif
+    }
+
+    /// The lane takes the room the staff doesn't need at its full line gap, up to 30%
+    /// of the width, so the munchers are big wherever there's room. The staff never
+    /// shrinks for them: level 3's three bars don't fit at the full gap even now, so
+    /// there the lane stays at its old 17% and the munchers at their old size.
+    private func laneWidth(screen width: CGFloat) -> CGFloat {
+        let staff = CGFloat(controller.spec.width) * Metrics.gap * CGFloat(style.size) + 16
+        return max(180, min(width * 0.3, max(width * 0.17, width - staff)))
     }
 
     private func staffColumn(height: CGFloat) -> some View {

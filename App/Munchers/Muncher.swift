@@ -124,9 +124,10 @@ struct MuncherLook: Hashable {
         return Traits(using: &rng)
     }
 
-    /// A just-hatched muncher before he picks its colour: pale and waiting.
+    /// A just-hatched muncher before he picks its colour: pale and waiting, but dark
+    /// enough to stand out from the paper while it comes out of the egg.
     static func uncolored(id: ItemID) -> MuncherLook {
-        MuncherLook(rgb: (0.86, 0.84, 0.8), traits: traits(id: id))
+        MuncherLook(rgb: (0.78, 0.76, 0.72), traits: traits(id: id))
     }
 
     private init(rgb: (Double, Double, Double), traits: Traits) {
@@ -181,6 +182,9 @@ struct MuncherPose {
 struct MuncherPainter {
     let look: MuncherLook
     let pose: MuncherPose
+    /// Size at fluency 0 and at 1, as a share of the rect's short side. The practice
+    /// lane starts bigger so a new muncher is easy to see from the piano bench.
+    var growth: ClosedRange<Double> = 0.58...1.0
 
     static let topperAt = 0.2
     static let cheeksAt = 0.3
@@ -200,12 +204,13 @@ struct MuncherPainter {
         let spec = ShapeSpec(t.shape)
         let squash = CGFloat(min(1, max(0, pose.squash)))
         // grows with fluency, but always fits the rect with its ears, topper and tail.
-        // the fit ignores the squash, so a chomp never changes the size
+        // the fit is taken at full growth (the most room it ever needs), so a muncher
+        // never gets smaller as it grows. it ignores the squash, so a chomp never changes the size
         let grownW = spec.width * (1 + 0.17 * f)
         let side = min(rect.width, rect.height)
-        let s = min(side * CGFloat(0.58 + 0.42 * f),
-                    rect.height / CGFloat(0.1 + spec.height + headroom(f)),
-                    rect.width / CGFloat(grownW + 2 * sideRoom(f)))
+        let s = min(side * CGFloat(growth.lowerBound + (growth.upperBound - growth.lowerBound) * f),
+                    rect.height / CGFloat(0.1 + spec.height + headroom(1)),
+                    rect.width / CGFloat(spec.width * 1.17 + 2 * sideRoom(1)))
         let ground = rect.maxY - s * 0.03 - CGFloat(pose.bob)
         let bodyW = s * CGFloat(grownW) * (1 + 0.1 * squash)
         let bodyH = s * CGFloat(spec.height) * (1 - 0.1 * squash)
@@ -1059,6 +1064,13 @@ struct EggPainter {
     let progress: Double
     /// shell spot colours, taken in turn. Empty = the muncher's own colour.
     var spotColors: [Color] = []
+    /// Where the baby stands once it's out, in the same coordinates as the egg's rect.
+    /// The hatch screen passes the spot its colour pick starts from, so nothing jumps.
+    /// nil = just above the bottom shell.
+    var babyRect: CGRect?
+    var babyFluency = 0.0
+
+    private let shell = Color(red: 1, green: 0.97, blue: 0.9)
 
     func draw(in context: inout GraphicsContext, rect: CGRect, id: ItemID) {
         let p = progress
@@ -1069,14 +1081,19 @@ struct EggPainter {
         let eggH = s * 0.72
         let center = CGPoint(x: cx, y: bottom - eggH / 2)
         let wobble = p < 0.5 ? sin(p * .pi * 10) * 0.14 * (p / 0.5) : 0
-        let shell = Color(red: 1, green: 0.97, blue: 0.9)
 
-        // the baby muncher pops out of the bottom half
+        // the baby pops out of the bottom half: drawn first, so the shell is in front of it
         if p > 0.55 {
-            let grow = min(1, (p - 0.55) / 0.3)
-            let size = s * CGFloat(0.4 + 0.55 * grow)
-            let babyRect = CGRect(x: cx - size / 2, y: bottom - size - s * 0.12 * CGFloat(grow), width: size, height: size)
-            MuncherPainter(look: look, pose: MuncherPose(fluency: 0, mouthOpen: grow > 0.8 ? 0.6 : 0)).draw(in: &context, rect: babyRect)
+            let t = min(1, (p - 0.55) / 0.35)
+            let grow = 1 - pow(1 - t, 3)
+            let from = CGRect(x: cx - s * 0.2, y: bottom - s * 0.4, width: s * 0.4, height: s * 0.4)
+            let to = babyRect ?? CGRect(x: cx - s * 0.475, y: bottom - s * 1.07, width: s * 0.95, height: s * 0.95)
+            let baby = CGRect(
+                x: from.minX + (to.minX - from.minX) * grow, y: from.minY + (to.minY - from.minY) * grow,
+                width: from.width + (to.width - from.width) * grow, height: from.height + (to.height - from.height) * grow
+            )
+            let pose = MuncherPose(fluency: babyFluency, mouthOpen: grow > 0.8 ? 0.6 : 0)
+            MuncherPainter(look: look, pose: pose).draw(in: &context, rect: baby)
         }
 
         var egg = context
@@ -1085,34 +1102,65 @@ struct EggPainter {
         egg.translateBy(x: -center.x, y: -bottom)
         let eggPath = Self.eggPath(center: center, width: eggW, height: eggH)
         let crackY = center.y - eggH * 0.02
+        let crack = Self.crack(center: center, y: crackY, width: eggW)
+        let crackStyle = StrokeStyle(lineWidth: s * 0.02, lineJoin: .round)
 
         if p <= 0.55 {
-            egg.fill(eggPath, with: .color(shell))
-            egg.drawLayer { layer in
-                layer.clip(to: eggPath)
-                for (i, (dx, dy, r)) in [(-0.18, -0.2, 0.07), (0.15, -0.05, 0.09), (-0.1, 0.18, 0.06), (0.2, 0.22, 0.05)].enumerated() {
-                    let c = CGPoint(x: center.x + s * CGFloat(dx), y: center.y + s * CGFloat(dy))
-                    let rr = s * CGFloat(r)
-                    let color = spotColors.isEmpty ? look.body : spotColors[i % spotColors.count]
-                    layer.fill(Path(ellipseIn: CGRect(x: c.x - rr, y: c.y - rr, width: rr * 2, height: rr * 2)), with: .color(color.opacity(0.75)))
-                }
-            }
-            egg.stroke(eggPath, with: .color(Theme.keyEdge.opacity(0.5)), lineWidth: max(1, s * 0.012))
+            drawShell(&egg, eggPath, center: center, s: s)
             if p > 0.35 {
-                egg.stroke(Self.crack(center: center, y: crackY, width: eggW), with: .color(Theme.keyEdge), style: StrokeStyle(lineWidth: s * 0.02, lineJoin: .round))
+                egg.stroke(crack, with: .color(Theme.keyEdge), style: crackStyle)
             }
-        } else {
-            // bottom half stays, top half flies up and fades
-            let fade = max(0, 1 - (p - 0.55) / 0.45)
-            var bottomHalf = egg
-            bottomHalf.clip(to: Path(CGRect(x: rect.minX, y: crackY, width: rect.width, height: rect.maxY - crackY)))
-            bottomHalf.fill(eggPath, with: .color(shell.opacity(fade)))
-            var topHalf = egg
-            let lift = s * 0.5 * CGFloat(p - 0.55)
-            topHalf.translateBy(x: s * 0.2 * CGFloat(p - 0.55), y: -lift)
-            topHalf.clip(to: Path(CGRect(x: rect.minX - s, y: rect.minY - s, width: rect.width + 2 * s, height: crackY - rect.minY + s)))
-            topHalf.fill(eggPath, with: .color(shell.opacity(fade)))
+            return
         }
+        // the two halves keep their outline and spots while they fall away, so the
+        // screen is never empty while the baby comes out. top half: up and over.
+        // bottom half: stays a moment, then sinks. both fade at the end
+        let q = (p - 0.55) / 0.45
+        func ease(_ a: Double, _ b: Double) -> Double {
+            let x = min(1, max(0, (q - a) / (b - a)))
+            return x * x * (3 - 2 * x)
+        }
+        let far = s * 2
+        var below = Self.crackLine(center: center, y: crackY, width: eggW, reach: far)
+        below.addLine(to: CGPoint(x: cx + far, y: rect.maxY + far))
+        below.addLine(to: CGPoint(x: cx - far, y: rect.maxY + far))
+        below.closeSubpath()
+        var above = Self.crackLine(center: center, y: crackY, width: eggW, reach: far)
+        above.addLine(to: CGPoint(x: cx + far, y: rect.minY - far))
+        above.addLine(to: CGPoint(x: cx - far, y: rect.minY - far))
+        above.closeSubpath()
+
+        var bottomHalf = egg
+        bottomHalf.opacity = 1 - ease(0.45, 1)
+        bottomHalf.translateBy(x: 0, y: s * 0.18 * CGFloat(ease(0.35, 1)))
+        bottomHalf.clip(to: below)
+        drawShell(&bottomHalf, eggPath, center: center, s: s)
+        bottomHalf.stroke(crack, with: .color(Theme.keyEdge), style: crackStyle)
+
+        var topHalf = egg
+        let lift = ease(0, 0.8)
+        topHalf.opacity = 1 - ease(0.4, 1)
+        topHalf.translateBy(x: center.x + s * 0.32 * CGFloat(lift), y: crackY - s * 0.42 * CGFloat(lift))
+        topHalf.rotate(by: .radians(0.9 * lift))
+        topHalf.translateBy(x: -center.x, y: -crackY)
+        topHalf.clip(to: above)
+        drawShell(&topHalf, eggPath, center: center, s: s)
+        topHalf.stroke(crack, with: .color(Theme.keyEdge), style: crackStyle)
+    }
+
+    /// Shell, its spots and its outline.
+    private func drawShell(_ context: inout GraphicsContext, _ eggPath: Path, center: CGPoint, s: CGFloat) {
+        context.fill(eggPath, with: .color(shell))
+        context.drawLayer { layer in
+            layer.clip(to: eggPath)
+            for (i, (dx, dy, r)) in [(-0.18, -0.2, 0.07), (0.15, -0.05, 0.09), (-0.1, 0.18, 0.06), (0.2, 0.22, 0.05)].enumerated() {
+                let c = CGPoint(x: center.x + s * CGFloat(dx), y: center.y + s * CGFloat(dy))
+                let rr = s * CGFloat(r)
+                let color = spotColors.isEmpty ? look.body : spotColors[i % spotColors.count]
+                layer.fill(Path(ellipseIn: CGRect(x: c.x - rr, y: c.y - rr, width: rr * 2, height: rr * 2)), with: .color(color.opacity(0.75)))
+            }
+        }
+        context.stroke(eggPath, with: .color(Theme.keyEdge.opacity(0.5)), lineWidth: max(1, s * 0.012))
     }
 
     static func eggPath(center: CGPoint, width: CGFloat, height: CGFloat) -> Path {
@@ -1133,12 +1181,22 @@ struct EggPainter {
 
     static func crack(center: CGPoint, y: CGFloat, width: CGFloat) -> Path {
         var path = Path()
+        path.addLines(crackPoints(center: center, y: y, width: width))
+        return path
+    }
+
+    private static func crackPoints(center: CGPoint, y: CGFloat, width: CGFloat) -> [CGPoint] {
         let left = center.x - width * 0.42
-        path.move(to: CGPoint(x: left, y: y))
-        for i in 1...6 {
-            let x = left + width * 0.84 * CGFloat(i) / 6
-            path.addLine(to: CGPoint(x: x, y: y + (i.isMultiple(of: 2) ? 0 : -width * 0.08)))
+        return (0...6).map { i in
+            CGPoint(x: left + width * 0.84 * CGFloat(i) / 6, y: y + (i.isMultiple(of: 2) ? 0 : -width * 0.08))
         }
+    }
+
+    /// The crack, carried on flat out to `reach` on both sides, left to right. Closed
+    /// above or below, it splits the shell into its two halves.
+    static func crackLine(center: CGPoint, y: CGFloat, width: CGFloat, reach: CGFloat) -> Path {
+        var path = Path()
+        path.addLines([CGPoint(x: center.x - reach, y: y)] + crackPoints(center: center, y: y, width: width) + [CGPoint(x: center.x + reach, y: y)])
         return path
     }
 }
