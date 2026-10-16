@@ -81,8 +81,22 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     public var extraKeyIgnoreWindow: Double = 0.15
 
     /// A gap passes when it's between these multiples of the written length at his beat.
+    /// Under the window is a wrong value (played as half its value), over it a wrong
+    /// value up to `rhythmPauseRatio`.
     public var rhythmMinRatio = 0.6
     public var rhythmMaxRatio = 1.6
+    /// Inside the window but outside these is "a bit off": still fine, nothing said.
+    public var rhythmEvenMin = 0.8
+    public var rhythmEvenMax = 1.25
+    /// A gap this many times its written length or more is him reading the next note,
+    /// not a rhythm. Not judged (plans/2026-10-15-real-bars.md: "3x+").
+    public var rhythmPauseRatio = 3.0
+    /// A wrong value gets the screen played back to him and another go, at most this
+    /// many times a screen. Then it moves on kindly.
+    public var rhythmRetries = 2
+    /// The first this many rhythm-judged screens of a level that doesn't drill rhythm
+    /// (3 and 4) are played to him before he reads them (sound before symbol).
+    public var rhythmDemoScreens = 2
 
     // MARK: session
 
@@ -143,6 +157,11 @@ extension NoteCoreConfig {
         extraKeyIgnoreWindow = try c.value(.extraKeyIgnoreWindow, or: d.extraKeyIgnoreWindow)
         rhythmMinRatio = try c.value(.rhythmMinRatio, or: d.rhythmMinRatio)
         rhythmMaxRatio = try c.value(.rhythmMaxRatio, or: d.rhythmMaxRatio)
+        rhythmEvenMin = try c.value(.rhythmEvenMin, or: d.rhythmEvenMin)
+        rhythmEvenMax = try c.value(.rhythmEvenMax, or: d.rhythmEvenMax)
+        rhythmPauseRatio = try c.value(.rhythmPauseRatio, or: d.rhythmPauseRatio)
+        rhythmRetries = try c.value(.rhythmRetries, or: d.rhythmRetries)
+        rhythmDemoScreens = try c.value(.rhythmDemoScreens, or: d.rhythmDemoScreens)
         sessionMaxDuration = try c.value(.sessionMaxDuration, or: d.sessionMaxDuration)
         sessionMaxItems = try c.value(.sessionMaxItems, or: d.sessionMaxItems)
         warmUpCount = try c.value(.warmUpCount, or: d.warmUpCount)

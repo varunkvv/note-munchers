@@ -10,6 +10,9 @@ public enum SessionPhase: String, Codable, Hashable, Sendable {
     case hint2
     /// Screen done. Celebrate, then call `next(at:)` when the animation ends.
     case success
+    /// He played a note as a different value: the app plays the screen back to him (with
+    /// the keyboard), then calls `replayFinished(at:)` and he plays it again. Keys don't count.
+    case replaying
     /// Piano disconnected: the "turn on the piano" screen. Picks up where it was.
     case paused
     /// Session over: the summary screen.
@@ -68,8 +71,16 @@ public enum Speech: Hashable, Codable, Sendable {
     case keptTrying
     /// Now and then after a screen he read right first try: "you looked carefully!"
     case lookedCarefully
-    /// Rhythm: a note was too short. "hold this one longer"
+    /// A long note played short, on the second go round: "hold this one a little longer"
     case holdLonger
+    /// A long note played short (a half as a quarter), before the screen is played back
+    /// to him: "listen to this one - it's a long one"
+    case longOne
+    /// A short note played long (an eighth as a quarter), before the play back: "listen
+    /// to this one - it's a short one"
+    case shortOne
+    /// Still a wrong value after the last go: no more tries, on to the next screen. "let's keep going"
+    case keepGoing
     /// Shown with the paused screen.
     case turnOnPiano
     /// Session end: "look who ate well today"
@@ -90,9 +101,16 @@ public enum Cue: Hashable, Sendable {
     case say(Speech)
     /// Rhythm nudge: that note glows for its full written length.
     case rhythmGlow(note: Int)
-    /// Play the whole screen at `beat` seconds per quarter: the demo of a new rhythm
-    /// lesson, before he plays it.
+    /// Play the whole screen at `beat` seconds per quarter, the staff note sounding
+    /// softly highlighted: sound before symbol, before he reads it (a rhythm lesson's
+    /// first screen, a level's first rhythm screens). No keyboard: he still reads it.
     case playPhrase(beat: Double)
+    /// Play the whole screen at `beat` with the staff highlight and the keyboard picture
+    /// lighting each key as it sounds: the play button, and the play back after a wrong
+    /// value (then call `replayFinished(at:)` when it's over).
+    case showAndPlay(beat: Double)
+    /// The same screen again from its first note: a rhythm retry. Draw every note fresh.
+    case again
     /// New notes unlocked. Each gets an intro (and a new muncher) when it comes up.
     case unlocked([ItemID])
     /// Show the "turn on the piano" screen.
@@ -184,6 +202,13 @@ public struct PracticeSession: Sendable {
     public private(set) var isLessonIntro = false
     /// Why the current screen was picked.
     public private(set) var pickReason = PickReason.normal
+    /// What the rhythm judge listens to on this screen, nil when it isn't rhythm-judged
+    /// (levels 1-2, one length only, intros).
+    public private(set) var rhythmLine: RhythmLine?
+    /// Rhythm retries used on this screen.
+    public private(set) var retries = 0
+    /// Waiting for the last note's key-up (its hold counts).
+    public var isAwaitingRelease: Bool { awaitingRelease }
 
     /// True while the current screen is an intro (a new note, or a new lesson texture).
     public var isIntro: Bool { introNote != nil || isLessonIntro }
@@ -223,6 +248,10 @@ public struct PracticeSession: Sendable {
     private var onsets: [Double] = []
     private var rhythmJudgeable = true
     private var awaitingRelease = false
+    /// The first go at a screen that gets a rhythm retry: what's recorded (pitch from
+    /// the first go counts as it was, and so does its rhythm).
+    private var firstGo: (notes: [AttemptResult], rhythm: RhythmResult?)?
+    private var isRhythmDemo = false
 
     public init(engine: MasteryEngine, seed: UInt64, pianoConnected: Bool = true) {
         self.engine = engine
@@ -244,8 +273,8 @@ public struct PracticeSession: Sendable {
     public var nextDeadline: Double? {
         guard phase.isPlaying, let item else { return nil }
         var deadlines: [Double] = []
-        if awaitingRelease {
-            deadlines.append(RhythmJudge(config: config).settleTime(item.values, onsets: onsets))
+        if awaitingRelease, let line = rhythmLine {
+            deadlines.append(RhythmJudge(config: config).settleTime(line, onsets: onsets))
         } else {
             if let window = judge?.windowDeadline {
                 deadlines.append(window)
@@ -297,8 +326,8 @@ public struct PracticeSession: Sendable {
     public mutating func tick(at time: Double) -> [Cue] {
         guard phase.isPlaying, let item else { return [] }
         let t = activeTime(at: time)
-        if awaitingRelease {
-            if t >= RhythmJudge(config: config).settleTime(item.values, onsets: onsets) {
+        if awaitingRelease, let line = rhythmLine {
+            if t >= RhythmJudge(config: config).settleTime(line, onsets: onsets) {
                 return finishRhythm(release: t)
             }
             return []
@@ -351,10 +380,25 @@ public struct PracticeSession: Sendable {
         return showNext(at: t)
     }
 
+    /// The play back after a wrong value is over: he plays the screen again from its
+    /// first note. A rhythm retry only: pitch from the first go counts as it was.
+    public mutating func replayFinished(at time: Double) -> [Cue] {
+        if phase == .paused, resumePhase == .replaying {
+            // the piano went while it played. start the retry when it's back
+            resumePhase = .prompt
+            restartRun(at: activeTime(at: time))
+            return []
+        }
+        guard phase == .replaying else { return [] }
+        restartRun(at: activeTime(at: time))
+        phase = .prompt
+        return [.again]
+    }
+
     /// No MIDI source. Shows the paused screen; nothing counts until it's back.
     public mutating func pianoDisconnected(at time: Double) -> [Cue] {
         isPianoConnected = false
-        guard phase.isPlaying || phase == .success else { return [] }
+        guard phase.isPlaying || phase == .success || phase == .replaying else { return [] }
         pausedAt = time
         resumePhase = phase
         phase = .paused
@@ -409,6 +453,11 @@ public struct PracticeSession: Sendable {
         let next = pick.item
         item = next
         pickReason = reason
+        let lesson = engine.lesson
+        rhythmLine = pick.intro == nil ? next.rhythmLine(lesson.texture.isRhythm ? .all : lesson.rhythmCheck) : nil
+        retries = 0
+        firstGo = nil
+        isRhythmDemo = false
         pickSize = pick.size
         introNote = pick.intro
         isLessonIntro = pick.isLessonIntro
@@ -448,8 +497,25 @@ public struct PracticeSession: Sendable {
             } else {
                 cues += [.say(.twoAtOnce), .playPitches(next.notes[0].pitches)]
             }
+        } else if rhythmLine != nil, engine.wantsRhythmDemo {
+            // the first rhythm screens of level 3 (and 4): hear it first, then read it
+            isRhythmDemo = true
+            cues += [.say(.listen), .playPhrase(beat: config.demoBeat)]
         }
         return cues
+    }
+
+    /// Back to the screen's first note for another go (a rhythm retry).
+    private mutating func restartRun(at t: Double) {
+        guard let item else { return }
+        noteIndex = 0
+        onsets = []
+        ladder = 0
+        rhythmJudgeable = true
+        awaitingRelease = false
+        keyboardHint = []
+        lastActivity = t
+        judge?.expect(item.notes[0].pitches)
     }
 
     private mutating func apply(_ verdict: PitchVerdict, at t: Double) -> [Cue] {
@@ -471,9 +537,12 @@ public struct PracticeSession: Sendable {
                 keyboardHint = isIntro ? nextPitches : []
                 return cues
             }
-            if engine.lesson.texture.isRhythm, rhythmJudgeable {
-                awaitingRelease = true // the last note's hold counts
-                return cues
+            if let line = rhythmLine, rhythmJudgeable {
+                if line.judged[line.judged.count - 1] {
+                    awaitingRelease = true // the last note's hold counts
+                    return cues
+                }
+                return cues + finishRhythm(release: t)
             }
             return cues + finish(at: t, rhythm: nil)
 
@@ -506,7 +575,7 @@ public struct PracticeSession: Sendable {
     /// "oops, silly goose" only while he's on a roll: 4 of his last 5 screens this
     /// session right first try, once a session, never after easing or on an intro.
     private var oopsFits: Bool {
-        guard !saidOops, !eased, !isIntro, pickReason != .easing else { return false }
+        guard !saidOops, !eased, !isIntro, pickReason != .easing, retries == 0 else { return false }
         let recent = summary.screens.filter { !$0.wasIntro && !$0.wasLessonIntro }.suffix(5)
         return recent.count == 5 && recent.filter(\.firstTry).count >= 4
     }
@@ -546,10 +615,10 @@ public struct PracticeSession: Sendable {
     }
 
     private mutating func finishRhythm(release: Double) -> [Cue] {
-        guard let item, onsets.count == item.notes.count else {
+        guard let item, let line = rhythmLine, onsets.count == item.notes.count else {
             return finish(at: release, rhythm: nil)
         }
-        let result = RhythmJudge(config: config).judge(item.values, onsets: onsets, release: release)
+        let result = RhythmJudge(config: config).judge(line, onsets: onsets, release: release)
         return finish(at: release, rhythm: result)
     }
 
@@ -557,22 +626,37 @@ public struct PracticeSession: Sendable {
         guard let item else { return [] }
         awaitingRelease = false
         let lesson = engine.lesson
-        // a rhythm line's gaps are the rhythm, not reading: every note gets the reading time
-        let readingTime = correctTimes[0] - startTimes[0]
-        var notes: [AttemptResult] = []
-        for (i, column) in item.notes.enumerated() {
-            let time = lesson.texture.isRhythm ? readingTime : correctTimes[i] - startTimes[i]
-            for key in column.keys {
-                notes.append(AttemptResult(
-                    itemID: key.id, lesson: lesson.id, level: lesson.level, wasIntro: introNote == key || isLessonIntro,
-                    firstTry: wrongs[i] == 0 && stucks[i] == 0, wrongPresses: wrongs[i], almostPresses: almosts[i],
-                    stuckSteps: stucks[i], hints: hints[i], responseTime: max(0, time)
-                ))
+        if firstGo == nil {
+            // a rhythm line's gaps are the rhythm, not reading: every note gets the reading time
+            let readingTime = correctTimes[0] - startTimes[0]
+            var notes: [AttemptResult] = []
+            for (i, column) in item.notes.enumerated() {
+                let time = lesson.texture.isRhythm ? readingTime : correctTimes[i] - startTimes[i]
+                for key in column.keys {
+                    notes.append(AttemptResult(
+                        itemID: key.id, lesson: lesson.id, level: lesson.level, wasIntro: introNote == key || isLessonIntro,
+                        firstTry: wrongs[i] == 0 && stucks[i] == 0, wrongPresses: wrongs[i], almostPresses: almosts[i],
+                        stuckSteps: stucks[i], hints: hints[i], responseTime: max(0, time)
+                    ))
+                }
             }
+            firstGo = (notes, rhythm)
         }
+        // a note played as a different value: hear the screen, then another go. Not on
+        // an intro, and at most `rhythmRetries` times, so there's no loop he can't leave
+        if let rhythm, let wrong = rhythm.nudgeIndex, !isIntro, retries < config.rhythmRetries {
+            retries += 1
+            phase = .replaying
+            keyboardHint = []
+            let speech: Speech = rhythm.verdicts[wrong] == .tooShort ? (retries > 1 ? .holdLonger : .longOne) : .shortOne
+            let beat = rhythm.beat > 0 ? min(1.5, max(0.35, rhythm.beat)) : config.demoBeat
+            return [.rhythmGlow(note: wrong), .say(speech), .showAndPlay(beat: beat)]
+        }
+        let go = firstGo!
         let screen = ScreenResult(
             screenID: item.id, lesson: lesson.id, reason: pickReason, wasIntro: introNote != nil,
-            wasLessonIntro: isLessonIntro, notes: notes, rhythm: rhythm, size: pickSize
+            wasLessonIntro: isLessonIntro, notes: go.notes, rhythm: go.rhythm, size: pickSize,
+            rhythmRetries: retries, wasRhythmDemo: isRhythmDemo
         )
         let before = Dictionary(item.keys.map { ($0.id, engine.stats(for: $0).peakFluency) }, uniquingKeysWith: { a, _ in a })
         let update = engine.record(screen)
@@ -584,12 +668,11 @@ public struct PracticeSession: Sendable {
         var cues: [Cue] = []
         var praised = false
         let roll = unitInterval(&rng)
-        if let rhythm, let nudge = rhythm.nudgeIndex {
-            cues.append(.rhythmGlow(note: nudge))
-            if rhythm.verdicts[nudge] == .tooShort {
-                cues.append(.say(.holdLonger))
-            }
-        } else if !isIntro, !praisedLast {
+        if let rhythm, let wrong = rhythm.nudgeIndex {
+            // still a different value after the last go: that note glows, and on we go, kindly
+            cues.append(.rhythmGlow(note: wrong))
+            if !isIntro { cues.append(.say(.keepGoing)) }
+        } else if !isIntro, !praisedLast, retries == 0 {
             // process praise, now and then. never two screens in a row
             let hinted = screen.usedHints
             if roll < (hinted ? config.keptTryingChance : config.praiseChance) {

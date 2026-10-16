@@ -44,7 +44,7 @@ import Testing
                         if unitInterval(&dice) >= kid.rightRate {
                             _ = bench.press(bench.wrongKey, after: kid.time)
                         }
-                        _ = bench.playCurrent(after: kid.time)
+                        _ = bench.playNote(after: kid.time)
                     }
                 }
                 _ = bench.next(after: 1.2)

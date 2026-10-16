@@ -118,11 +118,13 @@ func performance(_ lengths: [Double], start: Double = 10) -> (onsets: [Double], 
         #expect(result.verdicts == [.ok, .ok, .tooShort])
     }
 
-    @Test func onePauseMidPhraseOnlyFlagsThatNote() {
+    @Test func aLongPauseMidPhraseIsHimReadingNotAWrongValue() {
         let values: [NoteValue] = [.quarter, .quarter, .quarter, .quarter, .half]
         let result = run(values, [0.6, 3.0, 0.6, 0.6, 1.2])
-        #expect(result.verdicts == [.ok, .tooLong, .ok, .ok, .ok])
-        #expect(result.nudgeIndex == 1)
+        #expect(result.verdicts == [.ok, .pause, .ok, .ok, .ok])
+        #expect(result.isOK && result.nudgeIndex == nil)
+        // near double is a wrong value
+        #expect(run(values, [0.6, 1.2, 0.6, 0.6, 1.2]).verdicts[1] == .tooLong)
     }
 
     @Test func eighthsVersusQuarters() {

@@ -62,8 +62,11 @@ public struct MasteryState: Hashable, Codable, Sendable {
     public var lessonScreens = 0
     /// His last notes in this lesson. Reset when the lesson changes.
     public var lessonRecent: [AttemptSample] = []
-    /// Rhythm lessons: whether each recent judged screen had every note ok.
+    /// Whether each recent rhythm-judged screen in this lesson had no wrong value (the
+    /// first go). Only rhythm lessons wait for it.
     public var rhythmRecent: [Bool] = []
+    /// Per level number: how many of its first rhythm screens were played to him first.
+    public var rhythmDemos: [String: Int] = [:]
     /// Notes per screen (bars on rhythm screens). Grows when he's doing well, drops
     /// back when he struggles, always inside the lesson's range.
     public var screenSize = 1
@@ -219,6 +222,14 @@ public struct MasteryEngine: Sendable {
         return Double(recent.filter(\.firstTry).count) / Double(recent.count) >= config.sizeUpRate
     }
 
+    /// The next rhythm-judged screen gets played to him first: one of the first few of
+    /// a level that listens to rhythm without drilling it (3 and 4). Level 5's rhythm
+    /// lessons open with their own lesson intro.
+    public var wantsRhythmDemo: Bool {
+        lesson.rhythmCheck != .off && !lesson.texture.isRhythm
+            && (state.rhythmDemos[String(lesson.level)] ?? 0) < config.rhythmDemoScreens
+    }
+
     /// Rhythm track for the current lesson: 6 of the last 8 judged screens fully ok,
     /// or the last 3 all ok.
     public var isRhythmSolid: Bool {
@@ -315,7 +326,11 @@ public struct MasteryEngine: Sendable {
             state.lessonScreens += 1
         }
         if let rhythm = screen.rhythm, !screen.wasLessonIntro {
+            // a wrong value on the first go is a miss on the rhythm track. it never holds back notes
             state.rhythmRecent = Array((state.rhythmRecent + [rhythm.isOK]).suffix(config.solidWindow))
+        }
+        if screen.wasRhythmDemo {
+            state.rhythmDemos[String(lesson.level), default: 0] += 1
         }
         if screen.reason == .normal, !screen.wasIntro, !screen.wasLessonIntro, screen.size == state.screenSize {
             noteSize(screen, &update)
@@ -516,6 +531,7 @@ extension MasteryState {
         lessonScreens = try c.value(.lessonScreens, or: d.lessonScreens)
         lessonRecent = try c.value(.lessonRecent, or: d.lessonRecent)
         rhythmRecent = try c.value(.rhythmRecent, or: d.rhythmRecent)
+        rhythmDemos = try c.value(.rhythmDemos, or: d.rhythmDemos)
         screenSize = try c.value(.screenSize, or: d.screenSize)
         sizeRecent = try c.value(.sizeRecent, or: d.sizeRecent)
         recentScreens = try c.value(.recentScreens, or: d.recentScreens)

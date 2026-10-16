@@ -88,12 +88,15 @@ public struct Lesson: Identifiable, Hashable, Sendable {
     public let keySignature: KeySignature
     public let texture: Texture
     public let contour: Contour
+    /// How much of the rhythm is listened to: off in levels 1-2, "half longer than
+    /// quarter" in level 3, everything (rests counted) from level 4.
+    public let rhythmCheck: RhythmCheck
 
     public init(
         _ id: LessonID, level: Int, title: String, focus: Focus, layout: Layout = .alternating,
         treble: ClefNotes?, bass: ClefNotes?, sizes: ClosedRange<Int>, unlockBatch: Int = 1,
         octavePolicy: OctavePolicy, keySignature: KeySignature = .none, texture: Texture = .single,
-        contour: Contour = .mixed
+        contour: Contour = .mixed, rhythmCheck: RhythmCheck? = nil
     ) {
         self.id = id
         self.level = level
@@ -108,6 +111,7 @@ public struct Lesson: Identifiable, Hashable, Sendable {
         self.keySignature = keySignature
         self.texture = texture
         self.contour = contour
+        self.rhythmCheck = rhythmCheck ?? (level <= 2 ? .off : level == 3 ? .halves : .all)
     }
 
     public func notes(_ clef: Clef) -> ClefNotes? { clef == .treble ? treble : bass }

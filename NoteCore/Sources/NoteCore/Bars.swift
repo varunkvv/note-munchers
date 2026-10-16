@@ -82,7 +82,7 @@ extension MasteryEngine {
 
     /// `bars` bars of `meter` from quarters, halves, beamed eighth pairs (at most one
     /// pair a bar, on a beat) and, when halves are allowed, a whole note (4/4) or a
-    /// dotted half (3/4) now and then. Always 3+ notes, at least two different lengths,
+    /// dotted half (3/4) now and then. A bar can end on a quarter rest. Always 3+ notes, at least two different lengths,
     /// and never a line the judge would pass played all one length, or it can't tell
     /// anything at his tempo (context/notecore-design.md). A meter that can't do that (one bar of quarters
     /// and halves in 3/4) gives way to the other one.
@@ -92,19 +92,25 @@ extension MasteryEngine {
             for _ in 0..<40 {
                 let line = (0..<max(1, bars)).map { _ in rhythmBar(allowed, meter: candidate, using: &rng) }
                 let values = line.flatMap(\.values)
-                if values.count >= 3, Set(values).count >= 2, telling(values) { return (candidate, line) }
+                if values.count >= 3, Set(values).count >= 2, RhythmJudge.telling(rhythmLine(line)) { return (candidate, line) }
             }
         }
         let fallback = BarRhythm([.quarter, .quarter, .half])
         return (.fourFour, Array(repeating: fallback, count: max(1, bars)))
     }
 
-    /// The judge can tell this line apart from every note played the same length. Not
-    /// a given with three lengths: dh | h q played evenly reads as a fast dh and h and a
-    /// long last quarter, and the last note is never too long.
-    static func telling(_ values: [NoteValue]) -> Bool {
-        let onsets = values.indices.map(Double.init)
-        return !RhythmJudge().judge(values, onsets: onsets, release: Double(values.count)).isOK
+    /// The judge's view of these bars, every note judged: each gap is the note's value
+    /// plus the rests after it, the last note's is its value.
+    public static func rhythmLine(_ bars: [BarRhythm]) -> RhythmLine {
+        var values: [NoteValue] = [], gaps: [Double] = []
+        for bar in bars {
+            for (i, value) in bar.values.enumerated() {
+                values.append(value)
+                gaps.append(value.beats + (i == bar.values.count - 1 ? bar.rests.reduce(0) { $0 + $1.beats } : 0))
+            }
+        }
+        gaps[gaps.count - 1] = values[values.count - 1].beats
+        return RhythmLine(values: values, gaps: gaps)
     }
 
     private static func rhythmBar(_ allowed: [NoteValue], meter: Meter, using rng: inout some RandomNumberGenerator) -> BarRhythm {
@@ -127,6 +133,11 @@ extension MasteryEngine {
             pair = pair || cell.first == .eighth
             out += cell
             beats += cell.reduce(0) { $0 + $1.beats }
+        }
+        // now and then the bar's last beat is a rest, which counts into the gap before
+        // the next key (levels 4-5)
+        if out.count >= 2, out.last == .quarter, unitInterval(&rng) < 0.2 {
+            return BarRhythm(Array(out.dropLast()), rests: [.quarter])
         }
         return BarRhythm(out)
     }

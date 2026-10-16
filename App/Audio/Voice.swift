@@ -114,6 +114,10 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
         case .keptTrying: ("keptTrying", nil)
         case .lookedCarefully: ("lookedCarefully", nil)
         case .holdLonger: ("holdLonger", nil)
+        // a wrong value: before the screen is played back to him, and when it moves on
+        case .longOne: ("longOne", nil)
+        case .shortOne: ("shortOne", nil)
+        case .keepGoing: ("keepGoing", nil)
         case .turnOnPiano: ("turnOnPiano", nil)
         case .sessionDone: ("sessionDone", nil)
         }
@@ -243,7 +247,7 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
     func audit() -> [String] {
         var speeches: [Speech] = [
             .hello, .listen, .twoAtOnce, .almost(.c, .middleC), .sharpHint(.fSharp), .hintListen, .hintLook,
-            .oops, .keptTrying, .lookedCarefully, .holdLonger, .turnOnPiano, .sessionDone,
+            .oops, .keptTrying, .lookedCarefully, .holdLonger, .longOne, .shortOne, .keepGoing, .turnOnPiano, .sessionDone,
         ]
         for name in NoteName.allCases {
             speeches += [.meetNote(name), .hintShow(name), .almost(name, .higher), .almost(name, .lower)]

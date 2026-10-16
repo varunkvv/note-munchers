@@ -86,17 +86,35 @@ struct Bench {
         return cues
     }
 
-    /// Plays every note left on the screen, right first try.
+    /// The next step of playing the screen right: the current note's keys, `dt` a beat
+    /// after the last one on a rhythm-judged screen (in time), or the last note's key-up
+    /// once its hold counts.
+    mutating func playNote(after dt: Double = 0.5) -> [Cue] {
+        if session.isAwaitingRelease, let item = session.item {
+            let hold = (session.rhythmLine?.gaps.last ?? 1) * dt
+            var cues = release(item.notes[item.notes.count - 1].pitches[0], after: hold)
+            for pitch in item.notes[item.notes.count - 1].pitches.dropFirst() { cues += release(pitch) }
+            return cues
+        }
+        let i = session.noteIndex
+        let gap = i > 0 && session.rhythmLine != nil ? session.rhythmLine!.gaps[i - 1] * dt : dt
+        return playCurrent(after: gap)
+    }
+
+    /// Plays every note left on the screen, right first try, in time when it's rhythm-judged.
     mutating func playScreen(after dt: Double = 0.5) -> [Cue] {
         var cues: [Cue] = []
         while session.phase.isPlaying {
-            cues += playCurrent(after: dt)
+            cues += playNote(after: dt)
         }
         return cues
     }
 
+    /// After the celebration: the next screen. During a rhythm retry's play back it
+    /// stands in for the app saying the play back is over.
     mutating func next(after dt: Double = 1) -> [Cue] {
         now += dt
+        if session.phase == .replaying { return session.replayFinished(at: now) }
         return session.next(at: now)
     }
 

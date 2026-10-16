@@ -6,6 +6,7 @@ import NoteCore
 ///
 ///     -demoScript <name>   play a scripted sequence through InputHub.emit (see DemoRunner.run).
 ///                          sharpPrompt / sharp stop on the next F# (sharp also presses F natural).
+///                          wrongValue plays a rhythm screen's halves as quarters (the retry).
 ///                          show plays like a kid at -demoSlow from the start, for screen recordings
 ///     -demoScreen <name>   open a screen directly: home, parent, parent#levels, parent#staff,
 ///                          parent#history, levels (the level picker), monitor, gallery
@@ -198,16 +199,36 @@ final class DemoRunner {
             await skipIntros(c)
             c.holdAfterSuccess = true
             await playItem(c)
-        case "rhythmShort":
-            // every half note cut to under half its length: "hold this one longer" + glow
+        case "rhythmShort", "wrongValue":
+            // a rhythm-judged screen with a half, every half cut short: a wrong value, so
+            // the glow, "it's a long one", the screen played back with the keyboard, then
+            // his go again. rhythmShort stops there, wrongValue plays the retry right
             await skipIntros(c)
-            c.holdAfterSuccess = true
-            if let item = c.item {
-                await playItem(c, stretch: item.notes.map { $0.value == .half ? 0.4 : 1 })
+            for _ in 0..<40 {
+                guard let item = c.item, let line = c.session.rhythmLine, c.phase.isPlaying else {
+                    let shown = c.itemsShown
+                    await playItem(c)
+                    await waitForNext(c, after: shown)
+                    continue
+                }
+                if item.notes.indices.dropLast().contains(where: { line.judged[$0] && item.notes[$0].value == .half }) { break }
+                let shown = c.itemsShown
+                await playItem(c)
+                await waitForNext(c, after: shown)
             }
+            c.timeScale = options.slow
+            guard let item = c.item else { break }
+            log("playing the halves short on \(item.id)", c)
+            await playItem(c, stretch: item.notes.map { $0.value == .half ? 0.45 : 1 })
+            await waitUntil(seconds: 5) { c.phase == .replaying }
+            log("wrong value, playing it back", c)
+            guard script == "wrongValue" else { break }
+            await waitUntil(seconds: 60) { c.phase.isPlaying }
+            log("his go again", c)
+            c.holdAfterSuccess = true
+            await playItem(c)
             await sleep(1.0)
-            log("rhythm result \(c.session.summary.screens.last?.rhythm.map { "\($0.verdicts)" } ?? "none")", c)
-            await repeatEffect(.glow, c)
+            log("retry played: retries \(c.session.summary.screens.last?.rhythmRetries ?? -1)", c)
         case "almost":
             await skipIntros(c)
             await wrongOctave(c)
@@ -280,7 +301,7 @@ final class DemoRunner {
                 let shown = c.itemsShown
                 await waitUntil(seconds: 60) { !c.isHatching }
                 await sleep((c.session.isIntro ? 1.6 : 1.0) * options.slow)
-                if c.session.engine.lesson.texture.isRhythm {
+                if c.session.rhythmLine != nil {
                     await playItem(c)
                 } else {
                     if !c.session.isIntro, round % 4 == 3 {
@@ -380,7 +401,7 @@ final class DemoRunner {
     private func playItem(_ c: PracticeController, beat: Double = 0.5, stretch: [Double]? = nil) async {
         await waitUntil(seconds: 30) { !c.isHatching }
         guard let item = c.item, c.phase.isPlaying else { return }
-        if c.session.engine.lesson.texture.isRhythm {
+        if c.session.rhythmLine != nil || c.session.engine.lesson.texture.isRhythm {
             for index in c.session.noteIndex..<item.notes.count {
                 let pitches = item.notes[index].pitches
                 let length = item.gapBeats[index] * beat * (stretch?[index] ?? 1)

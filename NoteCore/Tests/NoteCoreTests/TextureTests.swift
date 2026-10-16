@@ -8,22 +8,28 @@ import Testing
     let judge = RhythmJudge()
     static let sets: [[NoteValue]] = [[.quarter, .half], [.eighth, .quarter, .half]]
 
-    func generated(_ count: Int = 600) -> [[NoteValue]] {
+    /// Generated level 5 lines as the judge sees them (rests count into the gap).
+    func generated(_ count: Int = 600) -> [RhythmLine] {
         var rng = SeededRandom(seed: 77)
         return (0..<count).map { i in
             let meter: Meter = i % 3 == 0 ? .threeFour : .fourFour
-            return MasteryEngine.rhythm(bars: 1 + i % 2, from: Self.sets[i % 2], meter: meter, using: &rng).bars.flatMap(\.values)
+            return MasteryEngine.rhythmLine(MasteryEngine.rhythm(bars: 1 + i % 2, from: Self.sets[i % 2], meter: meter, using: &rng).bars)
         }
     }
 
-    func run(_ values: [NoteValue], _ lengths: [Double]) -> RhythmResult {
+    func run(_ line: RhythmLine, _ lengths: [Double]) -> RhythmResult {
         let p = performance(lengths)
-        return judge.judge(values, onsets: p.onsets, release: p.release)
+        return judge.judge(line, onsets: p.onsets, release: p.release)
+    }
+
+    func name(_ line: RhythmLine) -> String {
+        zip(line.values, line.gaps).map { $0.rawValue + ($1 > $0.beats ? "+r" : "") }.joined(separator: " ")
     }
 
     @Test func wholeBarsThreePlusNotesMixedLengths() {
         var rng = SeededRandom(seed: 1)
         var meters = Set<Meter>()
+        var rests = 0
         for set in Self.sets {
             for bars in 1...2 {
                 for meter in Meter.allCases {
@@ -31,7 +37,8 @@ import Testing
                         let line = MasteryEngine.rhythm(bars: bars, from: set, meter: meter, using: &rng)
                         meters.insert(line.meter)
                         let values = line.bars.flatMap(\.values)
-                        let notes = values.map { WrittenNote(.treble, [Pitch(.g, 4)], $0) }
+                        rests += line.bars.filter { !$0.rests.isEmpty }.count
+                        let notes = MasteryEngine.apply(line.bars, to: values.map { _ in WrittenNote(.treble, [Pitch(.g, 4)]) })
                         // the item checks every bar adds up to the meter
                         let item = PracticeItem(notes, bars: line.bars.map(\.count), meter: line.meter)
                         #expect(item.totalBeats == Double(line.meter.beats * bars), "\(RhythmFixtures.name(values))")
@@ -40,15 +47,18 @@ import Testing
                         #expect(Set(values).isSubset(of: Set(set + [.whole, .dottedHalf])))
                         #expect(!values.contains(.whole) || line.meter == .fourFour)
                         #expect(!values.contains(.dottedHalf) || line.meter == .threeFour)
+                        #expect(line.bars.allSatisfy { $0.rests.allSatisfy { $0 == .quarter } })
                         let eighths = values.filter { $0 == .eighth }.count
                         #expect(item.beamedPairStarts.count * 2 == eighths, "eighths come as beamed pairs on a beat")
                         #expect(item.beamedPairStarts.count <= bars, "at most one pair a bar")
                         #expect(item.barLinesAfter.count == bars - 1)
+                        #expect(item.rhythmLine(.all) != nil, "every level 5 line can be judged: \(item.id)")
                     }
                 }
             }
         }
         #expect(meters == Set(Meter.allCases))
+        #expect(rests > 100, "a bar ends on a quarter rest now and then: \(rests)")
     }
 
     @Test func oneBarOfQuartersAndHalvesIn34GivesWayTo44() {
@@ -60,37 +70,37 @@ import Testing
     }
 
     @Test func everyGeneratedLinePassesAtAnyTempo() {
-        for values in generated() {
+        for line in generated() {
             for beat in [0.3, 0.6, 1.2] {
-                #expect(run(values, values.map { $0.beats * beat }).isOK, "\(RhythmFixtures.name(values)) at \(beat)")
+                #expect(run(line, line.gaps.map { $0 * beat }).isOK, "\(name(line)) at \(beat)")
             }
         }
     }
 
     @Test func everyNoteTheSameLengthNeverPasses() {
-        for values in generated() {
+        for line in generated() {
             for length in [0.3, 0.6, 1.0] {
-                #expect(!run(values, values.map { _ in length }).isOK, "\(RhythmFixtures.name(values)) at \(length)s each")
+                #expect(!run(line, line.values.map { _ in length }).isOK, "\(name(line)) at \(length)s each")
             }
         }
     }
 
     @Test func everyShortenedHalfIsTooShort() {
-        for values in generated() {
-            for (i, value) in values.enumerated() where value == .half {
-                var lengths = values.map { $0.beats * 0.6 }
+        for line in generated() {
+            for (i, value) in line.values.enumerated() where value == .half && line.gaps[i] == 2 {
+                var lengths = line.gaps.map { $0 * 0.6 }
                 lengths[i] = NoteValue.quarter.beats * 0.6
-                #expect(run(values, lengths).verdicts[i] == .tooShort, "\(RhythmFixtures.name(values)) note \(i)")
+                #expect(run(line, lengths).verdicts[i] == .tooShort, "\(name(line)) note \(i)")
             }
         }
     }
 
     @Test func roughlyRightTimingPasses() {
         var rng = SeededRandom(seed: 5)
-        for (n, values) in generated(300).enumerated() {
+        for (n, line) in generated(300).enumerated() {
             let beat = 0.4 + Double(rng.next() % 1000) / 1000
-            let lengths = values.map { $0.beats * beat * (1 + (Double(rng.next() % 1000) / 1000 - 0.5) * 0.4) }
-            #expect(run(values, lengths).isOK, "\(RhythmFixtures.name(values)) trial \(n)")
+            let lengths = line.gaps.map { $0 * beat * (1 + (Double(rng.next() % 1000) / 1000 - 0.5) * 0.4) }
+            #expect(run(line, lengths).isOK, "\(name(line)) trial \(n)")
         }
     }
 }

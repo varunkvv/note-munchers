@@ -89,15 +89,21 @@ struct PracticeView: View {
     }
 }
 
-/// Under the staff: the keyboard picture when a key is lit (hint 2, intros, "almost"),
-/// and a small ear picture while the app plays the right pitch (hint 1).
+/// Under the staff: the keyboard picture when a key is lit (hint 2, intros, "almost") or
+/// while the screen is played to him with its keys lighting up, and a small ear picture
+/// while the app plays the right pitch (hint 1).
 struct HintBand: View {
     let controller: PracticeController
     @State private var showEar = false
 
     var body: some View {
         ZStack {
-            if !controller.session.keyboardHint.isEmpty {
+            if let playing = controller.playingKeys {
+                KeyboardPicture(range: controller.keyboardRange, lit: playing)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 14)
+                    .transition(.opacity)
+            } else if !controller.session.keyboardHint.isEmpty {
                 KeyboardPicture(range: controller.keyboardRange, lit: controller.session.keyboardHint)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 14)
@@ -124,6 +130,7 @@ struct HintBand: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: controller.session.keyboardHint)
+        .animation(.easeInOut(duration: 0.25), value: controller.playingKeys == nil)
         .animation(.easeInOut(duration: 0.25), value: showEar)
         .task(id: controller.soundHintAt) {
             guard controller.soundHintAt != nil else { return }

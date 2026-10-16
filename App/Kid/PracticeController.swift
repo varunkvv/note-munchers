@@ -27,6 +27,12 @@ final class PracticeController {
     private(set) var hatchQueue: [ItemID] = []
     /// Screens shown so far this session.
     private(set) var itemsShown = 0
+    /// The screen is being played to him with the keyboard picture (the play button, or
+    /// the play back after a wrong value): the keys sounding right now, [] between notes.
+    /// nil when nothing plays with the keyboard.
+    private(set) var playingKeys: [Pitch]?
+    /// The screen is being played (with or without the keyboard).
+    private(set) var isPlayingBack = false
 
     /// Called after each finished screen, with the result and the state to save.
     var onScreenDone: ((ScreenResult, MasteryState) -> Void)?
@@ -52,6 +58,7 @@ final class PracticeController {
     @ObservationIgnored private var listenTask: Task<Void, Never>?
     @ObservationIgnored private var tickTask: Task<Void, Never>?
     @ObservationIgnored private var nextTask: Task<Void, Never>?
+    @ObservationIgnored private var playbackTask: Task<Void, Never>?
     @ObservationIgnored private var savedScreens = 0
     @ObservationIgnored private var finished = false
     /// The intro's sound and words wait until its muncher has hatched.
@@ -76,7 +83,11 @@ final class PracticeController {
     /// Notes drawn as already played.
     var doneCount: Int {
         guard let item = session.item else { return 0 }
-        return session.phase == .success ? item.notes.count : session.noteIndex
+        switch session.phase {
+        case .success: return item.notes.count
+        case .replaying: return 0 // played back fresh, then he plays it again
+        default: return session.noteIndex
+        }
     }
 
     // MARK: lifecycle
@@ -120,6 +131,9 @@ final class PracticeController {
         listenTask?.cancel()
         tickTask?.cancel()
         nextTask?.cancel()
+        playbackTask?.cancel()
+        playingKeys = nil
+        isPlayingBack = false
         voice.stop()
     }
 
@@ -152,7 +166,12 @@ final class PracticeController {
         // rhythm intro: "here's a new one! listen", then the phrase
         let meets = cues.contains { if case .say(.meetNote) = $0 { true } else { false } }
         let pitchDemo = cues.contains { if case .playPitches = $0 { true } else { false } }
-        let phraseBeat = cues.lazy.compactMap { if case .playPhrase(let beat) = $0 { beat } else { nil } }.first
+        let phraseBeat = cues.lazy.compactMap { cue -> Double? in
+            switch cue {
+            case .playPhrase(let beat), .showAndPlay(let beat): beat
+            default: nil
+            }
+        }.first
         var speechDelay = 0.0
         var soundDelay = 0.0
         if meets, pitchDemo {
@@ -161,7 +180,8 @@ final class PracticeController {
         if cues.contains(.say(.hintListen)) || cues.contains(.say(.twoAtOnce)) {
             soundDelay = 0.7
         }
-        if cues.contains(.say(.listen)), phraseBeat != nil {
+        if phraseBeat != nil, cues.contains(where: { if case .say = $0 { true } else { false } }) {
+            // "listen", "it's a long one": the screen plays once she's done
             soundDelay = 1.7
         }
         for cue in cues {
@@ -205,7 +225,7 @@ final class PracticeController {
                 }
                 // "listen" / "two at once" lines vary in length: the sound waits until she's done
                 if soundDelay > 0 { soundDelay = max(soundDelay, talking + 0.15) }
-                if speech == .holdLonger { celebrate += 1.2 }
+                if speech == .keepGoing { celebrate = max(celebrate, talking + 0.3) }
                 if speech == .keptTrying || speech == .lookedCarefully {
                     // the next screen waits for the praise to finish
                     celebrate = max(celebrate + 0.8, talking + 0.3)
@@ -215,14 +235,18 @@ final class PracticeController {
                 effects.add(.glow, column: note, duration: length)
                 celebrate = max(celebrate, length + 0.8)
             case .playPhrase(let beat):
-                if let item = session.item {
-                    let notes = item.playback(beat: beat)
-                    if soundDelay > 0 {
-                        later(soundDelay) { $0.sounds.play(notes) }
-                    } else {
-                        sounds.play(notes)
+                // sound before symbol: he still reads it, so no keyboard
+                playScreen(beat: beat, keys: false, delay: soundDelay)
+            case .showAndPlay(let beat):
+                playScreen(beat: beat, keys: true, delay: soundDelay) { c in
+                    // a wrong value's play back is over: his go again
+                    if c.session.phase == .replaying || c.session.phase == .paused {
+                        c.play(c.session.replayFinished(at: HostClock.now))
                     }
                 }
+            case .again:
+                // the same screen from its first note (a rhythm retry): every note fresh
+                effects.clear()
             case .unlocked:
                 break // each new note hatches when its intro comes up
             case .paused, .resumed:
@@ -255,10 +279,72 @@ final class PracticeController {
 
     /// Kid taps the speaker on a rhythm line: hear it at his own last tempo (or the demo tempo).
     func playPhrase() {
-        guard let item = session.item, session.engine.lesson.texture.isRhythm else { return }
+        guard session.item != nil, session.engine.lesson.texture.isRhythm, !isPlayingBack else { return }
         let lastBeat = session.summary.screens.last { $0.rhythm != nil }?.rhythm?.beat
         let beat = lastBeat.flatMap { $0 > 0 ? min(1.5, max(0.35, $0)) : nil } ?? session.engine.config.demoBeat
-        sounds.play(item.playback(beat: beat))
+        playScreen(beat: beat, keys: false, delay: 0)
+    }
+
+    /// Plays the screen that's up at `beat` seconds a quarter, after `delay`: the sound,
+    /// each note (or rest) on the staff softly highlighted while it sounds, and with
+    /// `keys` the keyboard picture lighting each key as it sounds. `done` runs when it's over.
+    private func playScreen(beat: Double, keys: Bool, delay: Double, done: (@MainActor (PracticeController) -> Void)? = nil) {
+        guard let item = session.item else { return }
+        playbackTask?.cancel()
+        isPlayingBack = true
+        // demo runs stretch time, so screenshots can catch it mid-way
+        let b = beat * timeScale
+        enum Step { case on(Int), off, rest(Int) }
+        var steps: [(at: Double, step: Step)] = []
+        var restIndex = 0
+        for (i, note) in item.notes.enumerated() {
+            let start = item.startBeats[i] * b
+            steps.append((start, .on(i)))
+            steps.append((start + note.value.beats * b * 0.85, .off))
+            var at = item.startBeats[i] + note.value.beats
+            for rest in note.restsAfter {
+                steps.append((at * b, .rest(restIndex)))
+                restIndex += 1
+                at += rest.beats
+            }
+        }
+        steps.sort { $0.at < $1.at }
+        let end = item.totalBeats * b
+        playbackTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(delay * (self?.timeScale ?? 1)))
+            guard let self, !Task.isCancelled else { return }
+            self.sounds.play(item.playback(beat: b))
+            if keys { self.playingKeys = [] }
+            let clock = ContinuousClock()
+            let start = clock.now
+            for (at, step) in steps {
+                try? await clock.sleep(until: start + .seconds(at))
+                guard !Task.isCancelled else { return }
+                switch step {
+                case .on(let i):
+                    // effects stretch by timeScale themselves
+                    self.effects.add(.follow, column: i, duration: item.notes[i].value.beats * beat)
+                    if keys { self.playingKeys = item.notes[i].pitches }
+                case .off:
+                    if keys { self.playingKeys = [] }
+                case .rest(let r):
+                    var beats = 0.0
+                    var k = 0
+                    outer: for note in item.notes {
+                        for rest in note.restsAfter {
+                            if k == r { beats = rest.beats; break outer }
+                            k += 1
+                        }
+                    }
+                    self.effects.add(.followRest, column: r, duration: beats * beat)
+                }
+            }
+            try? await clock.sleep(until: start + .seconds(end + 0.2))
+            guard !Task.isCancelled else { return }
+            self.playingKeys = nil
+            self.isPlayingBack = false
+            done?(self)
+        }
     }
 
     /// Runs `action` after `delay` seconds (stretched in demo runs).

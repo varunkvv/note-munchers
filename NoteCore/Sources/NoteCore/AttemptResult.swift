@@ -85,10 +85,16 @@ public struct ScreenResult: Hashable, Codable, Sendable {
     public var rhythm: RhythmResult?
     /// The screen's size in the lesson's unit: columns, or bars on rhythm screens.
     public var size: Int
+    /// Wrong values got the screen played back and another go this many times (at most
+    /// `rhythmRetries`). `rhythm` is the first go, the one that counts.
+    public var rhythmRetries: Int
+    /// One of a level's first rhythm screens, played to him before he read it.
+    public var wasRhythmDemo: Bool
 
     public init(
         screenID: ItemID, lesson: LessonID, reason: PickReason = .normal, wasIntro: Bool = false,
-        wasLessonIntro: Bool = false, notes: [AttemptResult], rhythm: RhythmResult? = nil, size: Int? = nil
+        wasLessonIntro: Bool = false, notes: [AttemptResult], rhythm: RhythmResult? = nil, size: Int? = nil,
+        rhythmRetries: Int = 0, wasRhythmDemo: Bool = false
     ) {
         self.screenID = screenID
         self.lesson = lesson
@@ -98,6 +104,8 @@ public struct ScreenResult: Hashable, Codable, Sendable {
         self.notes = notes
         self.rhythm = rhythm
         self.size = size ?? notes.count
+        self.rhythmRetries = rhythmRetries
+        self.wasRhythmDemo = wasRhythmDemo
     }
 
     /// Every note right first try.
@@ -134,5 +142,7 @@ extension ScreenResult {
         notes = try c.value(.notes, or: [])
         rhythm = try c.decodeIfPresent(RhythmResult.self, forKey: .rhythm)
         size = try c.value(.size, or: notes.count)
+        rhythmRetries = try c.value(.rhythmRetries, or: 0)
+        wasRhythmDemo = try c.value(.wasRhythmDemo, or: false)
     }
 }
