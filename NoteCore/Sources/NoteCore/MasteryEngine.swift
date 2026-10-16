@@ -77,6 +77,9 @@ public struct MasteryState: Hashable, Codable, Sendable {
     /// Last few columns shown (`"treble:G4"`, `"treble:G4+B4"`), for the no-long-runs rule.
     public var recentColumns: [ItemID] = []
     public var lastScreenWasIntro = false
+    /// His last songs (song time), oldest first, so a new song is never one of them and
+    /// level 1 songs take turns between the clefs. Not mastery: songs never touch stats.
+    public var recentSongs: [PlayedSong] = []
     /// The engine's own dice for curriculum choices: which notes a lesson starts with
     /// and which come next. Seeded once per kid (the app seeds it at first launch),
     /// saved with everything else, so the same state always makes the same choice.
@@ -537,6 +540,7 @@ extension MasteryState {
         recentScreens = try c.value(.recentScreens, or: d.recentScreens)
         recentColumns = try c.value(.recentColumns, or: d.recentColumns)
         lastScreenWasIntro = try c.value(.lastScreenWasIntro, or: d.lastScreenWasIntro)
+        recentSongs = try c.value(.recentSongs, or: d.recentSongs)
         dice = try c.value(.dice, or: d.dice)
     }
 }

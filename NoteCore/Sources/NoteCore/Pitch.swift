@@ -72,13 +72,32 @@ public struct Pitch: Hashable, Comparable, Codable, Sendable, CustomStringConver
     public var octave: Int { midi / 12 - 1 }
 
     /// The letter for a white key, nil for a black key.
-    public var letter: Letter? { Letter.allCases.first { $0.semitone == pitchClass } }
+    public var letter: Letter? {
+        switch pitchClass {
+        case 0: .c
+        case 2: .d
+        case 4: .e
+        case 5: .f
+        case 7: .g
+        case 9: .a
+        case 11: .b
+        default: nil
+        }
+    }
 
     public var isWhiteKey: Bool { letter != nil }
 
     /// The white key at or just below this pitch (C# -> C). Black keys are spelled as sharps.
     public var naturalLetter: Letter {
-        letter ?? Letter.allCases.last { $0.semitone < pitchClass }!
+        switch pitchClass {
+        case 0, 1: .c
+        case 2, 3: .d
+        case 4: .e
+        case 5, 6: .f
+        case 7, 8: .g
+        case 9, 10: .a
+        default: .b
+        }
     }
 
     /// "C4", "F#3". Sharp spelling for black keys.
