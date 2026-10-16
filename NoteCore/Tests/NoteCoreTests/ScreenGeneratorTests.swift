@@ -47,16 +47,16 @@ import Testing
     }
 
     @Test func noScreenComesBackWhileItsRecent() {
-        var engine = stayIn("1.2")
+        var engine = stayIn("2.1")
         let ids = run(&engine, 300).map(\.item.id)
         for (i, id) in ids.enumerated() where i >= 1 {
-            // 5 notes a clef, 2-3 per screen: 25+ screens per clef, so the full window of 10
+            // 5 notes a clef, 3-4 per screen: 125+ screens per clef, so the full window of 10
             #expect(!ids[max(0, i - 10)..<i].contains(id), "screen \(i) \(id) came back too soon")
         }
     }
 
     @Test func aTinyPoolOnlyAvoidsTheLastScreen() {
-        // 1.1 at 1 note per screen with 3 notes per clef: only 3 screens per clef exist
+        // 1.1 at 2 notes a screen with G and A on each clef: only 4 screens per clef exist
         var engine = stayIn("1.1")
         let picks = run(&engine, 40)
         let ids = picks.prefix(8).map(\.item.id)
@@ -66,7 +66,7 @@ import Testing
     }
 
     @Test func contourMixesStepsSkipsAndRepeats() {
-        var engine = stayIn("1.4")
+        var engine = stayIn("3.1")
         var steps = 0, skips = 0, repeats = 0
         for pick in run(&engine, 300) {
             let keys = pick.item.notes.flatMap(\.keys)
@@ -95,44 +95,127 @@ import Testing
         #expect(bass >= 18, "bass is weaker: \(bass) of 30")
     }
 
-    @Test func introsAreOneNoteAndSpacedOut() {
-        var engine = MasteryEngine(state: MasteryState(seed: 11))
-        let picks = run(&engine, 14)
-        let intros = picks.compactMap(\.intro)
-        #expect(intros.count == 6, "3 per clef")
-        for pick in picks where pick.intro != nil {
-            #expect(pick.item.notes.count == 1)
-            #expect(pick.item.keys == [pick.intro!])
-        }
-        // the first two on each clef can come back to back. after that there's reading in between
-        var met: [Clef: Int] = [:]
-        for (a, b) in zip(picks, picks.dropFirst()) {
-            if let intro = a.intro { met[intro.clef, default: 0] += 1 }
-            if a.intro != nil, let next = b.intro {
-                #expect(met[next.clef, default: 0] < 2, "\(next) came right after another intro")
+    /// Level 1: G first, then a couple of screens of G alone, then A. Intros are one
+    /// note, in order, and spaced out on their clef.
+    @Test func levelOneIntroducesGThenA() {
+        for seed: UInt64 in 1...5 {
+            var engine = MasteryEngine(state: MasteryState(seed: seed))
+            var rng = SeededRandom(seed: seed)
+            var picks: [Pick] = []
+            for _ in 0..<12 {
+                let pick = engine.pickScreen(clef: .treble, using: &rng)
+                picks.append(pick)
+                engine.playPick(pick, time: 1.2)
+            }
+            let ids = picks.map { $0.intro.map { "intro \($0.pitch.name)" } ?? $0.item.notes.flatMap(\.keys).map(\.pitch.name).joined(separator: " ") }
+            #expect(ids[0] == "intro G4", "\(ids)")
+            #expect(ids[1] == "G4 G4" && ids[2] == "G4 G4", "one note is enough for 2-note screens: \(ids)")
+            #expect(ids[3] == "intro A4", "\(ids)")
+            #expect(picks[4...].allSatisfy { $0.intro == nil && $0.item.notes.count >= 2 })
+            for pick in picks where pick.intro != nil {
+                #expect(pick.item.notes.count == 1 && pick.item.keys == [pick.intro!])
             }
         }
     }
 
-    @Test func newestNotesGetAboutOneNoteInFour() {
-        var engine = stayIn("1.1")
-        // open the treble gate: the pair comes in
-        for key in engine.pool(.treble) { for _ in 0..<3 { engine.play(key, time: 1) } }
-        let pair = engine.newestBatch(.treble)
-        #expect(pair.count == 2)
-        for key in pair { engine.intro(key) }
-        var rng = SeededRandom(seed: 5)
-        var trebleScreens = 0, withNewest = 0
-        for _ in 0..<200 {
-            let pick = engine.pickScreen(using: &rng)
-            guard pick.item.clefs == [.treble] else { continue }
-            trebleScreens += 1
-            if pick.item.keys.contains(where: pair.contains) { withNewest += 1 }
+    /// Repeats are fine on a clef with one note (maxRepeats can't hold), and hold again
+    /// once there are two.
+    @Test func oneNoteOnAClefRepeatsTwoDont() {
+        var engine = MasteryEngine(state: MasteryState(seed: 1))
+        var rng = SeededRandom(seed: 1)
+        var columns: [ItemID] = []
+        for _ in 0..<30 {
+            let pick = engine.pickScreen(clef: .treble, using: &rng)
+            if engine.playable(.treble).count >= 2, pick.intro == nil {
+                columns += pick.item.notes.map(MasteryEngine.columnID)
+            }
+            engine.playPick(pick)
         }
-        let share = Double(withNewest) / Double(trebleScreens)
-        print("newest pair on \(withNewest) of \(trebleScreens) treble screens: \(share)")
-        // 1 note a screen: the pair gets about 1 screen in 4 between them
-        #expect(share > 0.15 && share < 0.35, "\(share)")
+        #expect(columns.count > 40)
+        #expect(maxRun(columns) <= 2, "\(columns)")
+    }
+
+    /// After an intro on a clef, `introSpacing` screens on that clef before its next one.
+    @Test func introsAreSpacedOutOnTheirClef() {
+        var engine = MasteryEngine(state: MasteryState(seed: 3))
+        var rng = SeededRandom(seed: 3)
+        var sinceIntro: [Clef: Int] = [:]
+        var intros = 0
+        for _ in 0..<20 {
+            let pick = engine.pickScreen(using: &rng)
+            let clef = pick.item.clefs[0]
+            if pick.intro != nil {
+                intros += 1
+                if let gap = sinceIntro[clef] { #expect(gap >= 2, "\(pick.intro!) after \(gap) screens") }
+                sinceIntro[clef] = 0
+            } else if let gap = sinceIntro[clef] {
+                sinceIntro[clef] = gap + 1
+            }
+            engine.playPick(pick)
+        }
+        #expect(intros == 4, "G and A on each clef")
+    }
+
+    @Test func newestNotesGetAboutOneNoteInFour() {
+        // 3.1: one of E5 / F#5 / G5 joins treble G position
+        var engine = stayIn("3.1")
+        let newest = engine.newestBatch(.treble)
+        #expect(newest.count == 1)
+        var rng = SeededRandom(seed: 5)
+        var notes = 0, newestNotes = 0
+        for _ in 0..<300 {
+            let keys = engine.pickScreen(clef: .treble, using: &rng).item.notes.flatMap(\.keys)
+            notes += keys.count
+            newestNotes += keys.filter(newest.contains).count
+        }
+        let share = Double(newestNotes) / Double(notes)
+        print("newest note: \(newestNotes) of \(notes) treble notes: \(share)")
+        #expect(share > 0.18 && share < 0.32, "\(share)")
+    }
+
+    /// Level 1 drills its new note harder: about 1 in 3 of the notes on its clef.
+    @Test func aDrillLessonsNewNoteGetsAboutOneInThree() {
+        for (id, new) in [("1.2", key("treble:B4")), ("1.4", key("treble:D5"))] {
+            var engine = stayIn(id)
+            #expect(engine.newestBatch(.treble) == [new])
+            var rng = SeededRandom(seed: 5)
+            var notes = 0, newestNotes = 0
+            for _ in 0..<300 {
+                let keys = engine.pickScreen(clef: .treble, using: &rng).item.notes.flatMap(\.keys)
+                notes += keys.count
+                newestNotes += keys.filter { $0 == new }.count
+            }
+            let share = Double(newestNotes) / Double(notes)
+            print("\(id): \(new) is \(newestNotes) of \(notes) treble notes: \(share)")
+            #expect(share > 0.26 && share < 0.4, "\(id): \(share)")
+        }
+    }
+
+    /// Level 1 reads steps and repeats, a third the only skip (a piano teacher's review).
+    @Test func levelOneMovesByStepsRepeatsAndThirds() {
+        for id in ["1.1", "1.2", "1.3", "1.4"] {
+            var engine = stayIn(id)
+            var moves: [Int: Int] = [:]
+            for pick in run(&engine, 300) {
+                let keys = pick.item.notes.flatMap(\.keys)
+                for (a, b) in zip(keys, keys.dropFirst()) {
+                    moves[abs(a.pitch.diatonicIndex - b.pitch.diatonicIndex), default: 0] += 1
+                }
+            }
+            let total = moves.values.reduce(0, +)
+            print("\(id) moves (letters: count): \(moves.sorted { $0.key < $1.key })")
+            #expect(moves.keys.allSatisfy { $0 <= 2 }, "\(id): nothing wider than a third: \(moves)")
+            let stepsAndRepeats = Double((moves[0] ?? 0) + (moves[1] ?? 0)) / Double(total)
+            #expect(stepsAndRepeats > 0.7, "\(id): mostly steps and repeats: \(moves)")
+            if id != "1.1" { #expect((moves[2] ?? 0) > 0, "\(id): a third now and then: \(moves)") }
+        }
+        // level 2 is unchanged: skips lessons still skip a fourth or a fifth
+        var skips = stayIn("2.3")
+        let wide = run(&skips, 200).contains { pick in
+            let keys = pick.item.notes.flatMap(\.keys)
+            return zip(keys, keys.dropFirst()).contains { abs($0.pitch.diatonicIndex - $1.pitch.diatonicIndex) > 2 }
+        }
+        #expect(wide)
     }
 
     @Test func stretchOnlyWhenHesDoingWell() {

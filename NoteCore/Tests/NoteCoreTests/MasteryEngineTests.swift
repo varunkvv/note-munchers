@@ -38,31 +38,33 @@ import Testing
         }
     }
 
-    @Test func freshEngineStartsLessonOneWithThreeNotesPerClef() {
-        let engine = MasteryEngine()
-        #expect(engine.lesson.id == "1.1")
-        for clef in Clef.allCases {
-            let pool = engine.pool(clef)
-            #expect(pool.count == 3, "\(clef)")
-            #expect(pool.contains(where: \.isOnLine) && pool.contains(where: { !$0.isOnLine }), "\(clef) has a line and a space")
-            #expect(engine.newestBatch(clef) == pool, "the start set counts as the newest batch")
-            #expect(pool.allSatisfy(engine.needsIntro), "every start note waits for its intro")
+    /// Round 3: 4 notes to start, G and A on each clef, every kid the same.
+    @Test func freshEngineStartsWithGAndAOnEachClef() {
+        for seed: UInt64 in 1...10 {
+            let engine = MasteryEngine(state: MasteryState(seed: seed))
+            #expect(engine.lesson.id == "1.1")
+            #expect(engine.pool(.treble) == [key("treble:G4"), key("treble:A4")])
+            #expect(engine.pool(.bass) == [key("bass:G2"), key("bass:A2")])
+            for clef in Clef.allCases {
+                #expect(engine.newestBatch(clef) == engine.pool(clef), "the start set counts as the newest batch")
+                #expect(engine.pool(clef).allSatisfy(engine.needsIntro), "every start note waits for its intro")
+            }
+            #expect(engine.screenSize == 2)
         }
-        #expect(engine.screenSize == 1)
     }
 
+    /// Outside level 1 a lesson's start notes are a random draw per kid (level 3 here).
     @Test func startSetIsPickedAtRandomPerKid() {
-        var sets = Set<[NoteKey]>()
+        var picks = Set<[NoteKey]>()
         for seed in 1...30 {
-            let engine = MasteryEngine(state: MasteryState(seed: UInt64(seed)))
-            let treble = engine.pool(.treble)
-            #expect(treble.contains(where: \.isOnLine) && treble.contains(where: { !$0.isOnLine }), "seed \(seed)")
-            sets.insert(treble)
-            // same seed, same choice
-            #expect(MasteryEngine(state: MasteryState(seed: UInt64(seed))).pool(.treble) == treble)
+            var engine = MasteryEngine(state: MasteryState(seed: UInt64(seed)))
+            engine.moveToLesson("3.1")
+            picks.insert(engine.pendingIntros)
+            var again = MasteryEngine(state: MasteryState(seed: UInt64(seed)))
+            again.moveToLesson("3.1")
+            #expect(again.pendingIntros == engine.pendingIntros, "same seed, same choice")
         }
-        #expect(sets.count >= 5, "start sets vary between kids: \(sets.count)")
-        #expect(!sets.contains([key("treble:G4"), key("treble:B4"), key("treble:D5")]), "never all lines")
+        #expect(picks.count >= 2, "start notes vary between kids: \(picks)")
     }
 
     @Test func initIsIdempotent() {
@@ -111,7 +113,8 @@ import Testing
     }
 
     @Test func gateIsPerClefAndUnlocksAPair() {
-        var engine = engine(in: "1.1")
+        var engine = MasteryEngine(curriculum: gateCurriculum(), state: MasteryState(seed: 7))
+        engine.introduceAll()
         let treble = engine.pool(.treble)
         let bass = engine.pool(.bass)
         makeSolid(&engine, Array(treble.dropLast()))
@@ -128,7 +131,8 @@ import Testing
     }
 
     @Test func gateWaitsForEveryNoteOnTheClefAtBoxThree() {
-        var engine = engine(in: "1.1")
+        var engine = MasteryEngine(curriculum: gateCurriculum(), state: MasteryState(seed: 7))
+        engine.introduceAll()
         let start = engine.pool(.treble)
         makeSolid(&engine, start)
         let pair = engine.newestBatch(.treble)
@@ -196,7 +200,8 @@ import Testing
         }
         #expect(entered == "1.2")
         #expect(engine.state.completedLessons == ["1.1"])
-        #expect(engine.pool.count == 10)
+        #expect(engine.pool.count == 6, "G, A and B on each clef")
+        #expect(engine.pendingIntros == [key("treble:B4"), key("bass:B2")])
         #expect(engine.screenSize >= 2, "1.2 starts at 2 per screen")
         #expect(engine.status(ofLesson: "1.1") == .completed)
         #expect(engine.status(ofLesson: "1.2") == .current)
@@ -204,23 +209,43 @@ import Testing
     }
 
     @Test func lessonNeedsEnoughScreensEvenWhenHeKnowsEverything() {
-        var engine = engine(in: "1.2")
+        var engine = engine(in: "2.1")
         let t = engine.pool(.treble), b = engine.pool(.bass)
         // every note twice (box 3), right and quick, over exactly 10 screens
         let screens = [[t[0], t[1]], [t[2], t[3]], [t[4], t[0]], [t[1], t[2]], [t[3], t[4]],
                        [b[0], b[1]], [b[2], b[3]], [b[4], b[0]], [b[1], b[2]], [b[3], b[4]]]
         for (i, screen) in screens.enumerated() {
             engine.play(screen, time: 1)
-            #expect(engine.lesson.id == (i < 9 ? "1.2" : "1.3"), "after screen \(i + 1)")
+            #expect(engine.lesson.id == (i < 9 ? "2.1" : "2.2"), "after screen \(i + 1)")
         }
+    }
+
+    /// Level 1 drills: a new note needs 10 plays in its lesson, however fast he is (the
+    /// fast track can't end the lesson early).
+    @Test func aDrillLessonWaitsForTenPlaysOfEachNewNote() {
+        var engine = engine(in: "1.2")
+        let known = [key("treble:G4"), key("treble:A4"), key("bass:G2"), key("bass:A2")]
+        let new = [key("treble:B4"), key("bass:B2")]
+        var screens = 0
+        // B a little at a time: box 3 and the fast track come long before 10 plays
+        while engine.lesson.id == "1.2", screens < 100 {
+            screens += 1
+            for k in known { engine.play([k, k], time: 1) }
+            for k in new { engine.play([k], time: 1) }
+            if engine.lesson.id == "1.2" {
+                #expect(new.contains { engine.lessonPlays($0) < 10 }, "still in 1.2 with every B played 10 times")
+            }
+        }
+        #expect(engine.lesson.id == "1.3")
+        #expect(screens == 10, "B played once a round: 10 rounds")
     }
 
     @Test func parentJumpsAndMovingBack() {
         var engine = MasteryEngine()
         engine.moveToLesson("1.3")
         #expect(engine.lesson.id == "1.3")
-        #expect(engine.pool.count == 10, "known notes unlock on entry")
-        #expect(engine.pendingIntros.isEmpty, "known notes don't get intros")
+        #expect(engine.pool.count == 8, "known notes and C unlock on entry")
+        #expect(engine.pendingIntros == [key("treble:C5"), key("bass:C3")], "known notes don't get intros, only the new C")
         #expect(engine.status(ofLesson: "1.1") == .skipped)
         #expect(engine.status(ofLevel: 1) == .current)
         engine.moveToLevel(1)
@@ -261,7 +286,7 @@ import Testing
     @Test func missingKeysFallBackToDefaults() throws {
         let state = try JSONDecoder().decode(MasteryState.self, from: Data("{}".utf8))
         #expect(state.lesson == "1.1")
-        #expect(MasteryEngine(state: state).pool.count == 6)
+        #expect(MasteryEngine(state: state).pool.count == 4)
         let config = try JSONDecoder().decode(NoteCoreConfig.self, from: Data(#"{"sessionMaxItems": 30}"#.utf8))
         #expect(config.sessionMaxItems == 30)
         #expect(config.fastTrackCount == NoteCoreConfig.default.fastTrackCount)
@@ -273,6 +298,10 @@ import Testing
         config.sizeWindow = 6
         config.lessonMinScreens = 12
         config.keptTryingChance = 0.7
+        config.lessonMinNewPlays = 12
+        config.drillNewestShare = 0.4
+        config.introSpacing = 3
+        config.praiseStreak = 5
         let decoded = try JSONDecoder().decode(NoteCoreConfig.self, from: JSONEncoder().encode(config))
         #expect(decoded == config)
     }
@@ -305,9 +334,92 @@ import Testing
         #expect(state.introduced == ["treble:C4", "treble:G4", "treble:E4", "treble:D4"])
         let engine = MasteryEngine(state: state)
         #expect(engine.lesson.id == "1.1")
-        #expect(engine.pool(.treble).count == 3)
+        #expect(engine.pool(.treble).count == 2)
         #expect(!engine.needsIntro(key("treble:G4")), "he met G4 in round 1")
         #expect(engine.allProgress.map(\.id) == ["treble:C4", "treble:E4", "treble:G4"])
+    }
+
+    /// A round 2 save in the old 1.1, like his iPad's: 3 notes a clef drawn at random
+    /// (treble B4 C5 D5, bass A2 C3 D3), met and played, mid-lesson.
+    static let oldOnePointOne = #"""
+    {"lesson":"1.1","completedLessons":[],
+     "unlocked":["treble:B4","treble:C5","treble:D5","bass:A2","bass:C3","bass:D3"],
+     "introduced":["treble:B4","treble:C5","treble:D5","bass:A2","bass:C3","bass:D3"],
+     "stats":{
+       "treble:B4":{"box":4,"recent":[{"firstTry":true,"responseTime":2.1},{"firstTry":true,"responseTime":1.8}],"attempts":11,"firstTryCount":9,"peakFluency":0.5},
+       "treble:C5":{"box":2,"recent":[{"firstTry":false,"responseTime":5.2}],"attempts":8,"firstTryCount":5,"peakFluency":0.3},
+       "treble:D5":{"box":3,"recent":[{"firstTry":true,"responseTime":2.9}],"attempts":9,"firstTryCount":7,"peakFluency":0.4},
+       "bass:A2":{"box":3,"recent":[{"firstTry":true,"responseTime":3.3}],"attempts":10,"firstTryCount":7,"peakFluency":0.35},
+       "bass:C3":{"box":2,"recent":[{"firstTry":false,"responseTime":6.0}],"attempts":7,"firstTryCount":4,"peakFluency":0.25},
+       "bass:D3":{"box":2,"recent":[{"firstTry":true,"responseTime":4.1}],"attempts":6,"firstTryCount":4,"peakFluency":0.2}
+     },
+     "newest":{"treble":["treble:B4","treble:C5","treble:D5"],"bass":["bass:A2","bass:C3","bass:D3"]},
+     "lessonScreens":14,"lessonRecent":[{"firstTry":true,"responseTime":2.0},{"firstTry":false,"responseTime":4.0}],
+     "rhythmRecent":[],"rhythmDemos":{},"screenSize":2,"sizeRecent":[{"notes":2,"firstTry":2}],
+     "recentScreens":["treble:B4-C5","bass:A2-D3"],"recentColumns":["bass:A2","bass:D3"],"lastScreenWasIntro":false,
+     "recentSongs":[],"lessonPeak":0.4,"dice":{"state":12345}}
+    """#
+
+    /// The first screens of a session from `state`, as note ids (intros marked).
+    static func firstScreens(_ state: MasteryState, count: Int = 24) -> [String] {
+        var bench = Bench(MasteryEngine(state: state), seed: 4)
+        _ = bench.start()
+        var screens: [String] = []
+        while bench.session.phase != .done, screens.count < count {
+            let keys = bench.session.item!.notes.flatMap(\.keys).map(\.id)
+            screens.append(bench.session.isIntro ? "intro " + keys[0] : keys.joined(separator: " "))
+            _ = bench.playScreen()
+            _ = bench.next()
+        }
+        return screens
+    }
+
+    /// His iPad after round 3: the new 1.1 shows only G and A, with intros for the ones
+    /// he never met. Nothing is reset: his old notes keep their stats and stay unlocked.
+    @Test func hisOldOnePointOneBecomesGAndA() throws {
+        let state = try JSONDecoder().decode(MasteryState.self, from: Data(Self.oldOnePointOne.utf8))
+        let engine = MasteryEngine(state: state)
+        #expect(engine.lesson.id == "1.1")
+        #expect(engine.pool(.treble) == [key("treble:G4"), key("treble:A4")])
+        #expect(engine.pool(.bass) == [key("bass:G2"), key("bass:A2")])
+        #expect(engine.pendingIntros == [key("treble:G4"), key("treble:A4"), key("bass:G2")], "he met A2 already")
+        #expect(engine.newestBatch(.treble) == [key("treble:G4"), key("treble:A4")], "the old B C D don't leak in")
+        #expect(engine.newestBatch(.bass) == [key("bass:G2")])
+        #expect(engine.stats(for: key("treble:B4")).box == 4 && engine.isUnlocked(key("treble:B4")))
+        #expect(!engine.canPlaySongs)
+        let screens = Self.firstScreens(state)
+        let allowed: Set<String> = ["treble:G4", "treble:A4", "bass:G2", "bass:A2"]
+        for screen in screens {
+            #expect(screen.replacingOccurrences(of: "intro ", with: "").split(separator: " ").allSatisfy { allowed.contains(String($0)) }, "\(screen)")
+        }
+        #expect(screens.filter { $0.hasPrefix("intro") } == ["intro treble:G4", "intro treble:A4", "intro bass:G2"], "\(screens)")
+    }
+
+    /// A save in the old 1.2 (all of G position met): the new 1.2 is G, A and B, no
+    /// intros, B drilled before it moves on.
+    @Test func hisOldOnePointTwoIsAddB() throws {
+        var json = try JSONSerialization.jsonObject(with: Data(Self.oldOnePointOne.utf8)) as! [String: Any]
+        let all = Curriculum.trebleG.map { "treble:\($0.name)" } + Curriculum.bassG.map { "bass:\($0.name)" }
+        json["lesson"] = "1.2"
+        json["completedLessons"] = ["1.1"]
+        json["unlocked"] = all
+        json["introduced"] = all
+        json["newest"] = [String: Any]()
+        var stats = json["stats"] as! [String: Any]
+        for id in all where stats[id] == nil {
+            stats[id] = ["box": 4, "recent": [["firstTry": true, "responseTime": 2.0]], "attempts": 12, "firstTryCount": 10, "peakFluency": 0.5]
+        }
+        json["stats"] = stats
+        let state = try JSONDecoder().decode(MasteryState.self, from: JSONSerialization.data(withJSONObject: json))
+        let engine = MasteryEngine(state: state)
+        #expect(engine.lesson.id == "1.2")
+        #expect(engine.pool.map(\.id) == ["treble:G4", "treble:A4", "treble:B4", "bass:G2", "bass:A2", "bass:B2"])
+        #expect(engine.pendingIntros.isEmpty)
+        #expect(engine.newestBatch(.treble) == [key("treble:B4")], "B still gets its share")
+        #expect(!engine.isDrilled(key("treble:B4")))
+        for screen in Self.firstScreens(state) {
+            #expect(!screen.contains("C5") && !screen.contains("D5") && !screen.contains("C3") && !screen.contains("D3"), "\(screen)")
+        }
     }
 
     @Test func garbageNeverCrashes() {

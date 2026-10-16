@@ -1,10 +1,9 @@
 import Testing
 @testable import NoteCore
 
-/// Simulated kids through real sessions with the default config, to check pacing
-/// against plans/2026-10-15-round-2-feedback.md: "a quick kid should be at 2 notes per
-/// screen with 4-6 notes per clef within the first session or two". The numbers are
-/// written to context/notecore-design.md.
+/// Simulated kids through real sessions with the default config, to check pacing.
+/// Round 2's "4-6 notes per clef within the first session or two" was replaced in round
+/// 3 by a slower, drilled level 1. The numbers are written to context/notecore-design.md.
 @Suite struct PacingTests {
     struct Kid {
         var name: String
@@ -74,13 +73,20 @@ import Testing
     static let quick = Kid(name: "quick, always right, 1.2s a note", time: 1.2, rightRate: 1)
     static let steady = Kid(name: "3s a note, 90% right first try", time: 3, rightRate: 0.9)
 
-    @Test func quickKidIsAtTwoPerScreenWithFourToSixNotesPerClefWithinTwoSessions() {
+    /// Round 3 (plans/2026-10-16-round-3-feedback.md): level 1 starts with G and A on
+    /// each clef and adds one letter a lesson, each drilled. A quick kid doesn't race
+    /// through it: G and A for the first session, never more than one new letter a clef
+    /// in a session after that, level 1 done in about 6-8 sessions.
+    @Test func quickKidIsDrilledThroughLevelOne() {
         for seed: UInt64 in 1...5 {
-            let logs = Self.simulate(Self.quick, sessions: 2, seed: seed)
-            let second = logs[1]
-            #expect(second.size >= 2, "seed \(seed): size \(second.size)")
-            #expect((4...6).contains(second.treble) && (4...6).contains(second.bass), "seed \(seed): \(second.treble) / \(second.bass)")
-            if seed == 1 { print(Self.report(Self.quick, Self.simulate(Self.quick, sessions: 6, seed: seed))) }
+            let logs = Self.simulate(Self.quick, sessions: 8, seed: seed)
+            #expect(logs[0].treble == 2 && logs[0].bass == 2, "seed \(seed): session 1 is G and A")
+            for (a, b) in zip(logs, logs.dropFirst()) where b.lesson.hasPrefix("1.") {
+                #expect(b.treble - a.treble <= 1 && b.bass - a.bass <= 1, "seed \(seed): one new letter a session at most")
+            }
+            let levelOne = logs.filter { $0.lesson.hasPrefix("1.") }.count
+            #expect((5...8).contains(levelOne), "seed \(seed): \(levelOne) sessions in level 1")
+            if seed == 1 { print(Self.report(Self.quick, logs)) }
         }
     }
 

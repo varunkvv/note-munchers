@@ -42,7 +42,7 @@ import Testing
     @Test func practiceLessonFillsWithScreensAndRightNotes() {
         var config = NoteCoreConfig()
         config.lessonMinScreens = 10_000
-        var engine = engine("1.2", config: config)
+        var engine = engine("2.1", config: config)
         #expect(engine.lessonProgress == 0)
         var last = 0.0
         for i in 0..<12 {
@@ -58,7 +58,7 @@ import Testing
     @Test func neverGoesBackwards() {
         var config = NoteCoreConfig()
         config.lessonMinScreens = 10_000
-        var engine = engine("1.2", config: config)
+        var engine = engine("2.1", config: config)
         for _ in 0..<5 { engine.play(engine.pool.prefix(3).map { $0 }, reason: .normal) }
         let peak = engine.lessonProgress
         for _ in 0..<5 { engine.play(engine.pool.prefix(3).map { $0 }, right: false, reason: .normal) }
@@ -70,9 +70,9 @@ import Testing
     /// Right first try but slow (a median over 4s): every part is full, the lesson isn't
     /// done, the stone stops short of full.
     @Test func staysUnderFullUntilTheLessonIsDone() {
-        var engine = engine("1.2")
+        var engine = engine("2.1")
         for _ in 0..<40 { engine.play(engine.pool.prefix(3).map { $0 }, time: 5, reason: .normal) }
-        #expect(engine.lesson.id == "1.2")
+        #expect(engine.lesson.id == "2.1")
         #expect(engine.lessonProgress == MasteryEngine.lessonFractionCap)
     }
 
@@ -80,21 +80,21 @@ import Testing
     @Test func finishingALessonMovesHimOn() {
         var config = NoteCoreConfig()
         config.lessonMinScreens = 10_000
-        var engine = engine("1.2", config: config)
+        var engine = engine("2.2", config: config)
         solid(&engine)
         engine.config.lessonMinScreens = NoteCoreConfig().lessonMinScreens
         var moved = false
         for _ in 0..<40 where !moved {
             let update = engine.play(engine.pool.prefix(3).map { $0 }, reason: .normal)
-            moved = update.completedLesson == "1.2"
+            moved = update.completedLesson == "2.2"
         }
         #expect(moved)
         let path = engine.levelProgress
-        #expect(engine.lesson.id == "1.3")
+        #expect(engine.lesson.id == "2.3")
         #expect(path.current == 2)
         #expect(path.stones[1] == 1)
         #expect(path.stones[2] < 0.2, "a new lesson starts nearly empty: \(path.stones[2])")
-        #expect(path.stones[0] == 0, "1.1 was skipped over (the test moved him), so it's empty")
+        #expect(path.stones[0] == 0, "2.1 was skipped over (the test moved him), so it's empty")
     }
 
     /// Finishing the last lesson of a level: the new level's path, empty.
@@ -102,7 +102,7 @@ import Testing
         var engine = engine("1.4")
         solid(&engine)
         for _ in 0..<40 where engine.lesson.level == 1 {
-            engine.play(engine.pool.prefix(3).map { $0 }, reason: .normal)
+            engine.play(engine.pool, reason: .normal)
         }
         #expect(engine.lesson.id == "2.1")
         let path = engine.levelProgress
@@ -115,10 +115,10 @@ import Testing
     @Test func aParentMoveStartsTheLessonFresh() {
         var config = NoteCoreConfig()
         config.lessonMinScreens = 10_000
-        var engine = engine("1.2", config: config)
+        var engine = engine("2.1", config: config)
         for _ in 0..<6 { engine.play(engine.pool.prefix(3).map { $0 }, reason: .normal) }
         #expect(engine.lessonProgress > 0.3)
-        engine.moveToLesson("1.3")
+        engine.moveToLesson("2.3")
         #expect(engine.state.lessonPeak == 0)
         #expect(engine.lessonProgress == 0)
         #expect(engine.levelProgress.current == 2)
@@ -134,6 +134,18 @@ import Testing
             off.play([off.pool[0]], rhythmOK: false, size: 1)
         }
         #expect(good.lessonProgress > off.lessonProgress)
+    }
+
+    /// A drill lesson's stone keeps filling while its new notes get their 10 plays, so it
+    /// doesn't sit at the cap for half the lesson once they reach box 3.
+    @Test func aDrillLessonsStoneFillsWithPlays() {
+        var engine = engine("1.2")
+        let b = [key("treble:B4"), key("bass:B2")]
+        for k in b { for _ in 0..<3 { engine.play(k) } } // box 4, 3 plays
+        let atBoxThree = engine.lessonProgress
+        for k in b { for _ in 0..<5 { engine.play(k) } } // 8 plays
+        #expect(engine.lessonProgress > atBoxThree, "\(atBoxThree) -> \(engine.lessonProgress)")
+        #expect(engine.lesson.id == "1.2")
     }
 
     @Test func savedStateWithoutAPeakStillDecodes() throws {

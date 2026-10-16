@@ -27,9 +27,15 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// screen, 1 screen in 4). The rest are weighted toward low boxes. Small steps,
     /// aiming for ~80% first-try success (rosenshine).
     public var newestShare = 0.25
+    /// Drill lessons (level 1): the newest notes get this share of the notes on their
+    /// clef instead (round 3: "more repetition so that a note is really drilled in").
+    public var drillNewestShare = 1.0 / 3
     /// The same key never comes up more than this many times in a row (inside a screen
-    /// and across screens).
+    /// and across screens). A clef with one note (G on its own) can't hold to it.
     public var maxRepeats = 2
+    /// After a new note's intro, at least this many screens on that clef before the
+    /// next intro on it (unless there's nothing else to show).
+    public var introSpacing = 2
     /// Screens remembered so the same screen doesn't come back too soon. Fewer when the
     /// pool can't make that many different screens.
     public var recentScreens = 10
@@ -56,6 +62,9 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// try, with a median under `solidMedianResponse`.
     public var lessonWindow = 10
     public var lessonRate = 0.8
+    /// Drill lessons (level 1): each of the lesson's new notes is played at least this
+    /// many times in it before it can finish, however fast he finds them.
+    public var lessonMinNewPlays = 10
 
     // MARK: session shape
 
@@ -144,7 +153,9 @@ extension NoteCoreConfig {
         boxCount = try c.value(.boxCount, or: d.boxCount)
         gateMinBox = try c.value(.gateMinBox, or: d.gateMinBox)
         newestShare = try c.value(.newestShare, or: d.newestShare)
+        drillNewestShare = try c.value(.drillNewestShare, or: d.drillNewestShare)
         maxRepeats = try c.value(.maxRepeats, or: d.maxRepeats)
+        introSpacing = try c.value(.introSpacing, or: d.introSpacing)
         recentScreens = try c.value(.recentScreens, or: d.recentScreens)
         sizeWindow = try c.value(.sizeWindow, or: d.sizeWindow)
         sizeUpRate = try c.value(.sizeUpRate, or: d.sizeUpRate)
@@ -154,6 +165,7 @@ extension NoteCoreConfig {
         lessonMinScreens = try c.value(.lessonMinScreens, or: d.lessonMinScreens)
         lessonWindow = try c.value(.lessonWindow, or: d.lessonWindow)
         lessonRate = try c.value(.lessonRate, or: d.lessonRate)
+        lessonMinNewPlays = try c.value(.lessonMinNewPlays, or: d.lessonMinNewPlays)
         easingTrigger = try c.value(.easingTrigger, or: d.easingTrigger)
         easingWindow = try c.value(.easingWindow, or: d.easingWindow)
         easingItems = try c.value(.easingItems, or: d.easingItems)

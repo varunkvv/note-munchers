@@ -21,11 +21,13 @@ public struct Pick: Hashable, Sendable {
 ///   to show. Asked for nothing, weighted toward the weaker clef. Grand staff lessons:
 ///   which staff goes first, weighted toward the weaker clef, the focus clef counts
 ///   double, never 3 screens in a row starting on one clef
-/// - a new note's intro is one note on its own. Once a clef has 2 notes he has met,
-///   intros on it never come back to back, so there's reading in between
+/// - a new note's intro is one note on its own. After an intro on a clef, at least
+///   `introSpacing` screens on that clef before its next one (G, a couple of screens of
+///   G, then A), unless there's nothing else to show. Drill lessons in their order
 /// - a generated screen has `screenSize` notes, weighted toward low boxes, moving by
 ///   steps, skips and repeats in the lesson's mix. The newest notes get about 1 in 4
-///   of the notes on their clef. The same key never comes 3 times in a row
+///   of the notes on their clef (1 in 3 in drill lessons). The same key never comes 3
+///   times in a row (a clef with one note can't help it)
 /// - no screen identical to one of the recent ones (fewer when the pool is small)
 /// - doing well: now and then one note more (stretch)
 /// - every screen is whole bars of 3/4 or 4/4 (Bars.swift): the meter is rolled per
@@ -117,7 +119,10 @@ extension MasteryEngine {
     private func introDue(on clef: Clef, using rng: inout some RandomNumberGenerator) -> NoteKey? {
         let pending = pendingIntros(clef)
         guard !pending.isEmpty else { return nil }
-        if state.lastScreenWasIntro, playable(clef).count >= 2 { return nil }
+        if !playable(clef).isEmpty, let gap = state.introGap[clef.rawValue], gap < config.introSpacing { return nil }
+        if lesson.drill, let order = lesson.notes(clef)?.new {
+            return pending.min { (order.firstIndex(of: $0.pitch) ?? 0) < (order.firstIndex(of: $1.pitch) ?? 0) }
+        }
         return pending[min(pending.count - 1, Int(unitInterval(&rng) * Double(pending.count)))]
     }
 
@@ -300,34 +305,69 @@ extension MasteryEngine {
 
     /// `count` notes in a row. Each slot is one of `newest` with chance `newestShare`
     /// (25%: the newest notes get about 1 in 4 of the notes he reads on that clef, which
-    /// at one note a screen is 1 screen in 4), otherwise one of `pool`. Each move from the
-    /// last note is a repeat, a step or a skip (third to fifth), rolled from the lesson's
-    /// contour mix, then a note that fits is picked by weight (6 - box). When no note
-    /// fits, any note goes. `after` is what came just before (column ids), so a run of
+    /// at one note a screen is 1 screen in 4; 1 in 3 in drill lessons), otherwise one of
+    /// `pool`. Each move from the last note is a repeat, a step or a skip (third to
+    /// fifth, only a third in the gentle contour), rolled from the lesson's contour mix,
+    /// then a note that fits is picked by weight (6 - box). When no note fits, any note
+    /// goes, except past the contour's widest move: a newest note that far away moves the
+    /// line toward it and takes the next slot instead (a line that ends still owing it is
+    /// drawn again starting on the newest). `after` is what came just before (column ids), so a run of
     /// the same key can't carry over from the last screen. `fallback` is used when the
     /// run rule leaves nothing to pick.
     func line(_ count: Int, from pool: [NoteKey], newest: [NoteKey], fallback: [NoteKey], after: [ItemID], using rng: inout some RandomNumberGenerator) -> [NoteKey] {
+        let first = drawLine(count, from: pool, newest: newest, fallback: fallback, after: after, owing: false, using: &rng)
+        guard first.owed, count > 1 else { return first.keys }
+        return drawLine(count, from: pool, newest: newest, fallback: fallback, after: after, owing: true, using: &rng).keys
+    }
+
+    /// `line`, once. `owing`: the first note is one of the newest. Returns whether the
+    /// line ended still owing a newest note.
+    private func drawLine(_ count: Int, from pool: [NoteKey], newest: [NoteKey], fallback: [NoteKey], after: [ItemID], owing: Bool,
+                          using rng: inout some RandomNumberGenerator) -> (keys: [NoteKey], owed: Bool) {
         precondition(!pool.isEmpty)
         var out: [NoteKey] = []
+        let share = lesson.drill ? config.drillNewestShare : config.newestShare
+        let widest = lesson.contour.widest
+        // a newest slot that couldn't be reached within the widest move goes to the next note
+        var owed = owing
         for _ in 0..<count {
             let history = (after + out.map(\.id)).suffix(config.maxRepeats)
             let blocked = history.count == config.maxRepeats && Set(history).count == 1 ? history.last : nil
             var source = pool
-            if !newest.isEmpty, unitInterval(&rng) < config.newestShare {
+            if !newest.isEmpty, unitInterval(&rng) < share || owed {
                 source = newest
             }
+            owed = false
             var candidates = source.filter { $0.id != blocked }
             if candidates.isEmpty { candidates = fallback.filter { $0.id != blocked } }
             if candidates.isEmpty { candidates = fallback }
             if let previous = out.last {
+                if let widest {
+                    // never further than the contour allows: from these, else from the rest
+                    let near = { (keys: [NoteKey]) in
+                        keys.filter { abs($0.pitch.diatonicIndex - previous.pitch.diatonicIndex) <= widest }
+                    }
+                    if near(candidates).isEmpty, source == newest {
+                        // the newest is too far: a move toward it now, the newest next
+                        let toward = near(pool.filter { $0.id != blocked })
+                        let distance = { (k: NoteKey) in newest.map { abs($0.pitch.diatonicIndex - k.pitch.diatonicIndex) }.min() ?? 0 }
+                        if let best = toward.map(distance).min() {
+                            candidates = toward.filter { distance($0) == best }
+                            owed = true
+                        }
+                    }
+                    let close = [candidates, pool.filter { $0.id != blocked }, fallback.filter { $0.id != blocked }, fallback]
+                        .lazy.map(near).first { !$0.isEmpty }
+                    if let close { candidates = close }
+                }
                 let move = rollMove(using: &rng)
-                let fitting = candidates.filter { Self.fits(move, from: previous, to: $0) }
+                let fitting = candidates.filter { Self.fits(move, from: previous, to: $0, widest: widest) }
                 if !fitting.isEmpty { candidates = fitting }
             }
             let weights = candidates.map { Double(config.boxCount + 1 - stats(for: $0).box) }
             out.append(candidates[weightedIndex(weights, using: &rng)])
         }
-        return out
+        return (out, owed)
     }
 
     private func rollMove(using rng: inout some RandomNumberGenerator) -> Move {
@@ -335,17 +375,20 @@ extension MasteryEngine {
         case .mixed: (0.15, 0.45)
         case .steps: (0.15, 0.70)
         case .skips: (0.10, 0.20)
+        // the rest are thirds (more come from moving toward a newest note out of reach)
+        case .gentle: (0.25, 0.62)
         }
         let roll = unitInterval(&rng)
         return roll < same ? .same : roll < same + step ? .step : .skip
     }
 
-    static func fits(_ move: Move, from a: NoteKey, to b: NoteKey) -> Bool {
+    /// `widest`: the widest skip in letters (2 = a third), nil for up to a fifth.
+    static func fits(_ move: Move, from a: NoteKey, to b: NoteKey, widest: Int? = nil) -> Bool {
         let distance = abs(a.pitch.diatonicIndex - b.pitch.diatonicIndex)
         switch move {
         case .same: return a == b
         case .step: return distance == 1
-        case .skip: return (2...4).contains(distance)
+        case .skip: return (2...(widest ?? 4)).contains(distance)
         }
     }
 
@@ -353,7 +396,14 @@ extension MasteryEngine {
         state.recentScreens = Array((state.recentScreens + [pick.item.id]).suffix(max(2, config.recentScreens)))
         let columns = pick.item.notes.map(Self.columnID)
         state.recentColumns = Array((state.recentColumns + columns).suffix(max(1, config.maxRepeats)))
-        state.lastScreenWasIntro = pick.intro != nil || pick.isLessonIntro
+        // screens on each clef since its last intro
+        if let intro = pick.intro {
+            state.introGap[intro.clef.rawValue] = 0
+        } else {
+            for clef in pick.item.clefs {
+                if let gap = state.introGap[clef.rawValue] { state.introGap[clef.rawValue] = gap + 1 }
+            }
+        }
         return pick
     }
 

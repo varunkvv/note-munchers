@@ -16,7 +16,8 @@ public struct ClefNotes: Hashable, Sendable {
     public let known: [Pitch]
     /// Notes this lesson brings in. A set, not an order: `start` of them unlock when the
     /// lesson starts, picked at random with at least one line and one space in the
-    /// pool, the rest come one batch at a time through the gate, also at random.
+    /// pool, the rest come one batch at a time through the gate, also at random. In a
+    /// drill lesson (`Lesson.drill`, level 1) the listed order is the order.
     public let new: [Pitch]
     public let start: Int
 
@@ -55,6 +56,13 @@ public struct Lesson: Identifiable, Hashable, Sendable {
         case steps
         /// Mostly skips (line to line, space to space, or wider).
         case skips
+        /// Level 1 (a piano teacher's review): steps and repeats, with a third as the
+        /// only skip. Nothing on a line moves further than a third.
+        case gentle
+
+        /// The widest move from one note to the next on a line, in letters (2 = a third).
+        /// nil: no limit.
+        public var widest: Int? { self == .gentle ? 2 : nil }
     }
 
     public enum Texture: Hashable, Sendable {
@@ -92,12 +100,17 @@ public struct Lesson: Identifiable, Hashable, Sendable {
     /// How much of the rhythm is listened to: off in levels 1-2, "half longer than
     /// quarter" in level 3, everything (rests counted) from level 4.
     public let rhythmCheck: RhythmCheck
+    /// Level 1 (plans/2026-10-16-round-3-feedback.md): new notes come in the listed order
+    /// (G first), each one gets at least `lessonMinNewPlays` plays in the lesson before
+    /// it can finish, the newest notes are about 1 in 3 (`drillNewestShare`) of the
+    /// notes on their clef, and 2 notes on a clef already make 2-note screens.
+    public let drill: Bool
 
     public init(
         _ id: LessonID, level: Int, title: String, focus: Focus, layout: Layout = .alternating,
         treble: ClefNotes?, bass: ClefNotes?, sizes: ClosedRange<Int>, unlockBatch: Int = 1,
         octavePolicy: OctavePolicy, keySignature: KeySignature = .none, texture: Texture = .single,
-        contour: Contour = .mixed, rhythmCheck: RhythmCheck? = nil
+        contour: Contour = .mixed, rhythmCheck: RhythmCheck? = nil, drill: Bool = false
     ) {
         self.id = id
         self.level = level
@@ -113,6 +126,7 @@ public struct Lesson: Identifiable, Hashable, Sendable {
         self.texture = texture
         self.contour = contour
         self.rhythmCheck = rhythmCheck ?? (level <= 2 ? .off : level == 3 ? .halves : .all)
+        self.drill = drill
     }
 
     public func notes(_ clef: Clef) -> ClefNotes? { clef == .treble ? treble : bass }
@@ -180,28 +194,30 @@ public struct Curriculum: Sendable {
 
 extension Curriculum {
     /// Levels from plans/2026-10-15-round-2-feedback.md. G position = treble G4-D5,
-    /// bass G2-D3.
+    /// bass G2-D3. Level 1 from plans/2026-10-16-round-3-feedback.md: G and A on both
+    /// clefs, then one more letter a lesson, each one drilled, reading steps and repeats.
     public static let standard = Curriculum(levels: [
         Level(number: 1, title: "G position", lessons: [
+            // ids stay 1.1-1.4 (they're saved), the notes changed in round 3
             Lesson(
-                "1.1", level: 1, title: "First notes, both clefs", focus: .both,
-                treble: ClefNotes(new: trebleG, start: 3), bass: ClefNotes(new: bassG, start: 3),
-                sizes: 1...3, unlockBatch: 2, octavePolicy: .lenient
+                "1.1", level: 1, title: "G and A, both clefs", focus: .both,
+                treble: ClefNotes(new: [g4, a4], start: 2), bass: ClefNotes(new: [g2, a2], start: 2),
+                sizes: 2...3, octavePolicy: .lenient, contour: .gentle, drill: true
             ),
             Lesson(
-                "1.2", level: 1, title: "Treble G position", focus: .treble,
-                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
-                sizes: 2...3, octavePolicy: .lenient
+                "1.2", level: 1, title: "Add B", focus: .both,
+                treble: ClefNotes(known: [g4, a4], new: [b4], start: 1), bass: ClefNotes(known: [g2, a2], new: [b2], start: 1),
+                sizes: 2...3, octavePolicy: .lenient, contour: .gentle, drill: true
             ),
             Lesson(
-                "1.3", level: 1, title: "Bass G position", focus: .bass,
-                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
-                sizes: 2...3, octavePolicy: .lenient
+                "1.3", level: 1, title: "Add C", focus: .both,
+                treble: ClefNotes(known: [g4, a4, b4], new: [c5], start: 1), bass: ClefNotes(known: [g2, a2, b2], new: [c3], start: 1),
+                sizes: 2...3, octavePolicy: .lenient, contour: .gentle, drill: true
             ),
             Lesson(
-                "1.4", level: 1, title: "Both clefs", focus: .both,
-                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
-                sizes: 2...3, octavePolicy: .lenient
+                "1.4", level: 1, title: "Add D: the whole G position", focus: .both,
+                treble: ClefNotes(known: [g4, a4, b4, c5], new: [d5], start: 1), bass: ClefNotes(known: [g2, a2, b2, c3], new: [d3], start: 1),
+                sizes: 2...3, octavePolicy: .lenient, contour: .gentle, drill: true
             ),
         ]),
         Level(number: 2, title: "G position, steps and skips", lessons: [

@@ -101,8 +101,8 @@ import Testing
         engine.state.unlocked = engine.state.unlocked.filter { $0.hasPrefix("treble:") }
         engine.state.lastFirstClef = .treble // bass would go first
         let played = Self.play(engine, seed: 1)
-        #expect(played.clefs.allSatisfy { $0 == .treble })
-        #expect(played.runs.first == .bass, "the run was bass, it had nothing")
+        #expect(played.runs.first == .bass)
+        #expect(played.clefs.first == .treble, "the run was bass, it had nothing")
     }
 
     @Test func warmUpAndEasingStayInTheRun() {

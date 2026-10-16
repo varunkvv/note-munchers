@@ -21,13 +21,15 @@ extension MasteryEngine {
             : gPosition + [Curriculum.e3, Curriculum.fs3, Curriculum.g3]
     }
 
-    /// Notes he's solid on in `clef` for songs: met and played, box 3 or more, not in the
-    /// newest batch, inside the song range for his level. Low to high.
+    /// Notes he's solid on in `clef` for songs: in his lesson, met and played, box 3 or
+    /// more, not in the newest batch (unless a drill lesson has drilled it), inside the
+    /// song range for his level. Low to high. So level 1 songs open in 1.2, once B is drilled.
     public func solidNotes(_ clef: Clef) -> [NoteKey] {
-        let newest = Set(newestBatch(clef))
+        let newest = Set(newestBatch(clef).filter { !isDrilled($0) })
+        let lessonKeys = Set(lesson.keys)
         return Self.songRange(level: lesson.level, clef: clef).map { NoteKey(clef, $0) }.filter { key in
             let s = stats(for: key)
-            return isUnlocked(key) && s.attempts > 0 && s.box >= config.gateMinBox && !newest.contains(key)
+            return lessonKeys.contains(key) && isUnlocked(key) && s.attempts > 0 && s.box >= config.gateMinBox && !newest.contains(key)
         }
     }
 

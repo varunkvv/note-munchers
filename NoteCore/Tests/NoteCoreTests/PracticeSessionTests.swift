@@ -164,7 +164,7 @@ import Testing
         #expect(cues.isEmpty, "no words: the keyboard picture shows the right one")
         #expect(bench.session.keyboardHint == [expected])
         #expect(bench.session.phase == .prompt, "almost isn't a step up the ladder")
-        _ = bench.playCurrent()
+        _ = bench.playScreen()
         #expect(bench.session.summary.screens[0].notes[0].firstTry, "doesn't count against him")
     }
 

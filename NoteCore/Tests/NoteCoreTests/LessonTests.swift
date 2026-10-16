@@ -28,8 +28,9 @@ import Testing
         }
     }
 
+    /// Level 1 is G and A then one letter a lesson, both clefs every lesson (round 3).
     @Test func everyLevelHasTrebleBassAndMixedLessons() {
-        for level in curriculum.levels {
+        for level in curriculum.levels.dropFirst() {
             let focuses = Set(level.lessons.map(\.focus))
             #expect(focuses == [.treble, .bass, .both], "level \(level.number)")
         }
@@ -67,7 +68,7 @@ import Testing
         for lesson in curriculum.lessons {
             #expect(lesson.sizes.lowerBound >= 1 && lesson.sizes.upperBound <= 8, "\(lesson.id)")
         }
-        #expect(curriculum.lesson("1.1")!.sizes.lowerBound == 1, "1 note a screen for the first few screens")
+        #expect(curriculum.level(1)!.lessons.allSatisfy { $0.sizes == 2...3 }, "2 notes a screen, 3 when he's doing well")
         #expect(curriculum.level(2)!.lessons.filter { $0.layout == .alternating }.allSatisfy { $0.sizes == 3...4 })
     }
 

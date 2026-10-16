@@ -41,10 +41,37 @@ import Testing
     }
 
     @Test func noAMeansNoSongYet() {
-        var engine = engine("1.4")
+        var engine = engine("2.1")
         solid(&engine, ["treble:G4", "treble:B4", "treble:C5", "treble:D5"])
         #expect(engine.solidNotes(.treble).count == 4)
         #expect(engine.songClefs.isEmpty, "every level 1 song ends A to G")
+    }
+
+    /// Level 1 songs need G, A and one more: none in 1.1, and in 1.2 once B is drilled
+    /// (box 3 and its 10 plays). Notes from outside his lesson never count.
+    @Test func levelOneSongsOpenInOnePointTwo() {
+        var engine = MasteryEngine(config: stay, state: MasteryState(seed: 3))
+        engine.introduceAll()
+        solid(&engine, ["treble:G4", "treble:A4"])
+        #expect(!engine.canPlaySongs, "1.1 has only G and A")
+        // an old save with B solid doesn't open it in 1.1
+        var state = engine.state
+        for id in ["treble:B4", "treble:C5"] {
+            var s = ItemStats()
+            s.box = 4
+            s.attempts = 6
+            state.stats[id] = s
+            state.unlocked.insert(id)
+            state.introduced.insert(id)
+        }
+        engine.state = state
+        #expect(!engine.canPlaySongs, "B and C aren't in 1.1")
+        engine.moveToLesson("1.2")
+        #expect(!engine.canPlaySongs, "B is the newest note until it's drilled")
+        for _ in 0..<10 { engine.play(key("treble:B4")) }
+        #expect(engine.isDrilled(key("treble:B4")))
+        #expect(engine.solidNotes(.treble).map(\.id) == ["treble:G4", "treble:A4", "treble:B4"])
+        #expect(engine.songClefs == [.treble])
     }
 
     @Test func boxTwoIsntSolidYet() {

@@ -62,6 +62,9 @@ public struct MasteryState: Hashable, Codable, Sendable {
     public var lessonScreens = 0
     /// His last notes in this lesson. Reset when the lesson changes.
     public var lessonRecent: [AttemptSample] = []
+    /// Plays of each note in this lesson (not intros), by note id. Reset when the lesson
+    /// changes. Drill lessons wait for their new notes to have `lessonMinNewPlays`.
+    public var lessonPlays: [ItemID: Int] = [:]
     /// Whether each recent rhythm-judged screen in this lesson had no wrong value (the
     /// first go). Only rhythm lessons wait for it.
     public var rhythmRecent: [Bool] = []
@@ -76,7 +79,9 @@ public struct MasteryState: Hashable, Codable, Sendable {
     public var recentScreens: [ItemID] = []
     /// Last few columns shown (`"treble:G4"`, `"treble:G4+B4"`), for the no-long-runs rule.
     public var recentColumns: [ItemID] = []
-    public var lastScreenWasIntro = false
+    /// Per clef (`Clef.rawValue`): screens on it since its last new-note intro. Missing
+    /// means no intro lately. Intros on a clef wait for `introSpacing` screens.
+    public var introGap: [String: Int] = [:]
     /// His last songs (song time), oldest first, so a new song is never one of them and
     /// level 1 songs take turns between the clefs. Not mastery: songs never touch stats.
     public var recentSongs: [PlayedSong] = []
@@ -191,10 +196,21 @@ public struct MasteryEngine: Sendable {
         return notes.new.map { NoteKey(clef, $0) }.filter { !isUnlocked($0) }
     }
 
-    /// The most recent batch to unlock on this clef in this lesson (or the start set).
-    /// Empty when the lesson started with everything already unlocked.
+    /// The most recent batch to unlock on this clef in this lesson (or the start set; in
+    /// a drill lesson its new notes). Empty when the lesson started with everything
+    /// already unlocked. Only notes in this lesson's pool: an old save can hold notes the
+    /// lesson doesn't use (round 3 shrank level 1).
     public func newestBatch(_ clef: Clef) -> [NoteKey] {
-        (state.newest[clef.rawValue] ?? []).compactMap { NoteKey(id: $0) }.filter(isUnlocked)
+        let pool = pool(clef)
+        return (state.newest[clef.rawValue] ?? []).compactMap { NoteKey(id: $0) }.filter(pool.contains)
+    }
+
+    /// Plays of this note in the current lesson (not intros).
+    public func lessonPlays(_ key: NoteKey) -> Int { state.lessonPlays[key.id] ?? 0 }
+
+    /// A drill lesson's new note that has had its `lessonMinNewPlays`.
+    public func isDrilled(_ key: NoteKey) -> Bool {
+        lesson.drill && lessonPlays(key) >= config.lessonMinNewPlays
     }
 
     /// Does this note get its intro (keyboard picture up front, "this is D") next time?
@@ -341,6 +357,7 @@ public struct MasteryEngine: Sendable {
             s.firstTryCount += attempt.firstTry ? 1 : 0
             s.peakFluency = max(s.peakFluency, fluency(s))
             state.stats[key.id] = s
+            state.lessonPlays[key.id, default: 0] += 1
             state.lessonRecent = Array((state.lessonRecent + [sample]).suffix(max(config.lessonWindow, config.solidWindow)))
         }
         if !screen.wasIntro, !screen.wasLessonIntro {
@@ -391,8 +408,10 @@ public struct MasteryEngine: Sendable {
         let rate = Double(state.sizeRecent.reduce(0) { $0 + $1.firstTry }) / Double(notes)
         let sizes = lesson.sizes
         // a screen never needs every note he has on a clef, or it's only a reshuffle:
-        // 3 notes on a clef allow 2 a screen, 5 allow 4. grand staff screens put half on each
-        let perClef = lesson.clefs.map { playable($0).count - 1 }.min() ?? 1
+        // 3 notes on a clef allow 2 a screen, 5 allow 4. grand staff screens put half on
+        // each. drill lessons (level 1) repeat on purpose: 2 notes make 2-note screens,
+        // 3 notes allow 3
+        let perClef = lesson.clefs.map { playable($0).count - (lesson.drill ? 0 : 1) }.min() ?? 1
         let room = lesson.texture.isRhythm ? Int.max : lesson.layout == .grand ? perClef * 2 : perClef
         if state.sizeRecent.count >= config.sizeWindow, rate >= config.sizeUpRate, state.screenSize < sizes.upperBound,
            state.screenSize < room {
@@ -429,13 +448,16 @@ public struct MasteryEngine: Sendable {
 
     /// Every note out and met, every note at box 3 or more, enough screens in this
     /// lesson, and his recent notes here right first try (and rhythm solid in rhythm
-    /// lessons). The newest batch doesn't need its own 7 of 8 here: that rule paces
-    /// unlocks, and with nothing left to unlock the lesson window covers it.
+    /// lessons, and every new note played `lessonMinNewPlays` times in drill lessons, so
+    /// the fast track can't end one early). The newest batch doesn't need its own 7 of 8
+    /// here: that rule paces unlocks, and with nothing left to unlock the lesson window
+    /// covers it.
     var isLessonDone: Bool {
         let lesson = self.lesson
         guard lesson.clefs.allSatisfy({ lockedNew($0).isEmpty && pendingIntros($0).isEmpty }),
               pool.allSatisfy({ stats(for: $0).box >= config.gateMinBox }),
-              state.lessonScreens >= config.lessonMinScreens
+              state.lessonScreens >= config.lessonMinScreens,
+              !lesson.drill || lesson.newKeys.allSatisfy(isDrilled)
         else { return false }
         let window = state.lessonRecent.suffix(config.lessonWindow)
         guard window.count >= config.lessonWindow,
@@ -454,6 +476,7 @@ public struct MasteryEngine: Sendable {
         state.lesson = id
         state.lessonScreens = 0
         state.lessonRecent = []
+        state.lessonPlays = [:]
         state.rhythmRecent = []
         state.newest = [:]
         state.sizeRecent = []
@@ -462,6 +485,8 @@ public struct MasteryEngine: Sendable {
     }
 
     /// Unlocks the lesson's known notes and tops its new notes up to the start count.
+    /// A drill lesson's new notes are its newest even when they were out already (an old
+    /// save, a parent move), so they still get their share.
     /// Safe to call again: a lesson that's already set up doesn't change.
     @discardableResult
     private mutating func prepareLesson() -> [ItemID] {
@@ -478,6 +503,9 @@ public struct MasteryEngine: Sendable {
                 unlock(batch, clef: clef)
                 unlocked += batch.map(\.id)
             }
+            if lesson.drill, newestBatch(clef).isEmpty {
+                state.newest[clef.rawValue] = notes.new.map { NoteKey(clef, $0).id }.filter(state.unlocked.contains)
+            }
         }
         state.screenSize = min(max(state.screenSize, lesson.sizes.lowerBound), lesson.sizes.upperBound)
         return unlocked
@@ -489,10 +517,12 @@ public struct MasteryEngine: Sendable {
     }
 
     /// `count` notes at random from `locked`, so that the pool they join has at least
-    /// one line note and one space note when that's possible.
+    /// one line note and one space note when that's possible. In a drill lesson, the
+    /// first `count` in the lesson's order (G first).
     private mutating func chooseBatch(from locked: [NoteKey], count: Int, joining pool: [NoteKey]) -> [NoteKey] {
         let n = min(count, locked.count)
         guard n > 0 else { return [] }
+        if lesson.drill { return Array(locked.prefix(n)) }
         var first: [NoteKey]?
         for _ in 0..<40 {
             let pick = Array(shuffled(locked, using: &state.dice).prefix(n))
@@ -554,13 +584,14 @@ extension MasteryState {
         newest = try c.value(.newest, or: d.newest)
         lessonScreens = try c.value(.lessonScreens, or: d.lessonScreens)
         lessonRecent = try c.value(.lessonRecent, or: d.lessonRecent)
+        lessonPlays = try c.value(.lessonPlays, or: d.lessonPlays)
         rhythmRecent = try c.value(.rhythmRecent, or: d.rhythmRecent)
         rhythmDemos = try c.value(.rhythmDemos, or: d.rhythmDemos)
         screenSize = try c.value(.screenSize, or: d.screenSize)
         sizeRecent = try c.value(.sizeRecent, or: d.sizeRecent)
         recentScreens = try c.value(.recentScreens, or: d.recentScreens)
         recentColumns = try c.value(.recentColumns, or: d.recentColumns)
-        lastScreenWasIntro = try c.value(.lastScreenWasIntro, or: d.lastScreenWasIntro)
+        introGap = try c.value(.introGap, or: d.introGap)
         recentSongs = try c.value(.recentSongs, or: d.recentSongs)
         lessonPeak = try c.value(.lessonPeak, or: d.lessonPeak)
         lastFirstClef = try c.decodeIfPresent(Clef.self, forKey: .lastFirstClef)
