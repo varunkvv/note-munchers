@@ -1366,5 +1366,93 @@
   "note": null,
   "text": "bye! see you next time, silly goose.",
   "tag": "warmly"
+ },
+ {
+  "id": "longOne-74",
+  "situation": "longOne",
+  "line": 74,
+  "note": null,
+  "text": "listen to this one. it's a long one.",
+  "tag": "gently"
+ },
+ {
+  "id": "longOne-75",
+  "situation": "longOne",
+  "line": 75,
+  "note": null,
+  "text": "hmm, that one's a long note. listen.",
+  "tag": "gently"
+ },
+ {
+  "id": "longOne-76",
+  "situation": "longOne",
+  "line": 76,
+  "note": null,
+  "text": "this one gets held longer. listen.",
+  "tag": "gently"
+ },
+ {
+  "id": "longOne-77",
+  "situation": "longOne",
+  "line": 77,
+  "note": null,
+  "text": "let's listen. that one is a long one.",
+  "tag": "gently"
+ },
+ {
+  "id": "shortOne-78",
+  "situation": "shortOne",
+  "line": 78,
+  "note": null,
+  "text": "listen to this one. it's a short one.",
+  "tag": "gently"
+ },
+ {
+  "id": "shortOne-79",
+  "situation": "shortOne",
+  "line": 79,
+  "note": null,
+  "text": "that one's a quick note. listen.",
+  "tag": "gently"
+ },
+ {
+  "id": "shortOne-80",
+  "situation": "shortOne",
+  "line": 80,
+  "note": null,
+  "text": "this one is short and quick. listen.",
+  "tag": "gently"
+ },
+ {
+  "id": "keepGoing-81",
+  "situation": "keepGoing",
+  "line": 81,
+  "note": null,
+  "text": "let's keep going!",
+  "tag": "warmly"
+ },
+ {
+  "id": "keepGoing-82",
+  "situation": "keepGoing",
+  "line": 82,
+  "note": null,
+  "text": "that was a tricky one. let's keep going.",
+  "tag": "warmly"
+ },
+ {
+  "id": "keepGoing-83",
+  "situation": "keepGoing",
+  "line": 83,
+  "note": null,
+  "text": "okay, let's do the next one!",
+  "tag": "warmly"
+ },
+ {
+  "id": "keepGoing-84",
+  "situation": "keepGoing",
+  "line": 84,
+  "note": null,
+  "text": "that's okay. let's keep going.",
+  "tag": "warmly"
  }
 ]

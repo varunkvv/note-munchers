@@ -6,7 +6,8 @@ import NoteCore
 ///
 ///     -demoScript <name>   play a scripted sequence through InputHub.emit (see DemoRunner.run).
 ///                          sharpPrompt / sharp stop on the next F# (sharp also presses F natural).
-///                          wrongValue plays a rhythm screen's halves as quarters (the retry).
+///                          wrongValue plays a rhythm screen's halves as quarters (the retry),
+///                          keepGoing plays them short all three goes (then "let's keep going").
 ///                          play taps the play button after the first note and holds there
 ///                          show plays like a kid at -demoSlow from the start, for screen recordings
 ///     -demoScreen <name>   open a screen directly: home, parent, parent#levels, parent#staff,
@@ -200,7 +201,7 @@ final class DemoRunner {
             await skipIntros(c)
             c.holdAfterSuccess = true
             await playItem(c)
-        case "rhythmShort", "wrongValue":
+        case "rhythmShort", "wrongValue", "keepGoing":
             // a rhythm-judged screen with a half, every half cut short: a wrong value, so
             // the glow, "it's a long one", the screen played back with the keyboard, then
             // his go again. rhythmShort stops there, wrongValue plays the retry right
@@ -223,6 +224,15 @@ final class DemoRunner {
             await playItem(c, stretch: item.notes.map { $0.value == .half ? 0.45 : 1 })
             await waitUntil(seconds: 5) { c.phase == .replaying }
             log("wrong value, playing it back", c)
+            if script == "keepGoing" {
+                for go in 2...3 {
+                    await waitUntil(seconds: 60) { c.phase.isPlaying }
+                    await playItem(c, stretch: item.notes.map { $0.value == .half ? 0.45 : 1 })
+                    await sleep(1.0)
+                    log("go \(go) played short", c)
+                }
+                break
+            }
             guard script == "wrongValue" else { break }
             await waitUntil(seconds: 60) { c.phase.isPlaying }
             log("his go again", c)
