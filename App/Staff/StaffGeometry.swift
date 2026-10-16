@@ -103,7 +103,7 @@ enum Metrics {
     static let sharpWidth = 1.1
     /// the time signature's digits (Bravura's are about 1.8 spaces wide)
     static let meterWidth = 1.8
-    static let rightPad = 1.0
+    static let rightPad = 0.8
     /// room on each side of a bar line, and before the final one
     static let barGap = 1.1
     static let endGap = 0.7
@@ -116,7 +116,7 @@ enum Metrics {
     }
 
     static func notesStart(_ key: KeySignature, meter: Bool) -> Double {
-        meter ? meterX(key) + meterWidth + 1.2 : clefX + clefWidth + Double(key.sharpSteps(.treble).count) * sharpWidth + 1.3
+        meter ? meterX(key) + meterWidth + 1.1 : clefX + clefWidth + Double(key.sharpSteps(.treble).count) * sharpWidth + 1.3
     }
 
     /// Space between the treble staff's bottom line and the bass staff's top line, in
@@ -159,7 +159,7 @@ enum Metrics {
     static func columnWidth(_ value: NoteValue?) -> Double {
         switch value {
         case nil: 3
-        case .eighth: 1.8
+        case .eighth: 1.7
         case .quarter: 2.3
         case .half: 3.0
         case .dottedHalf: 3.5
