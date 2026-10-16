@@ -154,6 +154,24 @@ import Testing
         #expect(!r.sounded.contains { quiet.contains($0.event.time) && $0.event.event.part != .outro })
     }
 
+    /// The play button between two keys: that gap isn't his tempo, even early on.
+    @Test func aRestIsntCounted() {
+        let song = Self.song(level: 3)
+        var follower = BackingFollower(plan: BackingPlan(song: song))
+        var t = 0.0
+        _ = follower.played(0, at: t)
+        t += song.notes[0].span * 0.6
+        _ = follower.played(1, at: t)
+        #expect(abs(follower.beat - 0.6) < 1e-9)
+        follower.rest()
+        t += 5
+        _ = follower.played(2, at: t)
+        #expect(abs(follower.beat - 0.6) < 1e-9)
+        t += song.notes[2].span * 0.6
+        _ = follower.played(3, at: t)
+        #expect(abs(follower.beat - 0.6) < 1e-9)
+    }
+
     @Test func anchoredLevelsSoundOnlyOnHisKeys() {
         let song = Self.song(level: 1)
         var rng = SeededRandom(seed: 9)

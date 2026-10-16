@@ -10,10 +10,16 @@ final class AppModel {
         case home
         case practice
         case sessionEnd
+        /// song time: title card, pages, end card
+        case song
     }
 
     var screen: Screen = .home
     private(set) var practice: PracticeController?
+    /// The song he's playing (song time).
+    private(set) var song: SongController?
+    /// Song time's piano samples, loaded the first time a song starts.
+    @ObservationIgnored private lazy var piano = Piano()
     /// The last finished session, for the end screen.
     private(set) var lastSummary: SessionSummary?
     /// He tapped the "done for now" door (vs the session ending by itself).
@@ -156,6 +162,50 @@ final class AppModel {
         practice = nil
         screen = .sessionEnd
     }
+
+    // MARK: song time
+
+    /// He has 3+ solid notes (G and A among them) in a clef. Never a lock: before that
+    /// the button just isn't there.
+    var canPlaySongs: Bool { engine.canPlaySongs }
+
+    /// A new song at his level: the title card first. Remembered at once, so the next
+    /// one is different even if he leaves this one.
+    func startSong() {
+        guard practice == nil else { return }
+        song?.stop()
+        var seed = UInt64.random(in: 0...UInt64.max)
+        #if DEBUG
+        if let demoSeed = demo.seed { seed = demoSeed &+ UInt64(songsMade) }
+        songsMade += 1
+        #endif
+        guard let made = engine.makeSong(seed: seed) else { return }
+        engine.rememberSong(made)
+        store.saveMastery(engine.state, settings: ParentSettings(config))
+        let engine = self.engine
+        let controller = SongController(
+            song: made, octavePolicy: engine.lesson.octavePolicy, fluency: { engine.stats(for: $0).peakFluency },
+            input: input, sounds: sounds, voice: voice, piano: piano
+        )
+        controller.onAllDone = { [weak self] in self?.songAllDone() }
+        controller.onNewSong = { [weak self] in self?.startSong() }
+        song = controller
+        screen = .song
+        #if DEBUG
+        print("song: \(made.title), level \(made.level), \(made.meter.rawValue), \(made.form.rawValue)\(made.isFallback ? " (fallback)" : ""): \(made.signature)")
+        #endif
+    }
+
+    /// "All done" or the door on a song: home.
+    func songAllDone() {
+        song?.stop()
+        song = nil
+        screen = .home
+    }
+
+    #if DEBUG
+    @ObservationIgnored private var songsMade: UInt64 = 0
+    #endif
 
     // MARK: parent changes (never during a session)
 

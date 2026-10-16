@@ -15,7 +15,7 @@ struct SessionEndView: View {
     @State private var highFives = 0
     @State private var choice: Choice?
 
-    enum Choice { case oneMore, allDone }
+    enum Choice { case oneMore, song, allDone }
 
     struct Fed: Identifiable {
         let id: ItemID
@@ -64,8 +64,12 @@ struct SessionEndView: View {
                     .padding(.horizontal, 32)
                     .frame(maxWidth: .infinity, maxHeight: room, alignment: .center)
 
-                    HStack(alignment: .top, spacing: button * 0.45) {
+                    HStack(alignment: .top, spacing: button * (songs ? 0.32 : 0.45)) {
                         choiceButton(.oneMore, title: "One more", symbol: "arrow.clockwise", color: Theme.button, size: button, label: label)
+                        // song time, as an equal choice, once he has notes to make songs from
+                        if songs {
+                            choiceButton(.song, title: "Song time!", symbol: "music.note", color: Theme.song, size: button, label: label)
+                        }
                         VStack(spacing: 8) {
                             HighFiveHand(count: highFives, size: button * 1.1) {
                                 highFives += 1
@@ -97,6 +101,9 @@ struct SessionEndView: View {
 
     private var lastEndedByKid: Bool { model.lastEndedByKid }
 
+    /// Song time is a choice here once he qualifies (it's never shown locked).
+    private var songs: Bool { model.canPlaySongs }
+
     /// A word under a button, in a darker shade of its colour.
     private func word(_ text: String, color: Color, size: CGFloat) -> some View {
         Text(text)
@@ -111,10 +118,14 @@ struct SessionEndView: View {
             guard choice == nil else { return }
             withAnimation(.spring(duration: 0.3, bounce: 0.5)) { choice = which }
             model.sounds.chime()
-            model.voice.say(which == .oneMore ? .oneMore : .allDone)
+            model.voice.say(which == .allDone ? .allDone : .oneMore)
             Task {
                 try? await Task.sleep(for: .seconds(1.2))
-                which == .oneMore ? model.oneMoreRound() : model.allDone()
+                switch which {
+                case .oneMore: model.oneMoreRound()
+                case .song: model.startSong()
+                case .allDone: model.allDone()
+                }
             }
         } label: {
             VStack(spacing: 8) {

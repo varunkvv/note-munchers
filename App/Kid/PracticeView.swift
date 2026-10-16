@@ -140,14 +140,24 @@ struct HintBand: View {
 /// staff. Picture only. Tapping it plays the screen with the keyboard lighting up; it
 /// fades back while something is playing or there's nothing to play.
 struct ListenButton: View {
-    let controller: PracticeController
+    let enabled: Bool
+    let action: () -> Void
 
     static let size: CGFloat = 96
     /// Room the lane keeps clear for it, so a muncher never sits under it.
     static let room: CGFloat = size + 46
 
+    init(enabled: Bool, action: @escaping () -> Void) {
+        self.enabled = enabled
+        self.action = action
+    }
+
+    init(controller: PracticeController) {
+        self.init(enabled: controller.canListen, action: controller.listen)
+    }
+
     var body: some View {
-        Button(action: controller.listen) {
+        Button(action: action) {
             ZStack {
                 Circle()
                     .fill(Theme.button)
@@ -160,9 +170,9 @@ struct ListenButton: View {
             .frame(width: Self.size, height: Self.size)
         }
         .buttonStyle(.plain)
-        .opacity(controller.canListen ? 1 : 0.35)
-        .disabled(!controller.canListen)
-        .animation(.easeInOut(duration: 0.2), value: controller.canListen)
+        .opacity(enabled ? 1 : 0.35)
+        .disabled(!enabled)
+        .animation(.easeInOut(duration: 0.2), value: enabled)
     }
 }
 

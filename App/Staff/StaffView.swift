@@ -16,6 +16,11 @@ struct StaffView: View {
     var style = StaffStyle()
     /// Line gap in points. nil = the biggest that fits (small previews).
     var gap: CGFloat?
+    /// The time signature after the clef. A song shows it on its first system only.
+    var showsMeter = true
+    /// Thin-thick at the end, like the end of a piece. A song's other systems end on a
+    /// plain bar line.
+    var endsPiece = true
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -25,7 +30,7 @@ struct StaffView: View {
                 let geometry = StaffGeometry(spec: spec, size: size, style: style, gap: gap)
                 var painter = StaffPainter(
                     geo: geometry, style: style, effects: effects?.effects ?? [],
-                    now: timeline.date, reduceMotion: reduceMotion
+                    now: timeline.date, reduceMotion: reduceMotion, showsMeter: showsMeter, endsPiece: endsPiece
                 )
                 painter.draw(in: &context, item: item, doneCount: doneCount)
             }
@@ -39,6 +44,8 @@ struct StaffPainter {
     let effects: [StaffEffects.Effect]
     let now: Date
     let reduceMotion: Bool
+    var showsMeter = true
+    var endsPiece = true
 
     private var g: CGFloat { geo.g }
 
@@ -53,7 +60,7 @@ struct StaffPainter {
             drawLines(&context, clef, right: right)
             drawClef(&context, clef)
             drawKeySignature(&context, clef)
-            if let meter = item?.meter { drawMeter(&context, meter, on: clef) }
+            if let meter = item?.meter, showsMeter { drawMeter(&context, meter, on: clef) }
         }
         if geo.spec.clefs.count > 1 {
             drawBrace(&context)
@@ -158,7 +165,16 @@ struct StaffPainter {
             }
             context.stroke(bars, with: .color(style.ink), lineWidth: geo.lineWidth)
         }
-        if let end = layout.end { drawFinalBarLine(&context, at: end) }
+        if let end = layout.end {
+            if endsPiece {
+                drawFinalBarLine(&context, at: end)
+            } else {
+                var line = Path()
+                line.move(to: CGPoint(x: end, y: geo.systemTop - geo.lineWidth / 2))
+                line.addLine(to: CGPoint(x: end, y: geo.systemBottom + geo.lineWidth / 2))
+                context.stroke(line, with: .color(style.ink), lineWidth: geo.lineWidth)
+            }
+        }
         drawRests(&context, item: item, layout: layout, doneCount: doneCount)
         var xs: [CGFloat] = []
         for (index, center) in layout.notes.enumerated() {

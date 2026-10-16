@@ -242,6 +242,12 @@ public struct BackingFollower: Sendable {
         beat = startBeat
     }
 
+    /// He stopped for something that isn't his tempo (the play button, the piano off):
+    /// the gap to his next key isn't counted.
+    public mutating func rest() {
+        last = nil
+    }
+
     public mutating func played(_ index: Int, at time: Double) -> [TimedBackingEvent] {
         if let last, index == last.note + 1 {
             let written = plan.noteBeats[last.note]

@@ -72,6 +72,12 @@ struct RootView: View {
                 PracticeView(controller: practice, input: model.input, onDone: model.doneForNow)
                     .transition(.opacity)
             }
+        case .song:
+            if let song = model.song {
+                SongView(controller: song, input: model.input)
+                    .id(ObjectIdentifier(song))
+                    .transition(.opacity)
+            }
         case .sessionEnd:
             if let summary = model.lastSummary {
                 SessionEndView(summary: summary, model: model)

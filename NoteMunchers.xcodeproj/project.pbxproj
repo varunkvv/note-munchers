@@ -13,6 +13,7 @@
 		128D32BD861385A7B39347F2 /* PracticeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE8D594DCE24B32A4C800E6 /* PracticeController.swift */; };
 		12C47B9BF900D032E9EBC506 /* MIDIInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349A99AF7DACB9AA0D8A5841 /* MIDIInput.swift */; };
 		15BD4B1A27C02CA7CBAED8EE /* DemoRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3FA7A978845FA1A0F672B9 /* DemoRunner.swift */; };
+		1A448FD974EF9041848A1440 /* SongView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD1BEB272AFE65F69687AE02 /* SongView.swift */; };
 		1A934E13F309D95398F998E3 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8E314491A194B82A20A71 /* Models.swift */; };
 		1D18E789A82B14A62FB8604A /* HostClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FC4B9745E680C6A880B2EE2 /* HostClock.swift */; };
 		265751FDEEAF4711C9F66986 /* Muncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53C7DDDB4D0A66CBAE46E87E /* Muncher.swift */; };
@@ -32,6 +33,7 @@
 		8D061F6EE67C6DE5FAD1A204 /* Bravura-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = F9338F512C1757517B46A5ED /* Bravura-OFL.txt */; };
 		8FAEB7674BE31A627DAED064 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0D16CFDCBDE056B0F9D55 /* AppModel.swift */; };
 		9E9561E73505D31DC1776AE1 /* StaffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10B83CFBA29DED421136D54 /* StaffView.swift */; };
+		A46D63DA866E730195968EB8 /* SongController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF983CE8F3DDAB6C5CBA9DF4 /* SongController.swift */; };
 		B0D08207ADDB5FAD09648181 /* SessionEndView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A16A64520891B807314A5B7 /* SessionEndView.swift */; };
 		B9232846A6FD0172A9B7957B /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5410B640125C9BDC3D366429 /* HomeView.swift */; };
 		BA6C04055B8A4A3A7A90165B /* PracticeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 759D1542CEFCE31BBA18F2E1 /* PracticeView.swift */; };
@@ -79,6 +81,7 @@
 		CAE8D594DCE24B32A4C800E6 /* PracticeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeController.swift; sourceTree = "<group>"; };
 		CBC2E4328F8C2C397E33EF87 /* Store.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Store.swift; sourceTree = "<group>"; };
 		CCABD1188F2EE2766D0A1028 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		CD1BEB272AFE65F69687AE02 /* SongView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongView.swift; sourceTree = "<group>"; };
 		D58E4C4E2D0DBAF59F468503 /* Trends.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trends.swift; sourceTree = "<group>"; };
 		DC0E6CF142C5E0FCE48D39A4 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		E257BD7A33D1C30BC8BE454F /* Bravura.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bravura.swift; sourceTree = "<group>"; };
@@ -89,6 +92,7 @@
 		F9338F512C1757517B46A5ED /* Bravura-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Bravura-OFL.txt"; sourceTree = "<group>"; };
 		FA4CED4BA58D70AA2A1AC029 /* MIDIMonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIMonitorView.swift; sourceTree = "<group>"; };
 		FB028C9FB43E9C0EE09972D9 /* HatchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HatchView.swift; sourceTree = "<group>"; };
+		FF983CE8F3DDAB6C5CBA9DF4 /* SongController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -203,6 +207,8 @@
 				CAE8D594DCE24B32A4C800E6 /* PracticeController.swift */,
 				759D1542CEFCE31BBA18F2E1 /* PracticeView.swift */,
 				4A16A64520891B807314A5B7 /* SessionEndView.swift */,
+				FF983CE8F3DDAB6C5CBA9DF4 /* SongController.swift */,
+				CD1BEB272AFE65F69687AE02 /* SongView.swift */,
 				318DCBD3514202F91421554B /* TurnOnPianoView.swift */,
 			);
 			path = Kid;
@@ -347,7 +353,9 @@
 				128D32BD861385A7B39347F2 /* PracticeController.swift in Sources */,
 				BA6C04055B8A4A3A7A90165B /* PracticeView.swift in Sources */,
 				B0D08207ADDB5FAD09648181 /* SessionEndView.swift in Sources */,
+				A46D63DA866E730195968EB8 /* SongController.swift in Sources */,
 				2DF64374B92CE4DADC6CAFC8 /* SongMix.swift in Sources */,
+				1A448FD974EF9041848A1440 /* SongView.swift in Sources */,
 				2F410D1BFBE7FDBFD541494E /* Sounds.swift in Sources */,
 				6CCEB49262ECFE01DA0CEC1C /* StaffEffects.swift in Sources */,
 				C2FF651E0D489E86ACD6EC6C /* StaffGallery.swift in Sources */,

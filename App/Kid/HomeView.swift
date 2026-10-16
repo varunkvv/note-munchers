@@ -30,14 +30,24 @@ struct HomeView: View {
                 Theme.paper.ignoresSafeArea()
                 if landscape {
                     HStack(spacing: 0) {
-                        PlayButton(size: s * 0.3, breathing: idleOn) { model.startPractice() }
-                            .frame(width: proxy.size.width * 0.34)
+                        VStack(spacing: s * 0.06) {
+                            PlayButton(size: s * (model.canPlaySongs ? 0.27 : 0.3), breathing: idleOn) { model.startPractice() }
+                            if model.canPlaySongs {
+                                SongTimeButton(size: s * 0.13) { model.startSong() }
+                            }
+                        }
+                        .frame(width: proxy.size.width * 0.34)
                         MunchersGrid(model: model, idle: idle, onTap: tap)
                     }
                 } else {
                     VStack(spacing: 0) {
-                        PlayButton(size: s * 0.26, breathing: idleOn) { model.startPractice() }
-                            .frame(height: proxy.size.height * 0.34)
+                        HStack(spacing: s * 0.08) {
+                            PlayButton(size: s * 0.26, breathing: idleOn) { model.startPractice() }
+                            if model.canPlaySongs {
+                                SongTimeButton(size: s * 0.13) { model.startSong() }
+                            }
+                        }
+                        .frame(height: proxy.size.height * 0.34)
                         MunchersGrid(model: model, idle: idle, onTap: tap)
                     }
                 }
@@ -175,6 +185,34 @@ struct PlayButton: View {
                 Text("Play!")
                     .font(Theme.kidFont(size * 0.22, weight: .heavy))
                     .foregroundStyle(Theme.button.mix(with: .black, by: 0.25))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Song time, under Play!: smaller, its own colour, and still (Play! keeps the only
+/// pulse). It's only there once he has notes to make songs from, never shown locked.
+struct SongTimeButton: View {
+    let size: CGFloat
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: size * 0.12) {
+                ZStack {
+                    Circle().fill(Theme.song)
+                        .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
+                    Image(systemName: "music.note")
+                        .font(.system(size: size * 0.5, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: size, height: size)
+                Text("Song time!")
+                    .font(Theme.kidFont(size * 0.3, weight: .heavy))
+                    .foregroundStyle(Theme.song.mix(with: .black, by: 0.3))
+                    .fixedSize()
             }
             .contentShape(Rectangle())
         }

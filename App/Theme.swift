@@ -30,6 +30,10 @@ enum Theme {
     static let kidTextSoft = Color(red: 0.45, green: 0.38, blue: 0.32)
     /// "All done" and the parts that go with it.
     static let homeButton = Color(red: 0.38, green: 0.62, blue: 0.95)
+    /// Song time: its button on home, the title card and the end card.
+    static let song = Color(red: 0.91, green: 0.42, blue: 0.56)
+    /// The rug the band stands on.
+    static let rug = Color(red: 0.99, green: 0.86, blue: 0.83)
 
     /// Kid screen words: SF Rounded, big and bold. A few plain words a first grader
     /// reads on his own, never a paragraph, never a judging word.
