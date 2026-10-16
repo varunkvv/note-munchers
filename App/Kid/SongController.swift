@@ -130,6 +130,8 @@ final class SongController {
 
     /// The title card is up. Listens for keys from here (they don't count until he starts).
     func open() {
+        // once: a second listener would judge every key twice
+        guard listenTask == nil else { return }
         isPaused = !input.isConnected
         let stream = input.signals()
         listenTask = Task { @MainActor [weak self] in
@@ -257,9 +259,9 @@ final class SongController {
         effects[system].add(.wobble, column: column, duration: 0.6)
     }
 
-    /// Which system of the current page, and which column in it, a song note is.
-    private func position(of index: Int) -> (Int, Int) {
-        let starts = currentPage.systemStarts
+    /// Which system of a page (the current one by default), and which column in it, a song note is.
+    private func position(of index: Int, on page: SongPage? = nil) -> (Int, Int) {
+        let starts = (page ?? currentPage).systemStarts
         let s = starts.lastIndex { $0 <= index } ?? 0
         return (s, index - starts[s])
     }
@@ -362,7 +364,9 @@ final class SongController {
                 try? await clock.sleep(until: t0 + .seconds(at))
                 guard let self, !Task.isCancelled else { return }
                 if let i {
-                    let (system, column) = self.position(of: page.firstNote + i)
+                    // the page he tapped on, even if he plays on to the next one meanwhile
+                    guard self.currentPage == page else { continue }
+                    let (system, column) = self.position(of: page.firstNote + i, on: page)
                     self.effects[system].add(.follow, column: column, duration: notes[i].value.beats * Self.hearItBeat)
                     self.playingKeys = notes[i].pitches
                 } else {
