@@ -122,10 +122,6 @@ final class PracticeController {
         sounds.pop()
     }
 
-    func sayPickColor() {
-        voice.say(.pickColor)
-    }
-
     /// Leaves early (the "done for now" door). Whatever he finished is already saved.
     func stop() {
         listenTask?.cancel()
@@ -161,28 +157,16 @@ final class PracticeController {
             hatchQueue = [intro.id]
         }
         var celebrate = 1.2
-        // let a sound finish before the voice talks over it, and the voice before a sound:
-        // intro: pitch, then "this is D". hint: "listen", then the pitch.
-        // rhythm intro: "here's a new one! listen", then the phrase
-        let meets = cues.contains { if case .say(.meetNote) = $0 { true } else { false } }
-        let pitchDemo = cues.contains { if case .playPitches = $0 { true } else { false } }
-        let phraseBeat = cues.lazy.compactMap { cue -> Double? in
-            switch cue {
-            case .playPhrase(let beat), .showAndPlay(let beat): beat
-            default: nil
-            }
-        }.first
-        var speechDelay = 0.0
+        // a screen played to him waits a moment so he sees it first: a new screen (sound
+        // before symbol), or the glow on a note played as a different value. The play
+        // button plays straight away
+        let phrase = cues.contains { if case .playPhrase = $0 { true } else if case .showAndPlay = $0 { true } else { false } }
+        let glow = cues.contains { if case .rhythmGlow = $0 { true } else { false } }
         var soundDelay = 0.0
-        if meets, pitchDemo {
-            speechDelay = 0.9
-        }
-        if cues.contains(.say(.hintListen)) || cues.contains(.say(.twoAtOnce)) {
-            soundDelay = 0.7
-        }
-        if phraseBeat != nil, cues.contains(where: { if case .say = $0 { true } else { false } }) {
-            // "listen", "it's a long one": the screen plays once she's done
-            soundDelay = 1.7
+        if phrase, glow {
+            soundDelay = 1.0
+        } else if phrase, cues.contains(.showItem) {
+            soundDelay = 0.6
         }
         for cue in cues {
             switch cue {
@@ -222,15 +206,7 @@ final class PracticeController {
                 // the chomp lands when the note reaches the mouth
                 later(MuncherLane.gobbleLength * 0.5) { $0.sounds.chomp() }
             case .say(let speech):
-                var talking = 0.0
-                if case .meetNote = speech, speechDelay > 0 {
-                    later(speechDelay) { $0.voice.say(speech) }
-                } else {
-                    talking = voice.say(speech)
-                }
-                // "listen" / "two at once" lines vary in length: the sound waits until she's done
-                if soundDelay > 0 { soundDelay = max(soundDelay, talking + 0.15) }
-                if speech == .keepGoing { celebrate = max(celebrate, talking + 0.3) }
+                let talking = voice.say(speech)
                 if speech == .keptTrying || speech == .lookedCarefully {
                     // the next screen waits for the praise to finish
                     celebrate = max(celebrate + 0.8, talking + 0.3)

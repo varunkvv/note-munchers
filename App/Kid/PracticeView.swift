@@ -110,7 +110,9 @@ struct HintBand: View {
                     .padding(.vertical, 14)
                     .transition(.opacity)
             } else if !controller.session.keyboardHint.isEmpty {
-                KeyboardPicture(range: controller.keyboardRange, lit: controller.session.keyboardHint)
+                // a new note's intro: its letter on the lit key, so he learns its name
+                KeyboardPicture(range: controller.keyboardRange, lit: controller.session.keyboardHint,
+                                letters: controller.session.introNote != nil)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 14)
                     .transition(.opacity)

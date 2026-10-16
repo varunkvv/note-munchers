@@ -46,8 +46,8 @@ import Testing
     @Test func fNaturalOnAnFSharpGetsTheBlackKeyHint() {
         var bench = onFSharp()
         let cues = bench.press(Pitch(.f, 4))
-        #expect(cues == [.wobble(note: 0), .say(.sharpHint(.fSharp))])
-        #expect(bench.session.keyboardHint == [Self.fs4], "the keyboard picture shows the black key")
+        #expect(cues == [.wobble(note: 0)], "no words")
+        #expect(bench.session.keyboardHint == [Self.fs4], "the keyboard picture shows the black key straight away")
         #expect(bench.session.phase == .waiting, "it's a wrong key: one step up the ladder")
         _ = bench.press(Self.fs4)
         let note = bench.session.summary.screens.last!.notes[0]
@@ -58,14 +58,16 @@ import Testing
         var bench = onFSharp()
         _ = bench.press(Pitch(.f, 4))
         let second = bench.press(Pitch(.f, 4))
-        #expect(second == [.wobble(note: 0), .playPitches([Self.fs4]), .say(.sharpHint(.fSharp))])
+        #expect(second == [.wobble(note: 0), .playPitches([Self.fs4])])
+        #expect(bench.session.keyboardHint == [Self.fs4])
     }
 
     @Test func otherWrongKeysOnFSharpAreOrdinary() {
         var bench = onFSharp()
-        let cues = bench.press(Pitch(.a, 4))
-        #expect(cues.first == .wobble(note: 0) && !speeches(cues).contains(.sharpHint(.fSharp)))
-        #expect(!speeches(bench.press(Pitch(.f, 5))).contains(.sharpHint(.fSharp)), "F in another octave isn't the next-door natural")
+        #expect(bench.press(Pitch(.a, 4)) == [.wobble(note: 0)])
+        #expect(bench.session.keyboardHint.isEmpty, "no black key shortcut for an ordinary wrong key")
+        _ = bench.press(Pitch(.f, 5))
+        #expect(bench.session.keyboardHint.isEmpty, "F in another octave isn't the next-door natural")
     }
 
     @Test func aNewFSharpIsIntroducedAsFSharp() {
@@ -76,7 +78,7 @@ import Testing
             cues = bench.next()
         }
         #expect(bench.session.introNote?.pitch == Self.fs4)
-        #expect(cues.contains(.say(.meetNote(.fSharp))))
+        #expect(cues.contains(.playPitches([Self.fs4])) && speeches(cues).isEmpty)
         #expect(bench.session.keyboardHint == [Self.fs4])
     }
 }

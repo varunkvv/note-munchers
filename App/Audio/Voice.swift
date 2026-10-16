@@ -9,6 +9,10 @@ import NoteCore
 /// from tools/voice/lines.json, the line sheet. Each situation has a few lines and it picks
 /// one he hasn't heard lately. A missing clip says nothing. There's no synthesized
 /// fallback on purpose.
+///
+/// She talks rarely (round 3): one line at the end of a session, at most one earned
+/// line in between, "turn on the piano", and the end of a song. The other clips stay
+/// in the bundle for later rounds.
 @MainActor
 final class Voice: NSObject, AVAudioPlayerDelegate {
     var isMuted = false
@@ -17,17 +21,10 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
 
     /// Lines the app says on its own (not from NoteCore).
     enum Line {
-        /// a new muncher hatches
-        case pickColor
-        /// end screen, after NoteCore's "look who ate well today"
+        /// the end of a song
         case showGrownUp
-        /// end screen after the "done for now" door: both of the above
-        case lookAndShow
-        /// end screen after the door, nothing played
+        /// end screen after the "done for now" door, nothing played
         case seeYou
-        case highFive
-        case oneMore
-        case allDone
     }
 
     private struct Clip {
@@ -60,31 +57,25 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
 
     // MARK: saying things
 
-    /// Says a line for this situation. A wrong-key line (almost, hints, oops) cuts off
-    /// whatever she's saying, everything else waits its turn.
+    /// Says a line for this situation. Lines wait their turn.
     /// Returns the seconds until this line is over (0 if nothing plays), so a sound can wait for it.
     @discardableResult
     func say(_ speech: Speech) -> TimeInterval {
-        let cutsOff = switch speech {
-        case .almost, .sharpHint, .hintListen, .hintShow, .hintLook, .oops: true
-        default: false
+        // the session's one closing line: "look who ate well today" or "show a grown-up",
+        // one or the other each time
+        if speech == .sessionDone {
+            return speak([(Bool.random() ? "sessionDone" : "showGrownUp", nil)])
         }
-        return speak([Self.situation(of: speech)], cutOff: cutsOff)
+        return speak([Self.situation(of: speech)])
     }
 
     @discardableResult
     func say(_ line: Line) -> TimeInterval {
-        // a run of high-five taps shouldn't pile up a queue of them
-        if line == .highFive, player != nil { return remaining }
         let parts: [(String, NoteName?)] = switch line {
-        case .pickColor: [("hatch", nil)]
         case .showGrownUp: [("showGrownUp", nil)]
-        case .lookAndShow: [("sessionDone", nil), ("showGrownUp", nil)]
-        case .seeYou, .allDone: [("bye", nil)]
-        case .highFive: [("highFive", nil)]
-        case .oneMore: [("oneMore", nil)]
+        case .seeYou: [("bye", nil)]
         }
-        return speak(parts, cutOff: false)
+        return speak(parts)
     }
 
     func stop() {
@@ -123,7 +114,7 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
         }
     }
 
-    private func speak(_ parts: [(String, NoteName?)], cutOff: Bool) -> TimeInterval {
+    private func speak(_ parts: [(String, NoteName?)]) -> TimeInterval {
         var players: [AVAudioPlayer] = []
         for (situation, note) in parts {
             guard let clip = pick(situation, note: note) else {
@@ -146,7 +137,6 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
             }
         }
         guard !players.isEmpty else { return 0 }
-        if cutOff { stop() }
         queue += players
         if player == nil { playNext() }
         if logs { print(String(format: "voice: over in %.1fs", remaining)) }
@@ -242,18 +232,13 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
     }
 
     #if DEBUG
-    /// Every situation the app can be asked to say, with every note a line can name,
-    /// that has no clip.
+    /// Every situation she can still be asked to say (round 3: NoteCore's earned praise,
+    /// the closing line, turn on the piano; the app's song end and see you) that has no
+    /// clip. The quiet ones' clips stay in the bundle but aren't checked.
     func audit() -> [String] {
-        var speeches: [Speech] = [
-            .hello, .listen, .twoAtOnce, .almost(.c, .middleC), .sharpHint(.fSharp), .hintListen, .hintLook,
-            .oops, .keptTrying, .lookedCarefully, .holdLonger, .longOne, .shortOne, .keepGoing, .turnOnPiano, .sessionDone,
-        ]
-        for name in NoteName.allCases {
-            speeches += [.meetNote(name), .hintShow(name), .almost(name, .higher), .almost(name, .lower)]
-        }
+        let speeches: [Speech] = [.keptTrying, .lookedCarefully, .turnOnPiano, .sessionDone]
         var asks = speeches.map(Self.situation(of:))
-        asks += ["hatch", "showGrownUp", "bye", "highFive", "oneMore"].map { ($0, nil) }
+        asks += ["showGrownUp", "bye"].map { ($0, nil) }
         return asks.filter { clips($0.0, note: $0.1).isEmpty }.map { $0.0 + ($0.1.map { " " + $0.rawValue } ?? "") }
     }
     #endif

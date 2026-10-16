@@ -217,7 +217,7 @@ import Testing
         let cues = play(&bench) { $0 == half ? 0.5 : 1 }
         #expect(bench.session.phase == .replaying)
         #expect(cues.contains(.rhythmGlow(note: half)))
-        #expect(speeches(cues) == [.longOne])
+        #expect(speeches(cues).isEmpty, "the glow and the play back, no words")
         let replay = cues.compactMap { if case .showAndPlay(let beat) = $0 { beat } else { nil } }
         #expect(replay.count == 1 && abs(replay[0] - 0.6) < 0.01, "at his own tempo: \(replay)")
         #expect(bench.session.summary.screens.count == recorded, "nothing recorded until the screen is done")
@@ -238,14 +238,17 @@ import Testing
         var bench = onJudged("3.1") { firstHalf($0, $1) != nil }
         let half = firstHalf(bench.session.item!, bench.session.rhythmLine!)!
         var said: [Speech] = []
+        var last: [Cue] = []
         for go in 1...3 {
-            said += speeches(play(&bench) { $0 == half ? 0.5 : 1 })
+            last = play(&bench) { $0 == half ? 0.5 : 1 }
+            said += speeches(last)
             if go < 3 {
                 #expect(bench.session.phase == .replaying, "go \(go)")
                 _ = bench.next()
             }
         }
-        #expect(said == [.longOne, .holdLonger, .keepGoing])
+        #expect(said.isEmpty)
+        #expect(last.contains(.rhythmGlow(note: half)), "the note glows, and on we go")
         #expect(bench.session.phase == .success)
         #expect(bench.session.summary.screens.last!.rhythmRetries == 2)
         _ = bench.next()
@@ -259,7 +262,7 @@ import Testing
         let item = bench.session.item!
         let eighth = item.notes.indices.first { item.notes[$0].value == .eighth }!
         let cues = play(&bench) { $0 == eighth ? 2 : 1 }
-        #expect(speeches(cues) == [.shortOne], "\(item.id)")
+        #expect(cues.contains(.rhythmGlow(note: eighth)) && speeches(cues).isEmpty, "\(item.id)")
         #expect(bench.session.phase == .replaying)
     }
 
@@ -271,7 +274,7 @@ import Testing
         _ = bench.press(bench.wrongKey)
         let cues = bench.playScreen()
         #expect(bench.session.phase == .success)
-        #expect(!speeches(cues).contains(.keepGoing), "no rhythm verdict after a wrong key")
+        #expect(!cues.contains { if case .rhythmGlow = $0 { true } else { false } }, "no rhythm verdict after a wrong key")
         let screen = bench.session.summary.screens.last!
         #expect(screen.notes.allSatisfy { $0.firstTry } && screen.notes.allSatisfy { $0.wrongPresses == 0 })
         #expect(screen.rhythmRetries == 1)
@@ -316,7 +319,8 @@ import Testing
         var demos: [Bool] = []
         for _ in 0..<80 where demos.count < 4 {
             if bench.session.rhythmLine != nil, !bench.session.isIntro {
-                demos.append(cues.contains(.playPhrase(beat: config.demoBeat)) && speeches(cues).contains(.listen))
+                demos.append(cues.contains(.playPhrase(beat: config.demoBeat)))
+                #expect(speeches(cues).isEmpty)
             } else {
                 #expect(!cues.contains(.playPhrase(beat: config.demoBeat)), "only rhythm screens are played first")
             }

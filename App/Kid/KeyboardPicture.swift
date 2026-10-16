@@ -3,11 +3,16 @@ import SwiftUI
 
 /// A picture of piano keys with some lit up. On kid screens it's only a picture (not
 /// tappable). The DEBUG on-screen keyboard reuses it with `onPress` / `onRelease`.
-/// No letter names on the keys - middle C gets a small dot, like in his books.
+/// No letter names on the keys - middle C gets a small dot, like in his books - except
+/// on a new note's intro, where a big letter sits on the lit key (`letters`): that's how
+/// he learns its name now that the voice doesn't say it. The keys are too thin for a
+/// letter a 6 year old reads easily, so it's a badge standing on the key's top edge.
 struct KeyboardPicture: View {
     let range: ClosedRange<Pitch>
     var lit: [Pitch] = []
     var litColor = Theme.keyLit
+    /// Show the letter of each lit key, big. Intro screens only.
+    var letters = false
     var onPress: ((Pitch) -> Void)?
     var onRelease: ((Pitch) -> Void)?
 
@@ -20,6 +25,17 @@ struct KeyboardPicture: View {
                 draw(&context, layout)
             }
             .frame(width: layout.width, height: layout.height)
+            .overlay(alignment: .topLeading) {
+                if letters {
+                    ForEach(lit, id: \.midi) { key in
+                        if let name = NoteName(key) {
+                            let size = min(76, max(54, layout.whiteWidth * 2.4))
+                            KeyLetter(name: name, size: size)
+                                .position(x: layout.rect(key).midX, y: -size * 0.62 + layout.whiteWidth * 0.3)
+                        }
+                    }
+                }
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
             .gesture(onPress == nil ? nil : press(layout, offset: proxy.size))
@@ -64,6 +80,43 @@ struct KeyboardPicture: View {
             let isLit = litSet.contains(key.midi) || key == held
             context.fill(shape, with: .color(isLit ? litColor : Theme.keyBlack))
         }
+    }
+}
+
+/// A new note's letter: a round badge in the lit key's colour with a point that stands
+/// on the key, the letter big and dark.
+struct KeyLetter: View {
+    let name: NoteName
+    let size: CGFloat
+
+    var body: some View {
+        VStack(spacing: -size * 0.08) {
+            ZStack {
+                Circle().fill(Theme.keyWhite)
+                Circle().strokeBorder(Theme.keyLit, lineWidth: size * 0.09)
+                Text(name == .fSharp ? "F♯" : name.rawValue)
+                    .font(Theme.kidFont(size * (name == .fSharp ? 0.46 : 0.6), weight: .heavy))
+                    .foregroundStyle(Theme.ink)
+            }
+            .frame(width: size, height: size)
+            Triangle()
+                .fill(Theme.keyLit)
+                .frame(width: size * 0.34, height: size * 0.24)
+        }
+        .shadow(color: .black.opacity(0.12), radius: 3, y: 2)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Pointing down.
+private struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
 

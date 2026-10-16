@@ -93,7 +93,6 @@ struct HatchView: View {
             hatched = true
             // the pale baby steps out into two coloured munchers, one each side
             withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.35)) { spread = true }
-            controller.sayPickColor()
             #if DEBUG
             if let wait = controller.demoAutoPick {
                 try? await Task.sleep(for: .seconds(wait))

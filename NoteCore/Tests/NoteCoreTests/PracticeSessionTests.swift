@@ -7,11 +7,10 @@ import Testing
         Bench(engine(in: "1.2", config: config), seed: seed)
     }
 
-    @Test func startsWithHelloThenAScreen() {
+    @Test func startsWithAScreenAndNoWords() {
         var bench = twoNoteBench()
         let cues = bench.start()
-        #expect(cues.first == .say(.hello))
-        #expect(cues.contains(.showItem))
+        #expect(cues == [.showItem], "nothing is said at the start of a screen")
         #expect(bench.session.phase == .prompt)
         #expect(bench.session.item!.notes.count == 2)
         #expect(bench.next().isEmpty, "next does nothing until he plays")
@@ -24,12 +23,12 @@ import Testing
         #expect(bench.press(bench.wrongKey) == [.wobble(note: 0)])
         #expect(bench.session.phase == .waiting)
         let second = bench.press(bench.wrongKey)
-        #expect(second == [.wobble(note: 0), .say(.hintListen), .playPitches(first)])
+        #expect(second == [.wobble(note: 0), .playPitches(first)], "the sound, no words")
         #expect(bench.session.phase == .hint1)
         let third = bench.press(bench.wrongKey)
-        #expect(third == [.wobble(note: 0), .say(.hintShow(NoteName(first[0])!))])
+        #expect(third == [.wobble(note: 0)], "the keyboard picture, no words")
         #expect(bench.session.keyboardHint == first)
-        #expect(bench.press(bench.wrongKey) == [.wobble(note: 0), .playPitches(first)], "past the top: the sound again, no more talk")
+        #expect(bench.press(bench.wrongKey) == [.wobble(note: 0), .playPitches(first)], "past the top: the sound again")
         // right key: on to note 1 with a fresh ladder and the picture gone
         #expect(bench.playCurrent() == [.correct(note: 0)])
         #expect(bench.session.noteIndex == 1)
@@ -68,35 +67,58 @@ import Testing
         }
     }
 
-    @Test func praiseIsRareAndNeverTwoScreensInARow() {
-        var praised: [Bool] = []
-        for seed: UInt64 in 1...10 {
-            var run = 0
-            var config = NoteCoreConfig()
-            config.sessionMaxItems = 100
-            config.sessionMaxDuration = 10_000
-            var bench = twoNoteBench(seed: seed, config: config)
+    /// "You looked carefully" is earned: 6 screens in a row right first try, never in
+    /// the first 8 screens, at most once a session, at the end of a screen.
+    @Test func lookedCarefullyIsEarnedOnceASession() {
+        var sessionsWithIt = 0
+        for seed: UInt64 in 1...20 {
+            var bench = twoNoteBench(seed: seed, config: roomy())
             _ = bench.start()
-            for _ in 0..<40 {
-                let said = speeches(bench.playScreen())
-                let p = said.contains(.lookedCarefully)
-                praised.append(p)
-                run = p ? run + 1 : 0
-                #expect(run < 2, "never two screens in a row")
-                _ = bench.next()
+            var said: [(screen: Int, speech: Speech)] = []
+            for screen in 1...40 {
+                said += speeches(bench.playScreen()).map { (screen, $0) }
+                #expect(speeches(bench.next()).isEmpty, "nothing when the next screen comes up")
             }
+            #expect(said.count <= 1, "seed \(seed): \(said)")
+            #expect(said.allSatisfy { $0.speech == .lookedCarefully && $0.screen > 8 }, "seed \(seed): \(said)")
+            sessionsWithIt += said.isEmpty ? 0 : 1
         }
-        let rate = Double(praised.filter { $0 }.count) / Double(praised.count)
-        print("praise rate over \(praised.count) first-try screens: \(rate)")
-        #expect(rate > 0.1 && rate < 0.25, "about 1 in 5 or a bit less: \(rate)")
+        #expect(sessionsWithIt > 10, "a long run all right first try usually earns it: \(sessionsWithIt) of 20")
     }
 
-    @Test func aHintedScreenSometimesGetsKeptTrying() {
+    @Test func lookedCarefullyNeedsSixCleanScreensInARow() {
+        for seed: UInt64 in 1...10 {
+            var bench = twoNoteBench(seed: seed, config: roomy())
+            _ = bench.start()
+            var said: [Speech] = []
+            for screen in 1...40 {
+                // a wrong key on every 5th screen: never 6 clean in a row
+                if screen % 5 == 0 { said += speeches(bench.press(bench.wrongKey)) }
+                said += speeches(bench.playScreen())
+                _ = bench.next()
+            }
+            #expect(!said.contains(.lookedCarefully), "seed \(seed)")
+            #expect(!said.contains(.keptTrying), "one wrong key isn't the keyboard picture")
+        }
+    }
+
+    /// "You kept trying and found it" after a screen where the hint ladder had to show
+    /// the keyboard picture: about half the time, from screen 9 on, once a session.
+    @Test func keptTryingAfterTheKeyboardPicture() {
         var kept = 0
         for seed: UInt64 in 1...40 {
-            var bench = twoNoteBench(seed: seed)
+            var bench = twoNoteBench(seed: seed, config: roomy())
             _ = bench.start()
-            _ = bench.press(bench.wrongKey)
+            // the first 8 screens: the picture, but too early for a line
+            var early: [Speech] = []
+            for _ in 0..<8 {
+                for _ in 0..<3 { early += speeches(bench.press(bench.wrongKey)) }
+                early += speeches(bench.playScreen())
+                _ = bench.next()
+            }
+            #expect(early.isEmpty, "never in the first 8 screens: \(early)")
+            for _ in 0..<3 { _ = bench.press(bench.wrongKey) }
+            #expect(bench.session.keyboardHint == bench.expected)
             let said = speeches(bench.playScreen())
             if said.contains(.keptTrying) { kept += 1 }
             #expect(!said.contains(.lookedCarefully))
@@ -104,11 +126,26 @@ import Testing
         #expect(kept > 10 && kept < 30, "about half: \(kept) of 40")
     }
 
+    @Test func thePlayButtonIsntKeptTrying() {
+        for seed: UInt64 in 1...20 {
+            var bench = twoNoteBench(seed: seed, config: roomy())
+            _ = bench.start()
+            var said: [Speech] = []
+            for _ in 0..<20 {
+                _ = bench.session.listen(at: bench.now)
+                bench.now += 3
+                said += speeches(bench.playScreen())
+                _ = bench.next()
+            }
+            #expect(said.isEmpty, "seed \(seed): \(said)")
+        }
+    }
+
     @Test func newNoteGetsAnIntroThatDoesNotCount() {
         var bench = Bench(MasteryEngine(state: MasteryState(seed: 2)))
         let cues = bench.start()
         let intro = bench.session.introNote!
-        #expect(cues == [.say(.hello), .showItem, .playPitches([intro.pitch]), .say(.meetNote(intro.name!))])
+        #expect(cues == [.showItem, .playPitches([intro.pitch])], "its sound, then the picture with its letter. no words")
         #expect(bench.session.isIntro)
         #expect(bench.session.keyboardHint == [intro.pitch], "we do: the picture is up from the start")
         #expect(bench.session.item!.notes.count == 1)
@@ -124,18 +161,19 @@ import Testing
         _ = bench.start()
         let expected = bench.expected[0]
         let cues = bench.press(Pitch(midi: expected.midi + 12))
-        #expect(cues == [.say(.almost(NoteName(expected)!, .lower))], "played an octave up: this one is lower down")
+        #expect(cues.isEmpty, "no words: the keyboard picture shows the right one")
         #expect(bench.session.keyboardHint == [expected])
         #expect(bench.session.phase == .prompt, "almost isn't a step up the ladder")
         _ = bench.playCurrent()
         #expect(bench.session.summary.screens[0].notes[0].firstTry, "doesn't count against him")
     }
 
-    @Test func almostSaysWhichWay() {
+    @Test func almostBelowShowsTheKeyToo() {
         var bench = Bench(engine(in: "1.1"))
         _ = bench.start()
         let expected = bench.expected[0]
-        #expect(bench.press(Pitch(midi: expected.midi - 12)) == [.say(.almost(NoteName(expected)!, .higher))])
+        #expect(bench.press(Pitch(midi: expected.midi - 12)).isEmpty)
+        #expect(bench.session.keyboardHint == [expected])
     }
 
     @Test func accidentalTwoKeyPressCountsOnce() {
@@ -169,7 +207,8 @@ import Testing
         #expect(bench.start() == [.paused, .say(.turnOnPiano)])
         bench.now += 5
         let cues = bench.session.pianoConnected(at: bench.now)
-        #expect(cues.prefix(3) == [.resumed, .say(.hello), .showItem])
+        #expect(cues.prefix(2) == [.resumed, .showItem])
+        #expect(speeches(cues).isEmpty)
     }
 
     @Test func endsAfterTheScreenLimitOnASuccess() {
@@ -275,65 +314,13 @@ import Testing
         return config
     }
 
-    @Test func oopsOnAWrongKeyAfterAGoodRun() {
+    /// "Oops, silly goose" is gone (round 3): a wrong key after a good run is only the wobble.
+    @Test func aWrongKeyAfterAGoodRunIsOnlyTheWobble() {
         var bench = twoNoteBench(config: roomy())
         _ = bench.start()
         cruise(&bench, 5)
-        let cues = bench.press(bench.wrongKey)
-        #expect(cues == [.wobble(note: bench.session.noteIndex), .say(.oops)], "goes with the wobble")
+        #expect(bench.press(bench.wrongKey) == [.wobble(note: bench.session.noteIndex)])
         #expect(bench.session.phase == .waiting, "the ladder carries on as usual")
-        #expect(!speeches(bench.press(bench.wrongKey)).contains(.oops), "never after another miss on the same screen")
-    }
-
-    @Test func oopsAtMostOncePerSession() {
-        var bench = twoNoteBench(config: roomy())
-        _ = bench.start()
-        var oops = 0
-        for _ in 0..<6 {
-            cruise(&bench, 6)
-            oops += speeches(bench.press(bench.wrongKey)).filter { $0 == .oops }.count
-            _ = bench.playScreen()
-            _ = bench.next()
-        }
-        #expect(oops == 1)
-    }
-
-    @Test func noOopsAfterARunOfMisses() {
-        var bench = twoNoteBench(config: roomy())
-        _ = bench.start()
-        var said: [Speech] = []
-        for _ in 0..<12 {
-            said += speeches(bench.press(bench.wrongKey))
-            said += speeches(bench.playScreen())
-            _ = bench.next()
-        }
-        #expect(!said.contains(.oops))
-    }
-
-    @Test func noOopsOnceEasingHasKickedIn() {
-        var bench = twoNoteBench(config: roomy())
-        _ = bench.start()
-        // three missed notes in a row bring easing, then a long good run
-        for _ in 0..<3 {
-            _ = bench.press(bench.wrongKey)
-            _ = bench.playCurrent()
-            if bench.session.phase == .success { _ = bench.next() }
-        }
-        if bench.session.phase.isPlaying { _ = bench.playScreen() }
-        _ = bench.next()
-        #expect(bench.session.pickReason == .easing)
-        cruise(&bench, 10)
-        #expect(!speeches(bench.press(bench.wrongKey)).contains(.oops))
-    }
-
-    @Test func noOopsWhenStuckOrAlmost() {
-        var bench = Bench(engine(in: "1.4", config: roomy()))
-        _ = bench.start()
-        cruise(&bench, 5)
-        let expected = bench.expected[0]
-        #expect(!speeches(bench.press(Pitch(midi: expected.midi + 12))).contains(.oops), "an almost isn't a wrong key")
-        let deadline = bench.session.nextDeadline!
-        #expect(!speeches(bench.tick(at: deadline)).contains(.oops), "being stuck isn't a wrong key")
     }
 
     @Test func stuckClimbsTheLadderAndStops() throws {
@@ -343,9 +330,10 @@ import Testing
         #expect(first == 15)
         #expect(bench.tick(at: first) == [.wobble(note: 0)])
         let second = try #require(bench.session.nextDeadline)
-        #expect(bench.tick(at: second).contains(.say(.hintListen)))
+        #expect(bench.tick(at: second) == [.wobble(note: 0), .playPitches(bench.expected)])
         let third = try #require(bench.session.nextDeadline)
-        #expect(bench.tick(at: third).contains(.say(.hintShow(NoteName(bench.expected[0])!))))
+        #expect(bench.tick(at: third) == [.wobble(note: 0)])
+        #expect(bench.session.keyboardHint == bench.expected)
         #expect(bench.session.nextDeadline == nil, "nothing more on a clock")
         _ = bench.playCurrent()
         let note = bench.session.summary.screens.isEmpty ? nil : bench.session.summary.screens[0].notes[0]

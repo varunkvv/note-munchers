@@ -36,9 +36,17 @@ public enum AlmostHint: String, CaseIterable, Codable, Hashable, Sendable {
 /// later into one of several recorded clips). Where a line names a note it's an
 /// associated value, so a clip bank needs one take per note name (A-G and F sharp).
 ///
-/// Voice is rare: no letter after right keys (the piano already makes the sound).
-/// NoteCore decides when to talk. Praise is process praise only - it names what he
-/// did (mueller & dweck), never "smart", "genius", "good boy".
+/// Voice is rare (plans/2026-10-16-round-3-feedback.md): nothing at the start of a
+/// screen, at most one earned line mid-session (`.keptTrying` / `.lookedCarefully`, at
+/// the end of a screen), one line at the end of the session (`.sessionDone`), and
+/// `.turnOnPiano`. NoteCore decides when to talk. Praise is process praise only - it
+/// names what he did (mueller & dweck), never "smart", "genius", "good boy".
+///
+/// Since round 3 NoteCore no longer says `.hello`, `.meetNote`, `.listen`, `.twoAtOnce`,
+/// `.almost`, `.sharpHint`, `.hintListen`, `.hintShow`, `.hintLook`, `.oops`,
+/// `.holdLonger`, `.longOne`, `.shortOne` or `.keepGoing`. The sound, wobble, glow and
+/// keyboard picture that went with them stay. The cases (and their clips) are kept for
+/// the parent side or later rounds.
 public enum Speech: Hashable, Codable, Sendable {
     /// Session start: "hi! let's play"
     case hello
@@ -67,9 +75,10 @@ public enum Speech: Hashable, Codable, Sendable {
     /// session, never once easing has kicked in. Goes with the wobble, the hint ladder
     /// carries on as usual
     case oops
-    /// Now and then after a screen that needed a hint: "you kept trying and found it!"
+    /// Earned, now and then: after a screen where a note needed the keyboard picture
+    /// and he found it anyway: "you kept trying and found it!"
     case keptTrying
-    /// Now and then after a screen he read right first try: "you looked carefully!"
+    /// Earned, now and then: after 6 screens in a row all right first try: "you looked carefully!"
     case lookedCarefully
     /// A long note played short, on the second go round: "hold this one a little longer"
     case holdLonger
@@ -177,13 +186,14 @@ public struct SessionSummary: Hashable, Codable, Sendable {
 /// its own response time from when it became the next note.
 ///
 /// Shape of a session (learning principles in the plan):
-/// - says hello, then opens with screens of his strongest notes (about 3 notes)
+/// - opens with screens of his strongest notes (about 3 notes). Nothing is said
 /// - a new note is introduced i do / we do / you do: the app plays it and lights the
-///   key (`.playPitches` + `.say(.meetNote)`), he plays it with the picture up, after
-///   that the picture only comes back as a hint
+///   key (`.playPitches`, the app shows its letter on the lit key), he plays it with the
+///   picture up, after that the picture only comes back as a hint
 /// - after 3 of his last 5 notes weren't right first try, the next 2 screens are his strongest
 /// - when time or the screen count is up it ends after his next screen all right first
 ///   try (easy screens, at most `maxExtraItems` extra)
+/// - the voice: one line at the end, and at most one earned line in between (`finish`)
 public struct PracticeSession: Sendable {
     public private(set) var engine: MasteryEngine
     public private(set) var phase: SessionPhase = .notStarted
@@ -224,15 +234,15 @@ public struct PracticeSession: Sendable {
     private var resumePhase: SessionPhase?
 
     // session shape
-    private var greeted = false
     private var warmUpLeft = 0
     private var easingLeft = 0
     /// Last few notes: true when it wasn't right first try.
     private var struggles: [Bool] = []
     private var limitReached: SessionSummary.EndReason?
-    private var praisedLast = false
-    private var saidOops = false
-    private var eased = false
+    /// The one earned line this session has been said.
+    private var praised = false
+    /// Screens in a row all right first try (intros don't count either way).
+    private var cleanRun = 0
 
     // the current screen, per column
     private var pickSize = 1
@@ -245,6 +255,9 @@ public struct PracticeSession: Sendable {
     private var hints: [HintLevel] = []
     /// Notes he hadn't played yet when he tapped play: he heard and saw them first.
     private var listened: [Bool] = []
+    /// Notes the hint ladder had to show on the keyboard picture (not the play button,
+    /// not an "almost").
+    private var pictured: [Bool] = []
     /// Steps up the hint ladder on the current note (wrong keys and stuck steps).
     private var ladder = 0
     private var onsets: [Double] = []
@@ -343,7 +356,7 @@ public struct PracticeSession: Sendable {
             // stuck: one step up the ladder, same as a wrong try but not a wrong press
             stucks[noteIndex] += 1
             lastActivity = t
-            cues += climbLadder(speak: true)
+            cues += climbLadder()
         }
         return cues
     }
@@ -453,10 +466,6 @@ public struct PracticeSession: Sendable {
 
     private mutating func showNext(at t: Double, reason forced: PickReason? = nil) -> [Cue] {
         var cues: [Cue] = []
-        if !greeted {
-            greeted = true
-            cues.append(.say(.hello))
-        }
         var reason = forced ?? .normal
         if forced == nil {
             if warmUpLeft > 0 {
@@ -494,6 +503,7 @@ public struct PracticeSession: Sendable {
         almosts = Array(repeating: 0, count: columns)
         hints = Array(repeating: .none, count: columns)
         listened = Array(repeating: false, count: columns)
+        pictured = Array(repeating: false, count: columns)
         ladder = 0
         onsets = []
         rhythmJudgeable = true
@@ -508,23 +518,22 @@ public struct PracticeSession: Sendable {
         keyboardHint = isIntro ? next.notes[0].pitches : []
         phase = .prompt
         cues.append(.showItem)
+        // nothing is said at the start of a screen: the sound and the picture do it
         if let intro = pick.intro {
-            // i do: the app shows him. then we do: he plays it with the picture up
+            // i do: the app plays it and lights the key (with its letter). then we do:
+            // he plays it with the picture up
             cues.append(.playPitches([intro.pitch]))
-            if let name = intro.name {
-                cues.append(.say(.meetNote(name)))
-            }
         } else if pick.isLessonIntro {
-            // a new texture: say what's coming, then play it (sound before symbol)
+            // a new texture: play it to him first (sound before symbol)
             if engine.lesson.texture.isRhythm {
-                cues += [.say(.listen), .playPhrase(beat: config.demoBeat)]
+                cues.append(.playPhrase(beat: config.demoBeat))
             } else {
-                cues += [.say(.twoAtOnce), .playPitches(next.notes[0].pitches)]
+                cues.append(.playPitches(next.notes[0].pitches))
             }
         } else if rhythmLine != nil, engine.wantsRhythmDemo {
             // the first rhythm screens of level 3 (and 4): hear it first, then read it
             isRhythmDemo = true
-            cues += [.say(.listen), .playPhrase(beat: config.demoBeat)]
+            cues.append(.playPhrase(beat: config.demoBeat))
         }
         return cues
     }
@@ -570,43 +579,29 @@ public struct PracticeSession: Sendable {
             }
             return cues + finish(at: t, rhythm: nil)
 
-        case .almost(let played):
+        case .almost:
+            // right letter, wrong octave: the keyboard picture shows where. no words
             almosts[noteIndex] += 1
             keyboardHint = expected
-            guard let name = NoteName(played[0]) else { return [] }
-            let hint: AlmostHint = expected[0] == .middleC ? .middleC : expected[0] > played[0] ? .higher : .lower
-            return [.say(.almost(name, hint))]
+            return []
 
         case .wrong(let played):
             wrongs[noteIndex] += 1
-            // the natural next to a sharp (F on an F# note): say what it is, show the black key
+            // the natural next to a sharp (F on an F# note): show the black key straight away
             if expected.count == 1, played.count == 1, !expected[0].isWhiteKey,
-               played[0].midi == expected[0].midi - 1, let sharp = NoteName(expected[0]) {
-                let cues = climbLadder(speak: false)
+               played[0].midi == expected[0].midi - 1 {
+                let cues = climbLadder()
                 keyboardHint = expected
-                return cues + [.say(.sharpHint(sharp))]
+                pictured[noteIndex] = true
+                return cues
             }
-            let firstMiss = wrongs.reduce(0, +) == 1 && stucks.reduce(0, +) == 0
-            let cues = climbLadder(speak: true)
-            if firstMiss, oopsFits {
-                saidOops = true
-                return cues + [.say(.oops)]
-            }
-            return cues
+            return climbLadder()
         }
     }
 
-    /// "oops, silly goose" only while he's on a roll: 4 of his last 5 screens this
-    /// session right first try, once a session, never after easing or on an intro.
-    private var oopsFits: Bool {
-        guard !saidOops, !eased, !isIntro, pickReason != .easing, retries == 0 else { return false }
-        let recent = summary.screens.filter { !$0.wasIntro && !$0.wasLessonIntro }.suffix(5)
-        return recent.count == 5 && recent.filter(\.firstTry).count >= 4
-    }
-
     /// One step up the hint ladder for the current note: wobble, then the sound, then
-    /// the keyboard picture. Past the top, a wrong key replays the sound.
-    private mutating func climbLadder(speak: Bool) -> [Cue] {
+    /// the keyboard picture. Past the top, a wrong key replays the sound. No words.
+    private mutating func climbLadder() -> [Cue] {
         guard let item else { return [] }
         let expected = item.notes[noteIndex].pitches
         ladder += 1
@@ -619,19 +614,13 @@ public struct PracticeSession: Sendable {
         case 2:
             phase = .hint1
             hints[noteIndex] = max(hints[noteIndex], .playedPitch)
-            if speak { cues.append(.say(.hintListen)) }
             cues.append(.playPitches(expected))
         default:
             phase = .hint2
             hints[noteIndex] = .keyboard
+            pictured[noteIndex] = true
             if keyboardHint == expected {
-                cues.append(.playPitches(expected)) // picture already up: say it with sound again
-            } else if speak {
-                if expected.count == 1, let name = NoteName(expected[0]) {
-                    cues.append(.say(.hintShow(name)))
-                } else {
-                    cues.append(.say(.hintLook))
-                }
+                cues.append(.playPitches(expected)) // picture already up: the sound again
             }
             keyboardHint = expected
         }
@@ -672,9 +661,8 @@ public struct PracticeSession: Sendable {
             retries += 1
             phase = .replaying
             keyboardHint = []
-            let speech: Speech = rhythm.verdicts[wrong] == .tooShort ? (retries > 1 ? .holdLonger : .longOne) : .shortOne
             let beat = rhythm.beat > 0 ? min(1.5, max(0.35, rhythm.beat)) : config.demoBeat
-            return [.rhythmGlow(note: wrong), .say(speech), .showAndPlay(beat: beat)]
+            return [.rhythmGlow(note: wrong), .showAndPlay(beat: beat)]
         }
         let go = firstGo!
         let screen = ScreenResult(
@@ -690,25 +678,45 @@ public struct PracticeSession: Sendable {
         phase = .success
         keyboardHint = []
         var cues: [Cue] = []
-        var praised = false
-        let roll = unitInterval(&rng)
         if let rhythm, let wrong = rhythm.nudgeIndex {
             // still a different value after the last go: that note glows, and on we go, kindly
             cues.append(.rhythmGlow(note: wrong))
-            if !isIntro { cues.append(.say(.keepGoing)) }
-        } else if !isIntro, !praisedLast, retries == 0 {
-            // process praise, now and then. never two screens in a row
-            let hinted = screen.usedHints
-            if roll < (hinted ? config.keptTryingChance : config.praiseChance) {
-                cues.append(.say(hinted ? .keptTrying : .lookedCarefully))
-                praised = true
-            }
         }
-        praisedLast = praised
+        if let praise = earnedPraise(screen) {
+            cues.append(.say(praise))
+        }
         if !update.unlocked.isEmpty {
             cues.append(.unlocked(update.unlocked))
         }
         return cues
+    }
+
+    /// The one earned line a session can have, at the end of a screen that deserves it
+    /// (varun: "only the ones that REALLY deserve it", about 1 screen in 20 or fewer).
+    /// Never on the first `praiseAfterScreens` screens, never on an intro or a screen
+    /// that needed a rhythm retry, and only when a roll comes up:
+    /// - `.keptTrying` when a note needed the hint ladder's keyboard picture and he found it
+    /// - `.lookedCarefully` after `praiseStreak` screens in a row all right first try.
+    ///   A roll that doesn't come up starts the count again
+    private mutating func earnedPraise(_ screen: ScreenResult) -> Speech? {
+        guard !isIntro else { return nil }
+        cleanRun = screen.firstTry ? cleanRun + 1 : 0
+        guard !praised, retries == 0, summary.screensPlayed > config.praiseAfterScreens else { return nil }
+        let speech: Speech
+        let chance: Double
+        if pictured.contains(true) {
+            speech = .keptTrying
+            chance = config.keptTryingChance
+        } else if cleanRun >= config.praiseStreak {
+            speech = .lookedCarefully
+            chance = config.praiseChance
+            cleanRun = 0
+        } else {
+            return nil
+        }
+        guard unitInterval(&rng) < chance else { return nil }
+        praised = true
+        return speech
     }
 
     /// Easing: after `easingTrigger` of the last `easingWindow` notes weren't right first
@@ -718,7 +726,6 @@ public struct PracticeSession: Sendable {
             struggles = Array((struggles + [!note.firstTry]).suffix(config.easingWindow))
             if easingLeft == 0, struggles.filter({ $0 }).count >= config.easingTrigger {
                 easingLeft = config.easingItems
-                eased = true
                 struggles = []
             }
         }

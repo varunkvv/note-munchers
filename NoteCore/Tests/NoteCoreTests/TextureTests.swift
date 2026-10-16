@@ -185,7 +185,7 @@ import Testing
             cues += bench.press(wrong)
             cues += bench.tick(at: bench.now + 0.2)
         }
-        #expect(cues.contains(.say(.hintLook)))
+        #expect(speeches(cues).isEmpty)
         #expect(bench.session.keyboardHint == bench.expected)
     }
 
@@ -195,7 +195,7 @@ import Testing
         #expect(bench.session.isLessonIntro)
         let dyad = bench.session.item!.notes[0].pitches
         #expect(dyad.count == 2)
-        #expect(cues.suffix(2) == [.say(.twoAtOnce), .playPitches(dyad)])
+        #expect(cues == [.showItem, .playPitches(dyad)], "played to him first, no words")
         #expect(bench.session.keyboardHint == dyad, "we do: both keys lit")
         _ = bench.playScreen()
         #expect(bench.session.summary.notesPlayed == 0, "the intro doesn't count")
@@ -208,7 +208,7 @@ import Testing
         let cues = bench.start()
         #expect(bench.session.isLessonIntro)
         #expect(bench.session.item!.meter != nil)
-        #expect(cues.suffix(2) == [.say(.listen), .playPhrase(beat: NoteCoreConfig.default.demoBeat)])
+        #expect(cues == [.showItem, .playPhrase(beat: NoteCoreConfig.default.demoBeat)], "played to him first, no words")
     }
 
     @Test func oneNoteRhythmScreens() {

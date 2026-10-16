@@ -3,9 +3,11 @@ import SwiftUI
 
 /// "Look who ate today!": the munchers he fed this session, full and happy, growing
 /// from their size before the session to their size now. New ones get a sparkle and
-/// "New!". It's made to show a grown-up: the voice says so, and there's a big hand for
-/// a high five. Then two equal choices, "One more" and "All done", and both get the
-/// same little celebration. A few plain words, no numbers.
+/// "New!". It's made to show a grown-up, with a big hand for a high five. Then two
+/// equal choices, "One more" and "All done", and both get the same little celebration.
+/// A few plain words, no numbers. The voice says one line for the whole screen (round
+/// 3): NoteCore's closing line, or after the door the same line (or "see you" when he
+/// played nothing). Taps and buttons are sound only.
 struct SessionEndView: View {
     let summary: SessionSummary
     let model: AppModel
@@ -74,7 +76,6 @@ struct SessionEndView: View {
                             HighFiveHand(count: highFives, size: button * 1.1) {
                                 highFives += 1
                                 model.sounds.clap()
-                                model.voice.say(.highFive)
                             }
                             word("High five!", color: Theme.keyLit, size: label)
                         }
@@ -85,11 +86,13 @@ struct SessionEndView: View {
             }
         }
         .onAppear {
+            // when the session ended by itself NoteCore already said its one line
             if lastEndedByKid {
-                model.voice.say(fed.isEmpty ? .seeYou : .lookAndShow)
-            } else {
-                // NoteCore already said "look who ate well today"
-                model.voice.say(.showGrownUp)
+                if fed.isEmpty {
+                    model.voice.say(.seeYou)
+                } else {
+                    model.voice.say(Speech.sessionDone)
+                }
             }
             if reduceMotion {
                 grown = true
@@ -118,7 +121,6 @@ struct SessionEndView: View {
             guard choice == nil else { return }
             withAnimation(.spring(duration: 0.3, bounce: 0.5)) { choice = which }
             model.sounds.chime()
-            model.voice.say(which == .allDone ? .allDone : .oneMore)
             Task {
                 try? await Task.sleep(for: .seconds(1.2))
                 switch which {
