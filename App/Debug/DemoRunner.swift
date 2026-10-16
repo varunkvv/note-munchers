@@ -5,7 +5,8 @@ import NoteCore
 /// DEBUG launch arguments for driving the app without a piano (simulator, agents).
 ///
 ///     -demoScript <name>   play a scripted sequence through InputHub.emit (see DemoRunner.run).
-///                          sharpPrompt / sharp stop on the next F# (sharp also presses F natural)
+///                          sharpPrompt / sharp stop on the next F# (sharp also presses F natural).
+///                          show plays like a kid at -demoSlow from the start, for screen recordings
 ///     -demoScreen <name>   open a screen directly: home, parent, parent#levels, parent#staff,
 ///                          parent#history, levels (the level picker), monitor, gallery
 ///                          (generated screens of -demoLesson)
@@ -144,8 +145,9 @@ final class DemoRunner {
         guard let script = options.script else { return }
         model.startPractice()
         guard let c = model.practice else { return }
-        // setup steps run fast. the slow factor is for the state being screenshotted
-        c.timeScale = 0.3
+        // setup steps run fast. the slow factor is for the state being screenshotted.
+        // show is recorded from the first hatch, so it's slow from the start
+        c.timeScale = script == "show" ? options.slow : 0.3
         await waitUntil(seconds: 40) { c.phase != .notStarted }
         log("start", c)
         await sleep(0.6)
@@ -268,6 +270,31 @@ final class DemoRunner {
                 await waitForNext(c, after: shown)
             }
             log("learn finished after \(rounds) rounds", c)
+        case "show":
+            // a kid playing, for screen recordings: a look at each screen, then one note
+            // at a time at his pace, now and then a wrong key first. hatches pick by
+            // themselves (-demoAutoPick). runs to the end screen
+            var round = 0
+            while c.phase != .done, round < 200 {
+                round += 1
+                let shown = c.itemsShown
+                await waitUntil(seconds: 60) { !c.isHatching }
+                await sleep((c.session.isIntro ? 1.6 : 1.0) * options.slow)
+                if c.item?.isRhythm == true {
+                    await playItem(c)
+                } else {
+                    if !c.session.isIntro, round % 4 == 3 {
+                        await wrong(c)
+                        await sleep(0.8 * options.slow)
+                    }
+                    while c.phase.isPlaying, c.itemsShown == shown {
+                        await right(c)
+                        await sleep(0.75 * options.slow)
+                    }
+                }
+                await waitForNext(c, after: shown)
+            }
+            log("show finished after \(round) rounds", c)
         default:
             log("unknown script \(script)")
         }
