@@ -31,7 +31,7 @@ extension MasteryEngine {
             return record(ScreenResult(screenID: pick.item.id, lesson: lesson.id, wasLessonIntro: true, notes: notes, size: pick.size))
         }
         return play(keys, right: right, time: time, reason: pick.isStretch ? .stretch : .normal,
-                    rhythmOK: pick.item.isRhythm ? true : nil, size: pick.size)
+                    rhythmOK: lesson.texture.isRhythm ? true : nil, size: pick.size)
     }
 
     @discardableResult

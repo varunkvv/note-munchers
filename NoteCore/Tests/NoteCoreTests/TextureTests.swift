@@ -1,8 +1,8 @@
 import Testing
 @testable import NoteCore
 
-/// Generated rhythm must keep the rhythm judge's invariant: whole 4/4 bars, 3+ notes,
-/// at least two lengths (in a 2-note line any timing passes - context/notecore-design.md).
+/// Generated rhythm must keep the rhythm judge's invariant: whole bars, 3+ notes, at
+/// least two lengths (in a 2-note line any timing passes - context/notecore-design.md).
 /// Round 1 checked this on a fixed curriculum; now it's a property of the generator.
 @Suite struct RhythmGeneratorTests {
     let judge = RhythmJudge()
@@ -11,7 +11,8 @@ import Testing
     func generated(_ count: Int = 600) -> [[NoteValue]] {
         var rng = SeededRandom(seed: 77)
         return (0..<count).map { i in
-            MasteryEngine.rhythm(bars: 1 + i % 2, from: Self.sets[i % 2], using: &rng)
+            let meter: Meter = i % 3 == 0 ? .threeFour : .fourFour
+            return MasteryEngine.rhythm(bars: 1 + i % 2, from: Self.sets[i % 2], meter: meter, using: &rng).bars.flatMap(\.values)
         }
     }
 
@@ -22,21 +23,39 @@ import Testing
 
     @Test func wholeBarsThreePlusNotesMixedLengths() {
         var rng = SeededRandom(seed: 1)
+        var meters = Set<Meter>()
         for set in Self.sets {
             for bars in 1...2 {
-                for _ in 0..<500 {
-                    let values = MasteryEngine.rhythm(bars: bars, from: set, using: &rng)
-                    let item = PracticeItem(values.map { WrittenNote(.treble, [Pitch(.g, 4)], $0) })
-                    #expect(item.totalBeats == Double(4 * bars), "\(RhythmFixtures.name(values))")
-                    #expect(values.count >= 3, "\(RhythmFixtures.name(values))")
-                    #expect(Set(values).count >= 2, "\(RhythmFixtures.name(values))")
-                    #expect(Set(values).isSubset(of: Set(set)))
-                    let eighths = values.filter { $0 == .eighth }.count
-                    #expect(item.beamedPairStarts.count * 2 == eighths, "eighths come as beamed pairs on a beat")
-                    #expect(item.beamedPairStarts.count <= bars, "at most one pair a bar")
-                    #expect(item.barLinesAfter.count == bars - 1)
+                for meter in Meter.allCases {
+                    for _ in 0..<300 {
+                        let line = MasteryEngine.rhythm(bars: bars, from: set, meter: meter, using: &rng)
+                        meters.insert(line.meter)
+                        let values = line.bars.flatMap(\.values)
+                        let notes = values.map { WrittenNote(.treble, [Pitch(.g, 4)], $0) }
+                        // the item checks every bar adds up to the meter
+                        let item = PracticeItem(notes, bars: line.bars.map(\.count), meter: line.meter)
+                        #expect(item.totalBeats == Double(line.meter.beats * bars), "\(RhythmFixtures.name(values))")
+                        #expect(values.count >= 3, "\(RhythmFixtures.name(values))")
+                        #expect(Set(values).count >= 2, "\(RhythmFixtures.name(values))")
+                        #expect(Set(values).isSubset(of: Set(set + [.whole, .dottedHalf])))
+                        #expect(!values.contains(.whole) || line.meter == .fourFour)
+                        #expect(!values.contains(.dottedHalf) || line.meter == .threeFour)
+                        let eighths = values.filter { $0 == .eighth }.count
+                        #expect(item.beamedPairStarts.count * 2 == eighths, "eighths come as beamed pairs on a beat")
+                        #expect(item.beamedPairStarts.count <= bars, "at most one pair a bar")
+                        #expect(item.barLinesAfter.count == bars - 1)
+                    }
                 }
             }
+        }
+        #expect(meters == Set(Meter.allCases))
+    }
+
+    @Test func oneBarOfQuartersAndHalvesIn34GivesWayTo44() {
+        // q q q is all one length and h q is two notes: neither can be judged
+        var rng = SeededRandom(seed: 2)
+        for _ in 0..<50 {
+            #expect(MasteryEngine.rhythm(bars: 1, from: [.quarter, .half], meter: .threeFour, using: &rng).meter == .fourFour)
         }
     }
 
@@ -178,7 +197,7 @@ import Testing
         var bench = Bench(engine(in: "5.1"), seed: 1)
         let cues = bench.start()
         #expect(bench.session.isLessonIntro)
-        #expect(bench.session.item!.isRhythm)
+        #expect(bench.session.item!.meter != nil)
         #expect(cues.suffix(2) == [.say(.listen), .playPhrase(beat: NoteCoreConfig.default.demoBeat)])
     }
 
@@ -189,10 +208,9 @@ import Testing
         for _ in 0..<60 {
             let pick = engine.pickScreen(using: &rng)
             let item = pick.item
-            #expect(item.isRhythm)
             #expect(Set(item.notes.flatMap(\.pitches)).count == 1, "one key: only the rhythm is new")
-            #expect(item.totalBeats == Double(4 * pick.size), "size counts bars")
-            sawEighths = sawEighths || item.values!.contains(.eighth)
+            #expect(item.totalBeats == Double(item.meter!.beats * pick.size), "size counts bars")
+            sawEighths = sawEighths || item.values.contains(.eighth)
             engine.playPick(pick)
         }
         #expect(sawEighths)
@@ -206,7 +224,7 @@ import Testing
         for _ in 0..<40 {
             let item = engine.pickScreen(using: &rng).item
             if Set(item.notes.flatMap(\.pitches)).count > 1 { moving += 1 }
-            #expect(item.values!.count >= 3 && Set(item.values!).count >= 2)
+            #expect(item.values.count >= 3 && Set(item.values).count >= 2)
         }
         #expect(moving > 30)
     }
@@ -217,12 +235,12 @@ import Testing
         for _ in 0..<40 {
             let item = engine.pickScreen(using: &rng).item
             #expect(item.layout == .grand)
-            #expect(item.totalBeats == 8)
+            #expect(item.totalBeats == Double(2 * item.meter!.beats))
             #expect(item.clefs.count == 2, "\(item.id)")
             #expect(item.barLinesAfter.count == 1)
             let split = item.barLinesAfter[0]
             #expect(Set(item.notes[...split].map(\.clef)).count == 1 && Set(item.notes[(split + 1)...].map(\.clef)).count == 1)
-            engine.playPick(item.isRhythm ? Pick(item: item, intro: nil, isLessonIntro: false, usedStrongest: false, isStretch: false, size: 2) : engine.pickScreen(using: &rng))
+            engine.playPick(Pick(item: item, intro: nil, isLessonIntro: false, usedStrongest: false, isStretch: false, size: 2))
         }
     }
 
@@ -260,9 +278,9 @@ import Testing
             let item = bench.session.item!
             // play it in time at 0.5s a beat, holding the last note
             for (i, note) in item.notes.enumerated() {
-                _ = bench.press(note.pitches[0], after: i == 0 ? 0.8 : item.notes[i - 1].value!.beats * 0.5)
+                _ = bench.press(note.pitches[0], after: i == 0 ? 0.8 : item.gapBeats[i - 1] * 0.5)
             }
-            _ = bench.release(item.notes.last!.pitches[0], after: item.notes.last!.value!.beats * 0.5)
+            _ = bench.release(item.notes.last!.pitches[0], after: item.notes.last!.value.beats * 0.5)
             #expect(bench.session.phase == .success, "\(item.id)")
             if let rhythm = bench.session.summary.screens.last?.rhythm {
                 judged += 1

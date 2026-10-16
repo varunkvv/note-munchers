@@ -63,8 +63,9 @@ public struct Lesson: Identifiable, Hashable, Sendable {
         /// a second note this many letters above (2 = a third, 3 = a fourth, 4 = a
         /// fifth), from notes he already has. Sizes count columns.
         case dyads(intervals: [Int])
-        /// Rhythm lines in 4/4 from these lengths (eighths come as a beamed pair, at most
-        /// one pair a bar). Sizes count bars. `oneNote`: every note on a screen is the
+        /// Rhythm lines in 3/4 or 4/4 from these lengths (eighths come as a beamed pair,
+        /// at most one pair a bar; with halves, a whole note or dotted half now and then).
+        /// Sizes count bars. `oneNote`: every note on a screen is the
         /// same key, so only the rhythm is new.
         case rhythm(values: [NoteValue], oneNote: Bool)
 
@@ -226,32 +227,34 @@ extension Curriculum {
             ),
         ]),
         // G major from here on: the key signature's sharp is on every screen, and F is
-        // read as F# from it (F#4 and F#5 in treble, F#3 in bass)
+        // read as F# from it (F#4 and F#5 in treble, F#3 in bass). 4-6 notes, 2 bars at
+        // most: real bars of quarters wider than that don't fit the staff at the 30pt
+        // line gap (round 2's plan said "4 notes per screen, 2 bars")
         Level(number: 3, title: "Around G position, in G major", lessons: [
             Lesson(
                 "3.1", level: 3, title: "Treble up to G5", focus: .treble,
                 treble: ClefNotes(known: trebleG, new: [e5, fs5, g5], start: 1), bass: ClefNotes(known: bassG),
-                sizes: 4...8, octavePolicy: .strict, keySignature: .gMajor
+                sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor
             ),
             Lesson(
                 "3.2", level: 3, title: "Bass up to G3", focus: .bass,
                 treble: ClefNotes(known: trebleUp), bass: ClefNotes(known: bassG, new: [e3, fs3, g3], start: 1),
-                sizes: 4...8, octavePolicy: .strict, keySignature: .gMajor
+                sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor
             ),
             Lesson(
                 "3.3", level: 3, title: "Middle C from the treble side", focus: .treble,
                 treble: ClefNotes(known: trebleUp, new: [c4, d4, e4, fs4], start: 1), bass: ClefNotes(known: bassUp),
-                sizes: 4...8, octavePolicy: .strict, keySignature: .gMajor
+                sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor
             ),
             Lesson(
                 "3.4", level: 3, title: "Middle C from the bass side", focus: .bass,
                 treble: ClefNotes(known: trebleWide), bass: ClefNotes(known: bassUp, new: [a3, b3, c4], start: 1),
-                sizes: 4...8, octavePolicy: .strict, keySignature: .gMajor
+                sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor
             ),
             Lesson(
                 "3.5", level: 3, title: "Grand staff, the whole range", focus: .both, layout: .grand,
                 treble: ClefNotes(known: trebleWide), bass: ClefNotes(known: bassWide),
-                sizes: 6...8, octavePolicy: .strict, keySignature: .gMajor
+                sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor
             ),
         ]),
         Level(number: 4, title: "Two notes at once", lessons: [
@@ -277,7 +280,7 @@ extension Curriculum {
             ),
         ]),
         // rhythm on notes he knows (G position). 2 bars at most: wider lines don't fit
-        // the landscape staff at the fixed line gap
+        // the landscape staff at the fixed line gap. Every screen is 3/4 or 4/4
         Level(number: 5, title: "Rhythm", lessons: [
             Lesson(
                 "5.1", level: 5, title: "Quarters and halves on one note", focus: .both,

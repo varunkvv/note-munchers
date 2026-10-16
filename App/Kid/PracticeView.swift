@@ -103,7 +103,7 @@ struct HintBand: View {
                     .padding(.vertical, 14)
                     .transition(.opacity)
             }
-            if controller.item?.isRhythm == true {
+            if controller.session.engine.lesson.texture.isRhythm {
                 // sound before symbol: he can hear the line again whenever he wants
                 Button(action: controller.playPhrase) {
                     Image(systemName: "speaker.wave.2.circle.fill")

@@ -43,6 +43,9 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     public var sizeDownRate = 0.6
     /// Chance of a stretch screen (one note more than his size) when he's doing well.
     public var stretchChance = 0.125
+    /// Share of screens in 4/4. The rest are 3/4. Rolled per screen, so he checks the
+    /// time signature every time (plans/2026-10-15-real-bars.md).
+    public var fourFourShare = 0.5
 
     // MARK: lessons
 
@@ -128,6 +131,7 @@ extension NoteCoreConfig {
         sizeUpRate = try c.value(.sizeUpRate, or: d.sizeUpRate)
         sizeDownRate = try c.value(.sizeDownRate, or: d.sizeDownRate)
         stretchChance = try c.value(.stretchChance, or: d.stretchChance)
+        fourFourShare = try c.value(.fourFourShare, or: d.fourFourShare)
         lessonMinScreens = try c.value(.lessonMinScreens, or: d.lessonMinScreens)
         lessonWindow = try c.value(.lessonWindow, or: d.lessonWindow)
         lessonRate = try c.value(.lessonRate, or: d.lessonRate)

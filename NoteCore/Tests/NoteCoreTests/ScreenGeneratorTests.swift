@@ -187,12 +187,35 @@ import Testing
         #expect(run(&c, 60, seed: 9) != run(&a, 60, seed: 8))
     }
 
-    @Test func barsSplitEvenly() {
-        #expect(MasteryEngine.bars(1) == [1])
-        #expect(MasteryEngine.bars(4) == [4])
-        #expect(MasteryEngine.bars(5) == [3, 2])
-        #expect(MasteryEngine.bars(8) == [4, 4])
-        #expect(MasteryEngine.bars(9) == [3, 3, 3])
+    @Test func barSizesHoldOneNoteABeatInOneOrTwoBars() {
+        var rng = SeededRandom(seed: 4)
+        for meter in Meter.allCases {
+            for count in 1...9 {
+                var shapes = Set<[Int]>()
+                for _ in 0..<200 {
+                    let sizes = MasteryEngine.barSizes(count, meter: meter, twoBars: false, using: &rng)
+                    shapes.insert(sizes)
+                    #expect(sizes.reduce(0, +) == min(count, MasteryEngine.maxNotes(meter)))
+                    #expect(sizes.allSatisfy { (1...meter.beats).contains($0) }, "\(sizes) in \(meter.rawValue)")
+                    #expect(sizes.count <= 2)
+                }
+                if count == 1 { #expect(shapes == [[1]]) }
+                if count == 3, meter == .fourFour { #expect(shapes.contains([3]) && shapes.contains { $0.count == 2 }, "one bar or two") }
+            }
+            #expect(MasteryEngine.barSizes(5, meter: meter, twoBars: true, using: &rng) == [3, 2])
+        }
+    }
+
+    @Test func everyReadingBarPatternFillsItsBar() {
+        for meter in Meter.allCases {
+            for notes in 1...meter.beats {
+                for (rhythm, weight) in MasteryEngine.readingBars(notes: notes, meter: meter) {
+                    #expect(rhythm.beats == Double(meter.beats))
+                    #expect(rhythm.count == notes && weight > 0)
+                    #expect(!rhythm.values.contains(.eighth), "eighths only in level 5")
+                }
+            }
+        }
     }
 
     @Test func screenIDs() {

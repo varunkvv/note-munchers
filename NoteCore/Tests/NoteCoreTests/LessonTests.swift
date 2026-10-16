@@ -145,7 +145,7 @@ import Testing
             let item = engine.pickScreen(using: &rng).item
             #expect(item.clefs.count == 1)
             #expect(item.layout != .grand)
-            #expect(item.bars == [item.notes.count])
+            #expect(item.meter != nil && (1...2).contains(item.bars.count), "real bars, one or two: \(item.id)")
         }
     }
 

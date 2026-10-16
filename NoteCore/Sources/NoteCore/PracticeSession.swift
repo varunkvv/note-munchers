@@ -244,8 +244,8 @@ public struct PracticeSession: Sendable {
     public var nextDeadline: Double? {
         guard phase.isPlaying, let item else { return nil }
         var deadlines: [Double] = []
-        if awaitingRelease, let values = item.values {
-            deadlines.append(RhythmJudge(config: config).settleTime(values, onsets: onsets))
+        if awaitingRelease {
+            deadlines.append(RhythmJudge(config: config).settleTime(item.values, onsets: onsets))
         } else {
             if let window = judge?.windowDeadline {
                 deadlines.append(window)
@@ -297,8 +297,8 @@ public struct PracticeSession: Sendable {
     public mutating func tick(at time: Double) -> [Cue] {
         guard phase.isPlaying, let item else { return [] }
         let t = activeTime(at: time)
-        if awaitingRelease, let values = item.values {
-            if t >= RhythmJudge(config: config).settleTime(values, onsets: onsets) {
+        if awaitingRelease {
+            if t >= RhythmJudge(config: config).settleTime(item.values, onsets: onsets) {
                 return finishRhythm(release: t)
             }
             return []
@@ -443,7 +443,7 @@ public struct PracticeSession: Sendable {
             }
         } else if pick.isLessonIntro {
             // a new texture: say what's coming, then play it (sound before symbol)
-            if next.isRhythm {
+            if engine.lesson.texture.isRhythm {
                 cues += [.say(.listen), .playPhrase(beat: config.demoBeat)]
             } else {
                 cues += [.say(.twoAtOnce), .playPitches(next.notes[0].pitches)]
@@ -471,7 +471,7 @@ public struct PracticeSession: Sendable {
                 keyboardHint = isIntro ? nextPitches : []
                 return cues
             }
-            if item.isRhythm, rhythmJudgeable {
+            if engine.lesson.texture.isRhythm, rhythmJudgeable {
                 awaitingRelease = true // the last note's hold counts
                 return cues
             }
@@ -546,10 +546,10 @@ public struct PracticeSession: Sendable {
     }
 
     private mutating func finishRhythm(release: Double) -> [Cue] {
-        guard let item, let values = item.values, onsets.count == values.count else {
+        guard let item, onsets.count == item.notes.count else {
             return finish(at: release, rhythm: nil)
         }
-        let result = RhythmJudge(config: config).judge(values, onsets: onsets, release: release)
+        let result = RhythmJudge(config: config).judge(item.values, onsets: onsets, release: release)
         return finish(at: release, rhythm: result)
     }
 
@@ -561,7 +561,7 @@ public struct PracticeSession: Sendable {
         let readingTime = correctTimes[0] - startTimes[0]
         var notes: [AttemptResult] = []
         for (i, column) in item.notes.enumerated() {
-            let time = item.isRhythm ? readingTime : correctTimes[i] - startTimes[i]
+            let time = lesson.texture.isRhythm ? readingTime : correctTimes[i] - startTimes[i]
             for key in column.keys {
                 notes.append(AttemptResult(
                     itemID: key.id, lesson: lesson.id, level: lesson.level, wasIntro: introNote == key || isLessonIntro,

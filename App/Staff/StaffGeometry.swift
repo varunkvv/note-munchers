@@ -25,9 +25,9 @@ struct StaffSpec: Hashable {
             let busiest = 2 * Metrics.columnWidth(.eighth) + 3 * Metrics.columnWidth(.quarter)
             noteWidth = Double(bars) * busiest + Double(bars - 1) * Metrics.barGap
         } else {
-            let columns = lesson.sizes.upperBound + 1
-            let bars = MasteryEngine.bars(columns).count
-            noteWidth = Double(columns) * Metrics.columnWidth(nil) + Double(bars - 1) * Metrics.barGap
+            // two bars of quarters at most (8 in 4/4, 6 in 3/4)
+            let columns = min(lesson.sizes.upperBound + 1, MasteryEngine.maxNotes(.fourFour))
+            noteWidth = Double(columns) * Metrics.columnWidth(.quarter) + Metrics.barGap
         }
         self.init(layout: layout, keySignature: lesson.keySignature, noteWidth: noteWidth)
     }
@@ -130,11 +130,13 @@ enum Metrics {
         case .eighth: 1.9
         case .quarter: 2.4
         case .half: 3.2
+        case .dottedHalf: 3.6
+        case .whole: 4.0
         }
     }
 
     static func columnWidths(_ item: PracticeItem) -> [Double] {
-        item.notes.map { columnWidth($0.value) }
+        item.notes.map { columnWidth(item.meter == nil ? nil : $0.value) }
     }
 
     /// Notes plus the room around bar lines.

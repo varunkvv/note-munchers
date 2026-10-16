@@ -63,7 +63,8 @@ import Testing
 
     @Test func otherWrongKeysOnFSharpAreOrdinary() {
         var bench = onFSharp()
-        #expect(bench.press(Pitch(.a, 4)) == [.wobble(note: 0)])
+        let cues = bench.press(Pitch(.a, 4))
+        #expect(cues.first == .wobble(note: 0) && !speeches(cues).contains(.sharpHint(.fSharp)))
         #expect(!speeches(bench.press(Pitch(.f, 5))).contains(.sharpHint(.fSharp)), "F in another octave isn't the next-door natural")
     }
 

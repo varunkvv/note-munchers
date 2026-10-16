@@ -143,7 +143,7 @@ struct StaffPainter {
             xs.append(center + dx)
             drawColumn(&context, item: item, index: index, x: center + dx, done: index < doneCount, wobble: wobble)
         }
-        if item.isRhythm {
+        if item.meter != nil {
             drawStems(&context, item: item, xs: xs, doneCount: doneCount)
         }
     }
@@ -201,7 +201,7 @@ struct StaffPainter {
         }
 
         let beamed = Set(pairs + pairs.map { $0 + 1 })
-        for (i, stem) in stems.enumerated() {
+        for (i, stem) in stems.enumerated() where item.notes[i].value.hasStem {
             var line = Path()
             line.move(to: CGPoint(x: stem.x, y: stem.attachY))
             line.addLine(to: CGPoint(x: stem.x, y: stem.tipY))
@@ -300,7 +300,7 @@ struct StaffPainter {
 
         // a glowing (rhythm nudge) note stays in full ink so it stands out from the played ones
         let color = done && glow == nil ? Theme.doneInk : style.ink
-        let filled = !(item.notes[index].value?.hasOpenHead ?? false)
+        let filled = item.meter == nil || !item.notes[index].value.hasOpenHead
         guard let sparkle else {
             for (center, _) in heads {
                 drawHead(&context, at: center, filled: filled, color: color)

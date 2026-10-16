@@ -241,14 +241,15 @@ final class PracticeController {
 
     /// How long the rhythm glow lasts: that note's written length at his own beat.
     private func glowLength(_ note: Int) -> Double {
-        guard let item = session.item, let value = item.notes[note].value else { return 1 }
+        guard let item = session.item, item.notes.indices.contains(note) else { return 1 }
+        let value = item.notes[note].value
         let beat = session.summary.screens.last?.rhythm?.beat ?? session.engine.config.demoBeat
         return max(0.6, min(4, value.beats * (beat > 0 ? beat : 0.75)))
     }
 
     /// Kid taps the speaker on a rhythm line: hear it at his own last tempo (or the demo tempo).
     func playPhrase() {
-        guard let item = session.item, item.isRhythm else { return }
+        guard let item = session.item, session.engine.lesson.texture.isRhythm else { return }
         let lastBeat = session.summary.screens.last { $0.rhythm != nil }?.rhythm?.beat
         let beat = lastBeat.flatMap { $0 > 0 ? min(1.5, max(0.35, $0)) : nil } ?? session.engine.config.demoBeat
         sounds.play(item.playback(beat: beat))

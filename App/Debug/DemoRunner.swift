@@ -280,7 +280,7 @@ final class DemoRunner {
                 let shown = c.itemsShown
                 await waitUntil(seconds: 60) { !c.isHatching }
                 await sleep((c.session.isIntro ? 1.6 : 1.0) * options.slow)
-                if c.item?.isRhythm == true {
+                if c.session.engine.lesson.texture.isRhythm {
                     await playItem(c)
                 } else {
                     if !c.session.isIntro, round % 4 == 3 {
@@ -380,10 +380,10 @@ final class DemoRunner {
     private func playItem(_ c: PracticeController, beat: Double = 0.5, stretch: [Double]? = nil) async {
         await waitUntil(seconds: 30) { !c.isHatching }
         guard let item = c.item, c.phase.isPlaying else { return }
-        if item.isRhythm {
+        if c.session.engine.lesson.texture.isRhythm {
             for index in c.session.noteIndex..<item.notes.count {
                 let pitches = item.notes[index].pitches
-                let length = (item.notes[index].value?.beats ?? 1) * beat * (stretch?[index] ?? 1)
+                let length = item.gapBeats[index] * beat * (stretch?[index] ?? 1)
                 for p in pitches { model.input.emit(.on(p, at: HostClock.now)) }
                 await sleep(length * 0.8)
                 for p in pitches { model.input.emit(.off(p, at: HostClock.now)) }
