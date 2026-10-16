@@ -30,10 +30,12 @@ struct HomeView: View {
                 Theme.paper.ignoresSafeArea()
                 if landscape {
                     HStack(spacing: 0) {
-                        VStack(spacing: s * 0.06) {
-                            PlayButton(size: s * (model.canPlaySongs ? 0.27 : 0.3), breathing: idleOn) { model.startPractice() }
+                        VStack(spacing: s * 0.05) {
+                            // how far he is in his level, right over Play!
+                            HomeLevelPath(engine: model.engine, width: min(proxy.size.width * 0.3, s * 0.46))
+                            PlayButton(size: s * (model.canPlaySongs ? 0.24 : 0.27), breathing: idleOn) { model.startPractice() }
                             if model.canPlaySongs {
-                                SongTimeButton(size: s * 0.13) { model.startSong() }
+                                SongTimeButton(size: s * 0.12) { model.startSong() }
                             }
                         }
                         .frame(width: proxy.size.width * 0.34)
@@ -41,13 +43,16 @@ struct HomeView: View {
                     }
                 } else {
                     VStack(spacing: 0) {
-                        HStack(spacing: s * 0.08) {
-                            PlayButton(size: s * 0.26, breathing: idleOn) { model.startPractice() }
-                            if model.canPlaySongs {
-                                SongTimeButton(size: s * 0.13) { model.startSong() }
+                        VStack(spacing: s * 0.03) {
+                            HomeLevelPath(engine: model.engine, width: s * 0.44)
+                            HStack(spacing: s * 0.08) {
+                                PlayButton(size: s * 0.22, breathing: idleOn) { model.startPractice() }
+                                if model.canPlaySongs {
+                                    SongTimeButton(size: s * 0.12) { model.startSong() }
+                                }
                             }
                         }
-                        .frame(height: proxy.size.height * 0.34)
+                        .frame(height: proxy.size.height * 0.4)
                         MunchersGrid(model: model, idle: idle, onTap: tap)
                     }
                 }

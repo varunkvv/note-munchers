@@ -44,6 +44,8 @@ import NoteCore
 ///     -demoSongPage <n>    the song script stops when page n (1 = first) comes up
 ///     -demoSongStop <n>    ...or after n notes
 ///     -demoSongEnd YES     ...or jumps straight to the end card
+///     -demoPath <x>        the level path: every lesson before his in the level done, his
+///                          stone at x (0...0.9), for home / lane screenshots
 struct DemoOptions {
     var script: String?
     var screen: String?
@@ -68,6 +70,7 @@ struct DemoOptions {
     var songPage: Int?
     var songStop: Int?
     var songEnd = false
+    var path: Double?
 
     init(defaults: UserDefaults = .standard) {
         script = defaults.string(forKey: "demoScript")
@@ -91,6 +94,7 @@ struct DemoOptions {
         songPage = defaults.string(forKey: "demoSongPage").flatMap(Int.init)
         songStop = defaults.string(forKey: "demoSongStop").flatMap(Int.init)
         songEnd = defaults.bool(forKey: "demoSongEnd")
+        path = defaults.string(forKey: "demoPath").flatMap(Double.init)
     }
 
     var isActive: Bool { script != nil || screen != nil }
@@ -129,6 +133,14 @@ final class DemoRunner {
         if let size = options.size {
             var state = engine.state
             state.screenSize = size
+            engine = MasteryEngine(config: engine.config, state: state)
+        }
+        if let path = options.path {
+            var state = engine.state
+            for lesson in engine.level.lessons.prefix(while: { $0.id != engine.lesson.id }) {
+                state.completedLessons.insert(lesson.id)
+            }
+            state.lessonPeak = path
             engine = MasteryEngine(config: engine.config, state: state)
         }
         model.demoReplaceEngine(engine)

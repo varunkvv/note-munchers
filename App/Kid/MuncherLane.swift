@@ -19,6 +19,9 @@ struct MuncherLane: View {
     @State private var swapStart: Date?
 
     static let gobbleLength = 0.9
+    /// The level path's row in the landscape lane: just under the door (78pt + 20pt in
+    /// the corner), above where the muncher stands.
+    static let pathTop: CGFloat = 92
     /// a different muncher swapping in: the new one pops up in front of the old one
     static let popLength = 0.3
     /// A muncher's size at fluency 0 and 1, as a share of the lane's width. Big enough
@@ -35,6 +38,17 @@ struct MuncherLane: View {
             }
         }
         .background(RoundedRectangle(cornerRadius: 28).fill(Theme.lane))
+        // how far he is in the level: tiny and still, under the door's corner (landscape)
+        // or along the strip's leading top edge (portrait)
+        .overlay(alignment: .topLeading) {
+            GeometryReader { proxy in
+                let tall = proxy.size.height >= proxy.size.width
+                LaneLevelPath(controller: controller)
+                    .frame(width: tall ? proxy.size.width - 40 : min(220, proxy.size.width * 0.3), height: 42)
+                    .padding(.leading, 20)
+                    .padding(.top, tall ? Self.pathTop : 14)
+            }
+        }
         .padding(12)
         .onChange(of: controller.gobbleCount) {
             gobbleStart = Date()

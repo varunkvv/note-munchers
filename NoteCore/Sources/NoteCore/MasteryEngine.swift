@@ -80,6 +80,9 @@ public struct MasteryState: Hashable, Codable, Sendable {
     /// His last songs (song time), oldest first, so a new song is never one of them and
     /// level 1 songs take turns between the clefs. Not mastery: songs never touch stats.
     public var recentSongs: [PlayedSong] = []
+    /// The most his current lesson's stone on the level path has shown (`lessonProgress`),
+    /// so his path never goes backwards. Reset when the lesson changes.
+    public var lessonPeak = 0.0
     /// The engine's own dice for curriculum choices: which notes a lesson starts with
     /// and which come next. Seeded once per kid (the app seeds it at first launch),
     /// saved with everything else, so the same state always makes the same choice.
@@ -339,6 +342,8 @@ public struct MasteryEngine: Sendable {
             noteSize(screen, &update)
         }
         advance(&update)
+        // after moving on: a new lesson starts its stone from empty
+        state.lessonPeak = max(state.lessonPeak, liveLessonFraction)
         return update
     }
 
@@ -437,6 +442,7 @@ public struct MasteryEngine: Sendable {
         state.rhythmRecent = []
         state.newest = [:]
         state.sizeRecent = []
+        state.lessonPeak = 0
         return prepareLesson()
     }
 
@@ -541,6 +547,7 @@ extension MasteryState {
         recentColumns = try c.value(.recentColumns, or: d.recentColumns)
         lastScreenWasIntro = try c.value(.lastScreenWasIntro, or: d.lastScreenWasIntro)
         recentSongs = try c.value(.recentSongs, or: d.recentSongs)
+        lessonPeak = try c.value(.lessonPeak, or: d.lessonPeak)
         dice = try c.value(.dice, or: d.dice)
     }
 }

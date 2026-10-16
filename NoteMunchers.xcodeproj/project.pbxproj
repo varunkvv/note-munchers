@@ -46,6 +46,7 @@
 		E059A2D8690CB4E26E8CB3E0 /* StaffGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48C29779F0D7D5DA09BC58E /* StaffGeometry.swift */; };
 		E2C080E3351CBF84CC11BF1B /* Piano in Resources */ = {isa = PBXBuildFile; fileRef = BBF08E87935A0330B7F34468 /* Piano */; };
 		F79252E6EF19B482742C8010 /* KeyboardPicture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E2F63D22C871D71A27449B /* KeyboardPicture.swift */; };
+		FB5C6FC48C32B880FF7856B2 /* LevelPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ADD1982896496EF6906F610 /* LevelPath.swift */; };
 		FD056F4636F31DB9E6D9904A /* Bravura.swift in Sources */ = {isa = PBXBuildFile; fileRef = E257BD7A33D1C30BC8BE454F /* Bravura.swift */; };
 		FD274E95E77EFDA843D45DA6 /* DebugKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301C004A0414316B6A535D88 /* DebugKeyboard.swift */; };
 /* End PBXBuildFile section */
@@ -68,6 +69,7 @@
 		4D3FA7A978845FA1A0F672B9 /* DemoRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoRunner.swift; sourceTree = "<group>"; };
 		53C7DDDB4D0A66CBAE46E87E /* Muncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Muncher.swift; sourceTree = "<group>"; };
 		5410B640125C9BDC3D366429 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		5ADD1982896496EF6906F610 /* LevelPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelPath.swift; sourceTree = "<group>"; };
 		5FC4B9745E680C6A880B2EE2 /* HostClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostClock.swift; sourceTree = "<group>"; };
 		65FC0CA4F4BE4333ADA0A61E /* SongMix.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongMix.swift; sourceTree = "<group>"; };
 		759D1542CEFCE31BBA18F2E1 /* PracticeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeView.swift; sourceTree = "<group>"; };
@@ -203,6 +205,7 @@
 				FB028C9FB43E9C0EE09972D9 /* HatchView.swift */,
 				5410B640125C9BDC3D366429 /* HomeView.swift */,
 				C5E2F63D22C871D71A27449B /* KeyboardPicture.swift */,
+				5ADD1982896496EF6906F610 /* LevelPath.swift */,
 				03A84F809154A8D319B98CA9 /* MuncherLane.swift */,
 				CAE8D594DCE24B32A4C800E6 /* PracticeController.swift */,
 				759D1542CEFCE31BBA18F2E1 /* PracticeView.swift */,
@@ -341,6 +344,7 @@
 				1D18E789A82B14A62FB8604A /* HostClock.swift in Sources */,
 				10CE762EB870434791DA6EC8 /* InputHub.swift in Sources */,
 				F79252E6EF19B482742C8010 /* KeyboardPicture.swift in Sources */,
+				FB5C6FC48C32B880FF7856B2 /* LevelPath.swift in Sources */,
 				12C47B9BF900D032E9EBC506 /* MIDIInput.swift in Sources */,
 				3874071E905F91A711F4DF3E /* MIDIMonitorView.swift in Sources */,
 				1A934E13F309D95398F998E3 /* Models.swift in Sources */,
