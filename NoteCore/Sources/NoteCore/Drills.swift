@@ -143,6 +143,24 @@ extension MasteryEngine {
         return nil
     }
 
+    /// A drill screen of one shape on `clef` (the run's clef; the grand staff picks its
+    /// own), at the size a burst would use, or nil when this lesson's notes can't make it.
+    /// For galleries, demos and tests: sessions pick their drills themselves.
+    public mutating func pickDrill(_ drill: Drill, on clef: Clef? = nil, using rng: inout some RandomNumberGenerator) -> Pick? {
+        let clef = clef ?? lesson.clefs.first { drillNotes($0).count >= 2 } ?? lesson.clefs[0]
+        let base = lesson.isDrillLesson ? state.screenSize : state.screenSize + 1
+        let n = min(max(lesson.texture.isRhythm ? lesson.drillSizes.lowerBound : base, lesson.drillSizes.lowerBound), lesson.drillSizes.upperBound)
+        for _ in 0..<20 {
+            let meter = rollMeter(using: &rng)
+            if let draft = draft(drill, on: clef, size: n, meter: meter, using: &rng) {
+                let pick = finish(draft, drill: drill, meter: draft.meter ?? meter, clef: clef, size: n, strongest: false, using: &rng)
+                state.lastDrill = drill
+                return pick
+            }
+        }
+        return nil
+    }
+
     /// The same screen again, straight after (`PickStyle.again` in the session): a second
     /// read of a chunk. It skips the no-repeat window on purpose.
     mutating func again(_ pick: Pick) -> Pick {

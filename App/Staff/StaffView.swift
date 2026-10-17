@@ -21,6 +21,8 @@ struct StaffView: View {
     /// Thin-thick at the end, like the end of a piece. A song's other systems end on a
     /// plain bar line.
     var endsPiece = true
+    /// Finger numbers (a drill screen's first note, a shift note), from NoteCore.
+    var fingers: [FingerMark] = []
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -30,7 +32,8 @@ struct StaffView: View {
                 let geometry = StaffGeometry(spec: spec, size: size, style: style, gap: gap)
                 var painter = StaffPainter(
                     geo: geometry, style: style, effects: effects?.effects ?? [],
-                    now: timeline.date, reduceMotion: reduceMotion, showsMeter: showsMeter, endsPiece: endsPiece
+                    now: timeline.date, reduceMotion: reduceMotion, showsMeter: showsMeter, endsPiece: endsPiece,
+                    fingers: fingers
                 )
                 painter.draw(in: &context, item: item, doneCount: doneCount)
             }
@@ -46,8 +49,12 @@ struct StaffPainter {
     let reduceMotion: Bool
     var showsMeter = true
     var endsPiece = true
+    var fingers: [FingerMark] = []
 
     private var g: CGFloat { geo.g }
+
+    /// Finger numbers: a deep orange like the lit keys, so they read as help, not notes.
+    static let fingerColor = Color(red: 0.82, green: 0.38, blue: 0.0)
 
     mutating func draw(in context: inout GraphicsContext, item: PracticeItem?, doneCount: Int) {
         let layout = item.map(geo.layout)
@@ -186,6 +193,44 @@ struct StaffPainter {
         if item.meter != nil {
             drawStems(&context, item: item, xs: xs, doneCount: doneCount)
         }
+        if !fingers.isEmpty {
+            drawFingers(&context, item: item, xs: xs)
+        }
+    }
+
+    /// Finger numbers the way his books write them: above the note for the right hand
+    /// (treble), below it for the left (bass), clear of the staff and the stem. Two at
+    /// once stack, the upper key's finger on top. Fainter as the note becomes a habit.
+    private func drawFingers(_ context: inout GraphicsContext, item: PracticeItem, xs: [CGFloat]) {
+        let ups = item.meter != nil ? Metrics.stemsUp(item) : Array(repeating: true, count: item.notes.count)
+        let size = 1.3 * g
+        for (column, marks) in Dictionary(grouping: fingers, by: \.note) where xs.indices.contains(column) {
+            let clef = item.clef(ofNote: column)
+            let heads = item.positions(ofNote: column).map { geo.y($0.step, on: clef) }
+            let x = xs[column]
+            let hasStem = item.meter != nil && item.notes[column].value.hasStem
+            let stem = self.stem(item: item, index: column, x: x, up: ups[column])
+            let low = marks.sorted { $0.pitch < $1.pitch }
+            if clef == .treble {
+                var y = min(heads.min()! - 1.25 * g, geo.y(8, on: clef) - 0.95 * g)
+                if hasStem, stem.up { y = min(y, stem.tipY - 0.8 * g) }
+                for (i, mark) in low.enumerated() {
+                    drawFinger(&context, mark, at: CGPoint(x: x, y: y - CGFloat(i) * size * 0.85), size: size)
+                }
+            } else {
+                var y = max(heads.max()! + 1.25 * g, geo.y(0, on: clef) + 0.95 * g)
+                if hasStem, !stem.up { y = max(y, stem.tipY + 0.8 * g) }
+                for (i, mark) in low.reversed().enumerated() {
+                    drawFinger(&context, mark, at: CGPoint(x: x, y: y + CGFloat(i) * size * 0.85), size: size)
+                }
+            }
+        }
+    }
+
+    private func drawFinger(_ context: inout GraphicsContext, _ mark: FingerMark, at point: CGPoint, size: CGFloat) {
+        let alpha = 0.35 + 0.65 * mark.strength
+        let text = Text("\(mark.finger)").font(Theme.kidFont(size, weight: .heavy)).foregroundColor(Self.fingerColor.opacity(alpha))
+        context.draw(text, at: point, anchor: .center)
     }
 
     /// Thin then thick, at the end of the screen's last bar: the end, like in his books.

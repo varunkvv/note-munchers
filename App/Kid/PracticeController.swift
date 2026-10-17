@@ -381,6 +381,11 @@ final class PracticeController {
     }
 
     #if DEBUG
+    /// Demo: the session opens on a drill screen of this shape. Before `start`.
+    func demoOpen(with drill: Drill) {
+        session.openWithDrill = drill
+    }
+
     /// Demo: move on from a held success state.
     func demoNext() {
         guard session.phase == .success else { return }

@@ -85,7 +85,8 @@ struct PracticeView: View {
         VStack(spacing: 0) {
             StaffView(
                 spec: controller.spec, item: controller.item, doneCount: controller.doneCount,
-                effects: controller.effects, style: style, gap: Metrics.gap * CGFloat(style.size)
+                effects: controller.effects, style: style, gap: Metrics.gap * CGFloat(style.size),
+                fingers: controller.session.fingerMarks
             )
             .padding(.horizontal, 8)
             .padding(.top, 12)
@@ -112,7 +113,7 @@ struct HintBand: View {
             } else if !controller.session.keyboardHint.isEmpty {
                 // a new note's intro: its letter on the lit key, so he learns its name
                 KeyboardPicture(range: controller.keyboardRange, lit: controller.session.keyboardHint,
-                                letters: controller.session.introNote != nil)
+                                letters: controller.session.introNote != nil, fingers: controller.session.hintFingers)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 14)
                     .transition(.opacity)

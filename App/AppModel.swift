@@ -112,6 +112,7 @@ final class AppModel {
         }
         #if DEBUG
         if demo.isActive { controller.demoAutoPick = demo.autoPick }
+        if let drill = demo.drill { controller.demoOpen(with: drill) }
         #endif
         practice = controller
         screen = .practice

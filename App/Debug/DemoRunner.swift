@@ -22,6 +22,10 @@ import NoteCore
 ///     -demoLevel <n>       start in level n (its first lesson)
 ///     -demoMet YES         every note in the lesson already met (no intros or hatches)
 ///     -demoSize <n>        notes per screen to start at (kept inside the lesson's range)
+///     -demoDrill <name>    the session opens on a drill screen of this shape (run, motif, home,
+///                          repeatNote, echo, shift, movedTwo, brokenTwo, rhythmMotif, tune), no
+///                          warm-up. With -demoScript prompt it holds there, hint2 shows the
+///                          finger on the lit key
 ///     -demoFirstClef <c>   treble|bass: the clef the session's first run is on (one-clef lessons
 ///                          without a focus clef)
 ///     -demoSeed <n>        fixed seed (screens and the kid's note draw), for repeatable screenshots
@@ -59,6 +63,7 @@ struct DemoOptions {
     var level: Int?
     var met = false
     var size: Int?
+    var drill: Drill?
     var firstClef: Clef?
     var seed: UInt64?
     var slow = 1.0
@@ -86,6 +91,7 @@ struct DemoOptions {
         level = defaults.string(forKey: "demoLevel").flatMap(Int.init)
         met = defaults.bool(forKey: "demoMet")
         size = defaults.string(forKey: "demoSize").flatMap(Int.init)
+        drill = defaults.string(forKey: "demoDrill").flatMap(Drill.init(rawValue:))
         firstClef = defaults.string(forKey: "demoFirstClef").flatMap(Clef.init(rawValue:))
         seed = defaults.string(forKey: "demoSeed").flatMap { UInt64($0) }
         slow = defaults.string(forKey: "demoSlow").flatMap(Double.init) ?? 1
@@ -703,7 +709,7 @@ final class DemoRunner {
             return
         }
         let hint = c.session.keyboardHint.map(\.name).joined(separator: ",")
-        print("demo: \(message) | phase=\(c.phase.rawValue) lesson=\(c.session.engine.lesson.id) size=\(c.session.engine.screenSize) screen=\(c.item?.id ?? "-") note=\(c.session.noteIndex) intro=\(c.session.isIntro) keyboard=[\(hint)] screens=\(c.session.summary.screensPlayed) unlocked=\(c.session.summary.unlocked)")
+        print("demo: \(message) | phase=\(c.phase.rawValue) lesson=\(c.session.engine.lesson.id) size=\(c.session.engine.screenSize) screen=\(c.item?.id ?? "-") drill=\(c.session.drill?.rawValue ?? "-") note=\(c.session.noteIndex) intro=\(c.session.isIntro) keyboard=[\(hint)] screens=\(c.session.summary.screensPlayed) unlocked=\(c.session.summary.unlocked)")
     }
 }
 #endif

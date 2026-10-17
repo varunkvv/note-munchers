@@ -13,6 +13,8 @@ struct KeyboardPicture: View {
     var litColor = Theme.keyLit
     /// Show the letter of each lit key, big. Intro screens only.
     var letters = false
+    /// Finger numbers on lit keys (the hint picture), from NoteCore.
+    var fingers: [FingerMark] = []
     var onPress: ((Pitch) -> Void)?
     var onRelease: ((Pitch) -> Void)?
 
@@ -79,6 +81,16 @@ struct KeyboardPicture: View {
             let shape = Path(roundedRect: rect, cornerRadius: layout.whiteWidth * 0.08)
             let isLit = litSet.contains(key.midi) || key == held
             context.fill(shape, with: .color(isLit ? litColor : Theme.keyBlack))
+        }
+        // the finger on a lit key, low on the key where his finger lands (above middle C's dot)
+        for mark in fingers where litSet.contains(mark.pitch.midi) {
+            let rect = layout.rect(mark.pitch)
+            let white = mark.pitch.isWhiteKey
+            let size = white ? min(layout.whiteWidth * 0.95, 34) : min(layout.whiteWidth * 0.62, 22)
+            let y = rect.maxY - (white ? layout.whiteWidth * 1.35 : size * 0.85)
+            let text = Text("\(mark.finger)").font(Theme.kidFont(size, weight: .heavy))
+                .foregroundColor(Theme.ink.opacity(0.35 + 0.65 * mark.strength))
+            context.draw(text, at: CGPoint(x: rect.midX, y: y), anchor: .center)
         }
     }
 }

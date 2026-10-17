@@ -233,6 +233,9 @@ public struct PracticeSession: Sendable {
     public private(set) var runClef: Clef?
     /// Waiting for the last note's key-up (its hold counts).
     public var isAwaitingRelease: Bool { awaitingRelease }
+    /// Demos and screenshots: the session opens on a drill screen of this shape (no
+    /// warm-up). Set before `start`.
+    public var openWithDrill: Drill?
 
     /// True while the current screen is an intro (a new note, or a new lesson texture).
     public var isIntro: Bool { introNote != nil || isLessonIntro }
@@ -338,7 +341,7 @@ public struct PracticeSession: Sendable {
         guard phase == .notStarted else { return [] }
         startTime = time
         engine.beginSession(day: day)
-        warmUpLeft = engine.lesson.clefs.contains { !engine.strongestNotes($0).isEmpty } ? config.warmUpScreens : 0
+        warmUpLeft = openWithDrill == nil && engine.lesson.clefs.contains { !engine.strongestNotes($0).isEmpty } ? config.warmUpScreens : 0
         guard isPianoConnected else {
             pausedAt = time
             resumePhase = nil
@@ -526,6 +529,10 @@ public struct PracticeSession: Sendable {
         if reason == .again, let last = lastPick {
             agains += 1
             pick = engine.again(last)
+        } else if let drill = openWithDrill, let opener = engine.pickDrill(drill, on: clef, using: &rng) {
+            openWithDrill = nil
+            reason = .drill
+            pick = opener
         } else {
             pick = engine.pickScreen(style, clef: clef, using: &rng)
         }
