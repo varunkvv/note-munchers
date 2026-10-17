@@ -258,6 +258,20 @@ final class AppModel {
         store.saveMastery(engine.state, settings: ParentSettings(config))
     }
 
+    /// Start a lesson over: it and the later lessons in its level go back to not done,
+    /// his notes keep their progress.
+    func restartLesson(_ id: LessonID) {
+        guard practice == nil else { return }
+        engine.restartLesson(id)
+        store.saveMastery(engine.state, settings: ParentSettings(config))
+    }
+
+    func restartLevel(_ number: Int) {
+        guard practice == nil else { return }
+        engine.restartLevel(number)
+        store.saveMastery(engine.state, settings: ParentSettings(config))
+    }
+
     #if DEBUG
     /// Demo setup only: start from a given engine.
     func demoReplaceEngine(_ engine: MasteryEngine) {

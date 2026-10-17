@@ -162,7 +162,7 @@ struct ParentView: View {
         } header: {
             Text("Level")
         } footer: {
-            Text("\(engine.lesson.title). Pick a level, or jump to a lesson inside one.")
+            Text("\(engine.lesson.title). Pick a level, jump to a lesson, or start his lesson or level over.")
         }
     }
 
@@ -404,12 +404,23 @@ struct ItemDetailView: View {
     }
 }
 
-/// Levels 1-5 and the lessons inside each. The parent picks a level, or jumps to a
-/// lesson inside one. Lessons move on by themselves as he masters them.
+/// Levels 1-5 and the lessons inside each. The parent picks a level, jumps to a lesson,
+/// or starts a lesson (or the whole level) in his level over. Lessons move on by
+/// themselves as he masters them.
 struct LevelsView: View {
     let model: AppModel
     @State private var level = 1
-    @State private var pending: Lesson?
+    @State private var ask: Ask?
+
+    /// What the confirm dialog asks.
+    enum Ask: Equatable {
+        /// jump to a lesson in another level, or one ahead of him in his (as before)
+        case move(Lesson)
+        /// start a lesson in his level over: the one he's on, or one before it
+        case restart(Lesson)
+        /// start his level over from its first lesson
+        case restartLevel(Level)
+    }
 
     private var engine: MasteryEngine { model.engine }
 
@@ -430,6 +441,8 @@ struct LevelsView: View {
                     }
                     if engine.lesson.level != current.number {
                         Button("Start level \(current.number)") { model.moveToLevel(current.number) }
+                    } else {
+                        Button("Start level \(current.number) over") { ask = .restartLevel(current) }
                     }
                 }
             }
@@ -437,7 +450,7 @@ struct LevelsView: View {
                 Section {
                     ForEach(current.lessons) { lesson in
                         Button {
-                            if lesson.id != engine.lesson.id { pending = lesson }
+                            ask = tapped(lesson)
                         } label: {
                             HStack(alignment: .firstTextBaseline) {
                                 VStack(alignment: .leading, spacing: 3) {
@@ -453,24 +466,114 @@ struct LevelsView: View {
                 } header: {
                     Text("Lessons")
                 } footer: {
-                    Text("Tap a lesson to jump there. Every session mixes treble and bass, and has a short burst of patterns (runs, motifs, echoes) on notes he has met. Each level ends with a lesson of only patterns.")
+                    let tap = current.number == engine.lesson.level
+                        ? "Tap the lesson he's on, or one before it, to start it over. Tap a later one to jump there."
+                        : "Tap a lesson to jump there."
+                    Text("\(tap) Every session mixes treble and bass, and has a short burst of patterns (runs, motifs, echoes) on notes he has met. Each level ends with a lesson of only patterns.")
                 }
             }
         }
         .navigationTitle("Level and lesson")
-        .onAppear { level = engine.lesson.level }
+        .onAppear {
+            level = engine.lesson.level
+            #if DEBUG
+            demoTap()
+            #endif
+        }
         .confirmationDialog(
-            pending.map { "Move to lesson \($0.id)?" } ?? "",
-            isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }),
+            ask.map(title) ?? "",
+            isPresented: Binding(get: { ask != nil }, set: { if !$0 { ask = nil } }),
             titleVisibility: .visible
         ) {
-            if let lesson = pending {
-                Button("Move to \(lesson.id) \(lesson.title.lowercased())") { model.moveToLesson(lesson.id) }
+            switch ask {
+            case .move(let lesson):
+                Button("Move to \(lesson.id) \(lesson.title.lowercased())") { perform(.move(lesson)) }
+            case .restart(let lesson):
+                Button("Start \(lesson.id) over", role: .destructive) { perform(.restart(lesson)) }
+            case .restartLevel(let level):
+                Button("Start level \(level.number) over", role: .destructive) { perform(.restartLevel(level)) }
+            case nil:
+                EmptyView()
             }
         } message: {
-            Text("Lessons in between aren't marked done. Going back means he plays that lesson until it's solid again, then moves on to the first lesson that isn't done.")
+            Text(ask.map(message) ?? "")
         }
     }
+
+    /// In his level, the lesson he's on, a done one or one he passed starts over. One ahead
+    /// of him, or any lesson in another level, is a jump as before.
+    private func tapped(_ lesson: Lesson) -> Ask {
+        guard lesson.level == engine.lesson.level, engine.status(ofLesson: lesson.id) != .upcoming else { return .move(lesson) }
+        return .restart(lesson)
+    }
+
+    private func perform(_ ask: Ask) {
+        switch ask {
+        case .move(let lesson): model.moveToLesson(lesson.id)
+        case .restart(let lesson): model.restartLesson(lesson.id)
+        case .restartLevel(let level): model.restartLevel(level.number)
+        }
+    }
+
+    private func title(_ ask: Ask) -> String {
+        switch ask {
+        case .move(let lesson): "Move to lesson \(lesson.id)?"
+        case .restart(let lesson): "Start lesson \(lesson.id) over?"
+        case .restartLevel(let level): "Start level \(level.number) over?"
+        }
+    }
+
+    private func message(_ ask: Ask) -> String {
+        let lesson: Lesson
+        switch ask {
+        case .move:
+            return "Lessons in between aren't marked done. Going back means he plays that lesson until it's solid again, then moves on to the first lesson that isn't done."
+        case .restart(let restarted): lesson = restarted
+        case .restartLevel(let level): lesson = level.lessons[0]
+        }
+        let rest = (engine.curriculum.level(lesson.level)?.lessons ?? []).drop(while: { $0.id != lesson.id })
+        var lines = ["He starts \(lesson.id) (\(lesson.title)) from the beginning."]
+        let undone = rest.map(\.id).filter { engine.status(ofLesson: $0) == .completed }
+        if !undone.isEmpty {
+            lines.append("\(undone.formatted(.list(type: .and))) \(undone.count == 1 ? "goes" : "go") back to not done on his path.")
+        }
+        // level 1 adds a letter a lesson: the ones he met later wait for their lessons
+        let met = Set(engine.metNotes)
+        let waiting = Set(rest.flatMap(\.keys)).subtracting(lesson.keys).filter(met.contains).sorted()
+        var letters: [String] = []
+        for key in waiting {
+            if let name = NoteName(key.pitch)?.rawValue, !letters.contains(name) { letters.append(name) }
+        }
+        if !letters.isEmpty {
+            lines.append("\(letters.formatted(.list(type: .and))) \(letters.count == 1 ? "waits for its lesson" : "wait for their lessons").")
+        }
+        lines.append("His notes and munchers keep all their progress, only his place in the level moves back.")
+        return lines.joined(separator: " ")
+    }
+
+    #if DEBUG
+    /// `-demoTap <lesson id>|level`: as if the parent tapped that lesson (or "start level n
+    /// over"), so the dialog can be screenshotted (simctl can't tap). With `-demoTapConfirm
+    /// YES` its button is tapped too, 1.5s later.
+    private func demoTap() {
+        let defaults = UserDefaults.standard
+        guard let target = defaults.string(forKey: "demoTap") else { return }
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            if target == "level" {
+                ask = .restartLevel(engine.level)
+            } else if let lesson = engine.curriculum.lesson(target) {
+                level = lesson.level
+                ask = tapped(lesson)
+            }
+            guard defaults.bool(forKey: "demoTapConfirm"), let asked = ask else { return }
+            try? await Task.sleep(for: .seconds(1.5))
+            ask = nil
+            perform(asked)
+            print("demo: tapped \(title(asked)) -> lesson \(engine.lesson.id), done \(engine.state.completedLessons.sorted())")
+        }
+    }
+    #endif
 
     static func drillName(_ drill: Drill) -> String {
         switch drill {
