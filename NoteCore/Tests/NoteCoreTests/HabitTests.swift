@@ -195,3 +195,16 @@ import Testing
         #expect(MasteryEngine(state: decoded).isHabit(g))
     }
 }
+
+@Suite struct ParentMoveDayTests {
+    /// A parent moving him into a drill lesson between sessions: his last session's day
+    /// isn't a day in the new lesson, so the 2-day floor and the day cap start fresh.
+    @Test func aParentMoveStartsTheLessonsDaysFresh() {
+        var engine = engine(in: "1.4")
+        engine.beginSession(day: 5)
+        engine.moveToLesson("1.5")
+        #expect(engine.state.lessonDays.isEmpty)
+        engine.beginSession(day: 6)
+        #expect(engine.state.lessonDays == [6])
+    }
+}

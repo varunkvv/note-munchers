@@ -461,7 +461,10 @@ public struct MasteryEngine: Sendable {
     @discardableResult
     public mutating func moveToLesson(_ id: LessonID) -> [ItemID] {
         guard curriculum.lesson(id) != nil, id != state.lesson else { return [] }
-        return enter(id)
+        let unlocked = enter(id)
+        // between sessions: his last session's day isn't a day in this lesson
+        state.lessonDays = []
+        return unlocked
     }
 
     /// Parent picks a level: its first lesson that isn't done (or its first lesson).
