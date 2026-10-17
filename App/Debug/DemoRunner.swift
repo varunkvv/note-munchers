@@ -59,6 +59,8 @@ import NoteCore
 ///                          a look, two more (the band plays it). The bar comes back as an extra
 ///                          page at the end, where the script waits 4s x -demoSlow
 ///     -demoSongIdle YES    ...stuck without pressing anything instead (8s, then 10s more)
+///     -demoTune <name>     song time plays this familiar tune (a mystery song), e.g. mary,
+///                          jinglebells, odetojoy, hotcross, lightlyrow, auclair
 ///     -demoPath <x>        the level path: every lesson before his in the level done, his
 ///                          stone at x (0...0.9), for home / lane screenshots
 ///     -demoLevelUp YES     he has just reached his level by finishing the one before, so the
@@ -93,6 +95,7 @@ struct DemoOptions {
     var songEnd = false
     var songStuck: Int?
     var songIdle = false
+    var tune: String?
     var path: Double?
     var levelUp = false
 
@@ -122,6 +125,7 @@ struct DemoOptions {
         songEnd = defaults.bool(forKey: "demoSongEnd")
         songStuck = defaults.string(forKey: "demoSongStuck").flatMap(Int.init)
         songIdle = defaults.bool(forKey: "demoSongIdle")
+        tune = defaults.string(forKey: "demoTune")
         path = defaults.string(forKey: "demoPath").flatMap(Double.init)
         levelUp = defaults.bool(forKey: "demoLevelUp")
     }

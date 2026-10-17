@@ -89,9 +89,11 @@ public struct Song: Hashable, Codable, Sendable {
     /// The bar that comes back once at the end, as its own page (`withComeBack`): the bar
     /// he needed the band's help with. nil for the song as written.
     public let comeBack: Int?
+    /// A familiar tune's real name (the end card reveals it), nil for a made-up song.
+    public let tune: String?
 
     public init(seed: UInt64, level: Int, meter: Meter, keySignature: KeySignature, form: SongForm, bars: [SongBar],
-                title: String, layout: StaffLayout, isFallback: Bool = false, comeBack: Int? = nil) {
+                title: String, layout: StaffLayout, isFallback: Bool = false, comeBack: Int? = nil, tune: String? = nil) {
         precondition(!bars.isEmpty)
         for bar in bars {
             precondition(bar.notes.reduce(0) { $0 + $1.span } == Double(meter.beats), "a \(meter.rawValue) bar")
@@ -108,6 +110,7 @@ public struct Song: Hashable, Codable, Sendable {
         self.layout = layout
         self.isFallback = isFallback
         self.comeBack = comeBack
+        self.tune = tune
     }
 
     /// The song with bar `bar` once more after its last bar, on a page of its own: the bar
@@ -116,7 +119,7 @@ public struct Song: Hashable, Codable, Sendable {
     public func withComeBack(bar: Int) -> Song {
         guard comeBack == nil, bars.indices.contains(bar) else { return self }
         return Song(seed: seed, level: level, meter: meter, keySignature: keySignature, form: form, bars: bars + [bars[bar]],
-                    title: title, layout: layout, isFallback: isFallback, comeBack: bar)
+                    title: title, layout: layout, isFallback: isFallback, comeBack: bar, tune: tune)
     }
 
     /// Bars of the song as written (not the come-back bar).
@@ -242,14 +245,17 @@ public struct PlayedSong: Hashable, Codable, Sendable {
     public var signature: String
     /// The hands it used, phrase 1 then phrase 2.
     public var hands: [Clef]
+    /// A familiar tune's name, nil for a made-up song.
+    public var tune: String?
 
-    public init(seed: UInt64, signature: String, hands: [Clef]) {
+    public init(seed: UInt64, signature: String, hands: [Clef], tune: String? = nil) {
         self.seed = seed
         self.signature = signature
         self.hands = hands
+        self.tune = tune
     }
 
     public init(_ song: Song) {
-        self.init(seed: song.seed, signature: song.signature, hands: song.hands)
+        self.init(seed: song.seed, signature: song.signature, hands: song.hands, tune: song.tune)
     }
 }

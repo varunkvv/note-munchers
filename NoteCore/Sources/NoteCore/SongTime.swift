@@ -102,9 +102,11 @@ extension MasteryEngine {
         return Clef.allCases[weightedIndex(weights, using: &rng)]
     }
 
-    /// The next song for this seed, or nil before song time.
+    /// The next song for this seed, or nil before song time: now and then a familiar tune
+    /// (FamiliarTunes.swift), otherwise a made-up one.
     public func makeSong(seed: UInt64) -> Song? {
-        songRequest(seed: seed).map { SongGenerator.song($0, seed: seed) }
+        if let tune = familiarTune(seed: seed) { return tune }
+        return songRequest(seed: seed).map { SongGenerator.song($0, seed: seed) }
     }
 
     /// Remember a song he was given, so the next ones are different. Keeps the last 20.

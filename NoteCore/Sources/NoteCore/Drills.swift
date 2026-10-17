@@ -491,18 +491,19 @@ extension MasteryEngine {
     }
 
     /// The first bar or two of a tune whose every note he has on this clef, as many bars
-    /// as fit in `size` notes (at least one).
+    /// as fit in `size` notes (at least one). Tunes from his level down, and never a bit
+    /// that's one key all through (Jingle Bells' first two bars are all B).
     private func tuneDraft(on clef: Clef, size n: Int, using rng: inout some RandomNumberGenerator) -> DrillDraft? {
         let notes = Set(drillNotes(clef))
         let limit = max(n, lesson.drillSizes.upperBound)
         var fits: [(tune: Tune, keys: [[NoteKey]])] = []
-        for tune in Tune.all {
+        for tune in Tune.all where tune.level <= lesson.level {
             var taken: [[NoteKey]] = []
             for bar in tune.keys(clef).prefix(2) {
                 guard taken.joined().count + bar.count <= limit, bar.allSatisfy(notes.contains) else { break }
                 taken.append(bar)
             }
-            if !taken.isEmpty { fits.append((tune, taken)) }
+            if !taken.isEmpty, Set(taken.joined()).count > 1 { fits.append((tune, taken)) }
         }
         guard !fits.isEmpty else { return nil }
         let (tune, keys) = fits[min(fits.count - 1, Int(unitInterval(&rng) * Double(fits.count)))]

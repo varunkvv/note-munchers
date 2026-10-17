@@ -193,7 +193,16 @@ final class AppModel {
         if let demoSeed = demo.seed { seed = demoSeed &+ UInt64(songsMade) }
         songsMade += 1
         #endif
-        guard let made = engine.makeSong(seed: seed) else { return }
+        var next = engine.makeSong(seed: seed)
+        #if DEBUG
+        // -demoTune: that familiar tune, in the first clef it fits
+        if let name = demo.tune?.lowercased(),
+           let tune = Tune.all.first(where: { $0.name.lowercased().replacingOccurrences(of: " ", with: "").hasPrefix(name) }) {
+            let clef = engine.familiarTunes.first { $0.tune == tune }?.clefs.first ?? engine.songClefs.first ?? .treble
+            next = engine.song(tune, clef: clef, seed: seed)
+        }
+        #endif
+        guard let made = next else { return }
         engine.rememberSong(made)
         store.saveMastery(engine.state, settings: ParentSettings(config))
         let engine = self.engine
@@ -207,7 +216,7 @@ final class AppModel {
         song = controller
         screen = .song
         #if DEBUG
-        print("song: \(made.title), level \(made.level), \(made.meter.rawValue), \(made.form.rawValue)\(made.isFallback ? " (fallback)" : ""): \(made.signature)")
+        print("song: \(made.title)\(made.tune.map { " (\($0))" } ?? ""), level \(made.level), \(made.meter.rawValue), \(made.form.rawValue)\(made.isFallback ? " (fallback)" : ""): \(made.signature)")
         #endif
     }
 

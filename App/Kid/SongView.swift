@@ -5,8 +5,9 @@ import SwiftUI
 ///
 /// Calm on purpose: only the page fade moves in the staff area, one muncher at a time
 /// moves in the lane, and reduce motion makes everything still or instant. Text is only
-/// "Song time!", the title, "Let's play!", "One more time!" over the come-back bar,
-/// "You played it!", "Listen", "New song", "All done".
+/// "Song time!", the title ("Mystery song!" for a familiar tune), "Let's play!", "One
+/// more time!" over the come-back bar, "You played it!" (or the tune's name: "You played
+/// Mary Had a Little Lamb!"), "Listen", "New song", "All done".
 struct SongView: View {
     let controller: SongController
     let input: InputHub
@@ -217,8 +218,8 @@ struct PageDots: View {
 
 // MARK: - end card
 
-/// The band bowing, the song's name, "You played it!", then Listen, New song and All
-/// done, the same size. Listen plays his song with the backing while the band hops on
+/// The band bowing, the song's name, "You played it!" (a familiar tune's name revealed
+/// here, "You played Jingle Bells!"), then Listen, New song and All done, the same size. Listen plays his song with the backing while the band hops on
 /// the beat. One recorded line (show a grown-up), nothing new.
 struct SongEndCard: View {
     let controller: SongController
@@ -236,9 +237,13 @@ struct SongEndCard: View {
                     .lineLimit(1)
                 BandView(controller: controller, onRug: true)
                     .frame(width: min(proxy.size.width * 0.75, s * 1.0), height: s * 0.36)
-                Text("You played it!")
+                Text(controller.written.tune.map { "You played \($0)!" } ?? "You played it!")
                     .font(Theme.kidFont(s * 0.06, weight: .heavy))
                     .foregroundStyle(Theme.song.mix(with: .black, by: 0.3))
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(2)
+                    .padding(.horizontal, 24)
                 HStack(alignment: .top, spacing: button * 0.5) {
                     SongButton(title: "Listen", symbol: "speaker.wave.2.fill", size: button, color: Theme.keyLit,
                                enabled: controller.phase == .end, action: controller.listen)
