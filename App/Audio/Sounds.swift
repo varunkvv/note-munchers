@@ -1,7 +1,11 @@
 import AVFoundation
 import NoteCore
 
-/// Chime, chomp, hint pitches and phrase playback.
+/// Chime, chomp, clap, hint pitches and phrase playback.
+///
+/// Nothing here plays mid-session except the piano: hint pitches, the play button,
+/// song time. The chime, chomp and clap are for home and the end screen only, at
+/// `effectVolume` (varun: "too many sounds", "too loud").
 ///
 /// Every sound is rendered up front into a PCM buffer and played on a small pool of
 /// player nodes, so there's no render callback and no audio-thread state to guard.
@@ -43,32 +47,30 @@ final class Sounds {
         return player
     }
 
+    /// The chime, chomp and clap play at this, the piano (hints, songs) at full.
+    static let effectVolume: Float = 0.35
+
     // MARK: what the app plays
 
-    /// Right key: a soft two-note bell.
+    /// A soft two-note bell (home, the end screen buttons).
     func chime() {
-        play(cached("chime") { Synth.chime(format: $0) })
+        play(cached("chime") { Synth.chime(format: $0) }, volume: Self.effectVolume)
     }
 
-    /// A muncher eats the note.
+    /// A muncher eats the note (the intro cards).
     func chomp() {
-        play(cached("chomp") { Synth.chomp(format: $0) })
+        play(cached("chomp") { Synth.chomp(format: $0) }, volume: Self.effectVolume)
     }
 
     /// A high five.
     func clap() {
-        play(cached("clap") { Synth.clap(format: $0) })
-    }
-
-    /// An egg hatches.
-    func pop() {
-        play(cached("pop") { Synth.pop(format: $0) })
+        play(cached("clap") { Synth.clap(format: $0) }, volume: Self.effectVolume)
     }
 
     /// Hint: the right key(s), sounded together.
-    func play(_ pitches: [Pitch]) {
+    func play(_ pitches: [Pitch], volume: Float = 1) {
         let key = "pitch:" + pitches.map { String($0.midi) }.joined(separator: ",")
-        play(cached(key) { Synth.tone(pitches.map(\.midi), duration: 1.2, format: $0) })
+        play(cached(key) { Synth.tone(pitches.map(\.midi), duration: 1.2, format: $0) }, volume: volume)
     }
 
     /// Plays an item back (rhythm lines get played to him before he tries them).
@@ -151,11 +153,12 @@ final class Sounds {
         return buffer
     }
 
-    private func play(_ buffer: AVAudioPCMBuffer?) {
+    private func play(_ buffer: AVAudioPCMBuffer?, volume: Float = 1) {
         guard !isMuted, let buffer, ensureRunning() else { return }
         let player = players[nextPlayer]
         nextPlayer = (nextPlayer + 1) % players.count
         player.stop()
+        player.volume = volume
         player.scheduleBuffer(buffer, at: nil, options: [])
         player.play()
     }
@@ -283,19 +286,6 @@ enum Synth {
                 low += 0.25 * (noise - low)
                 let env = min(1, t / 0.002) * exp(-t * 38)
                 data[i] += Float(0.5 * env * (noise - low))
-            }
-        }
-    }
-
-    /// A quick rising pop for an egg hatching.
-    static func pop(format: AVAudioFormat) -> AVAudioPCMBuffer? {
-        buffer(seconds: 0.25, format: format) { data, frames, rate in
-            var phase = 0.0
-            for i in 0..<frames {
-                let t = Double(i) / rate
-                phase += 2 * .pi * (420 + 2400 * t) / rate
-                let env = min(1, t / 0.004) * exp(-t * 14)
-                data[i] += Float(0.25 * env * sin(phase))
             }
         }
     }

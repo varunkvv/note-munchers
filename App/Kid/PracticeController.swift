@@ -144,10 +144,6 @@ final class PracticeController {
         }
     }
 
-    func playHatchPop() {
-        sounds.pop()
-    }
-
     /// Leaves early (the "done for now" door). Whatever he finished is already saved.
     func stop() {
         stopped = true
@@ -224,14 +220,12 @@ final class PracticeController {
                 }
                 soundHintAt = Date()
             case .correct(let note):
+                // no chime or chomp mid-session (varun): the piano already made the sound
                 effects.add(.sparkle, column: note, duration: 0.7)
-                sounds.chime()
                 if let item = session.item, item.notes.indices.contains(note) {
                     eaten = item.notes[note].keys
                 }
                 gobbleCount += 1
-                // the chomp lands when the note reaches the mouth
-                later(MuncherLane.gobbleLength * 0.5) { $0.sounds.chomp() }
             case .say(let speech):
                 let talking = voice.say(speech)
                 if speech == .keptTrying || speech == .lookedCarefully {
@@ -391,8 +385,8 @@ final class PracticeController {
             c.voice.say(.levelUp)
             // a little "ta-da" up the G chord
             let notes = ["G4", "B4", "D5"].compactMap { Pitch($0) }
-            for (i, p) in notes.enumerated() { c.later(0.14 * Double(i)) { $0.sounds.play([p]) } }
-            c.later(0.45) { $0.sounds.play(["G4", "B4", "D5", "G5"].compactMap { Pitch($0) }) }
+            for (i, p) in notes.enumerated() { c.later(0.14 * Double(i)) { $0.sounds.play([p], volume: Sounds.effectVolume) } }
+            c.later(0.45) { $0.sounds.play(["G4", "B4", "D5", "G5"].compactMap { Pitch($0) }, volume: Sounds.effectVolume) }
         }
     }
 

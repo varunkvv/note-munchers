@@ -16,6 +16,8 @@ import NoteCore
 @MainActor
 final class Voice: NSObject, AVAudioPlayerDelegate {
     var isMuted = false
+    /// Under the piano (varun: "voice is also too loud").
+    static let volume: Float = 0.5
     /// DEBUG: print every line, so demo runs show what was said.
     var logs = false
 
@@ -130,6 +132,7 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
             guard !isMuted else { continue }
             do {
                 let player = try AVAudioPlayer(contentsOf: clip.url)
+                player.volume = Self.volume
                 player.delegate = self
                 player.prepareToPlay()
                 players.append(player)

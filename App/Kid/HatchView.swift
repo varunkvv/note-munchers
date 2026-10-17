@@ -87,7 +87,6 @@ struct HatchView: View {
             centered = false
             try? await Task.sleep(for: .seconds(rockLength + hatchLength * (0.55 - Self.crackAt)))
             guard !Task.isCancelled else { return }
-            controller.playHatchPop()
             try? await Task.sleep(for: .seconds(hatchLength * 0.45))
             guard !Task.isCancelled else { return }
             hatched = true
@@ -181,7 +180,6 @@ struct HatchView: View {
     private func pick(_ index: Int) {
         guard chosen == nil, hatched else { return }
         withAnimation(.easeOut(duration: 0.35)) { chosen = index }
-        controller.playHatchPop()
         if !reduceMotion {
             withAnimation(.spring(duration: 0.3, bounce: 0.6).delay(0.1)) { hop = true }
             withAnimation(.spring(duration: 0.3, bounce: 0.4).delay(0.45)) { hop = false }
