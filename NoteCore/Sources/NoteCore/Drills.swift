@@ -130,7 +130,9 @@ extension MasteryEngine {
             order.append(options[i])
             weights[i] = 0
         }
-        for drill in order + [.run] {
+        // the last drill again only when nothing else works, a run as the last resort
+        let last = state.lastDrill.flatMap { lesson.drills.contains($0) && !order.contains($0) ? [$0] : nil } ?? []
+        for drill in order + last + [.run] {
             let meter = rollMeter(using: &rng)
             if let draft = draft(drill, on: clef, size: size, meter: meter, using: &rng) {
                 return finish(draft, drill: drill, meter: draft.meter ?? meter, clef: clef, size: size, strongest: false, using: &rng)
@@ -383,12 +385,17 @@ extension MasteryEngine {
         guard case .dyads(let intervals) = lesson.texture else { return nil }
         let notes = drillNotes(clef)
         guard let (position, inside) = drillPosition(notes, on: clef, using: &rng) else { return nil }
-        let interval = drill == .movedTwo ? (intervals.contains(2) ? 2 : intervals[0])
-            : intervals[min(intervals.count - 1, Int(unitInterval(&rng) * Double(intervals.count)))]
-        let pairs = inside.compactMap { low -> (NoteKey, NoteKey)? in
-            inside.first { $0.pitch.diatonicIndex - low.pitch.diatonicIndex == interval }.map { (low, $0) }
+        let pairsOf = { (interval: Int) in
+            inside.compactMap { low -> (NoteKey, NoteKey)? in
+                inside.first { $0.pitch.diatonicIndex - low.pitch.diatonicIndex == interval }.map { (low, $0) }
+            }
         }
-        guard pairs.count >= 2 else { return nil }
+        // moved: thirds (G+B, A+C, B+D). broken: any of the lesson's, so fifths come up too
+        let usable = intervals.filter { pairsOf($0).count >= (drill == .movedTwo ? 2 : 1) }
+        guard !usable.isEmpty else { return nil }
+        let interval = drill == .movedTwo && usable.contains(2) ? 2
+            : usable[min(usable.count - 1, Int(unitInterval(&rng) * Double(usable.count)))]
+        let pairs = pairsOf(interval)
         let dyad = { (p: (NoteKey, NoteKey)) in WrittenNote(clef, [p.0.pitch, p.1.pitch]) }
         if drill == .movedTwo {
             // the pairs as one run: up a step each column, turning at the ends
@@ -401,7 +408,7 @@ extension MasteryEngine {
         // broken then together, once or twice (moved a step), a bar each
         let start = min(pairs.count - 1, Int(unitInterval(&rng) * Double(pairs.count)))
         var cells = [pairs[start]]
-        if n >= 6, meter.beats >= 3 {
+        if n >= 6, pairs.count >= 2 {
             let next = start + 1 < pairs.count ? start + 1 : start - 1
             cells.append(pairs[next])
         }

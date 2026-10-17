@@ -27,7 +27,7 @@ import Testing
     // MARK: what each level listens to
 
     @Test func levelsOneAndTwoAreDisplayOnly() {
-        for id in ["1.1", "1.4", "2.1", "2.5"] {
+        for id in ["1.1", "1.4", "2.1", "2.3"] {
             #expect(Curriculum.standard.lesson(id)!.rhythmCheck == .off)
             var bench = Bench(engine(in: id, config: long), seed: 3)
             _ = bench.start()

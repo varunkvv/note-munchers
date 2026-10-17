@@ -18,7 +18,7 @@ import NoteCore
 ///     -demoScreen <name>   open a screen directly: home, parent, parent#levels, parent#staff,
 ///                          parent#history, levels (the level picker), monitor, gallery
 ///                          (generated screens of -demoLesson)
-///     -demoLesson <id>     start in lesson id (e.g. 2.5)
+///     -demoLesson <id>     start in lesson id (e.g. 2.3)
 ///     -demoLevel <n>       start in level n (its first lesson)
 ///     -demoMet YES         every note in the lesson already met (no intros or hatches)
 ///     -demoSize <n>        notes per screen to start at (kept inside the lesson's range)

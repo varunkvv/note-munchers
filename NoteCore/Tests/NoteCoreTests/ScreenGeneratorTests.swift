@@ -210,7 +210,7 @@ import Testing
             if id != "1.1" { #expect((moves[2] ?? 0) > 0, "\(id): a third now and then: \(moves)") }
         }
         // level 2 is unchanged: skips lessons still skip a fourth or a fifth
-        var skips = stayIn("2.3")
+        var skips = stayIn("2.2")
         let wide = run(&skips, 200).contains { pick in
             let keys = pick.item.notes.flatMap(\.keys)
             return zip(keys, keys.dropFirst()).contains { abs($0.pitch.diatonicIndex - $1.pitch.diatonicIndex) > 2 }

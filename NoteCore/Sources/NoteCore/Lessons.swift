@@ -255,32 +255,36 @@ extension Curriculum {
                 treble: ClefNotes(known: [g4, a4, b4, c5], new: [d5], start: 1), bass: ClefNotes(known: [g2, a2, b2, c3], new: [d3], start: 1),
                 sizes: 2...3, octavePolicy: .lenient, contour: .gentle, paced: true
             ),
+            // each level ends with a drill lesson (plans/2026-10-16-drills-and-habit.md)
+            Lesson(
+                "1.5", level: 1, title: "G position patterns", focus: .both,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 3...4, octavePolicy: .lenient, contour: .gentle,
+                drills: [.run, .home, .repeatNote, .motif, .tune], isDrillLesson: true
+            ),
         ]),
+        // sessions run in clef blocks now, so level 2's four one-clef lessons became two
+        // both-clef ones (steps, then skips) in the drills round
         Level(number: 2, title: "G position, steps and skips", lessons: [
             Lesson(
-                "2.1", level: 2, title: "Treble steps", focus: .treble,
+                "2.1", level: 2, title: "Steps, both clefs", focus: .both,
                 treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
                 sizes: 3...4, octavePolicy: .lenient, contour: .steps
             ),
             Lesson(
-                "2.2", level: 2, title: "Bass steps", focus: .bass,
-                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
-                sizes: 3...4, octavePolicy: .lenient, contour: .steps
-            ),
-            Lesson(
-                "2.3", level: 2, title: "Treble skips", focus: .treble,
+                "2.2", level: 2, title: "Skips, both clefs", focus: .both,
                 treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
                 sizes: 3...4, octavePolicy: .lenient, contour: .skips
             ),
             Lesson(
-                "2.4", level: 2, title: "Bass skips", focus: .bass,
-                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
-                sizes: 3...4, octavePolicy: .lenient, contour: .skips
-            ),
-            Lesson(
-                "2.5", level: 2, title: "Grand staff: a treble bar and a bass bar", focus: .both, layout: .grand,
+                "2.3", level: 2, title: "Grand staff: a treble bar and a bass bar", focus: .both, layout: .grand,
                 treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
                 sizes: 4...6, octavePolicy: .lenient
+            ),
+            Lesson(
+                "2.4", level: 2, title: "Patterns and echoes", focus: .both, layout: .grand,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 4...6, octavePolicy: .lenient, drills: [.motif, .echo], isDrillLesson: true
             ),
         ]),
         // G major from here on: the key signature's sharp is on every screen, and F is
@@ -321,6 +325,15 @@ extension Curriculum {
                 treble: ClefNotes(known: trebleWide), bass: ClefNotes(known: bassWide),
                 sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor
             ),
+            // G and D position (F# under finger 3), home on middle C, and shift screens:
+            // each bar in a different position. No new notes
+            Lesson(
+                "3.7", level: 3, title: "Hand positions", focus: .both,
+                treble: ClefNotes(known: trebleWide), bass: ClefNotes(known: bassWide),
+                sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor,
+                drills: [.motif, .home, .shift], isDrillLesson: true,
+                drillPositions: [.g(.treble), .d(.treble), .g(.bass), .d(.bass)], home: .middleC
+            ),
         ]),
         Level(number: 4, title: "Two notes at once", lessons: [
             Lesson(
@@ -342,6 +355,13 @@ extension Curriculum {
                 "4.4", level: 4, title: "Grand staff, two at once", focus: .both, layout: .grand,
                 treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
                 sizes: 4...6, octavePolicy: .strict, keySignature: .gMajor, texture: .dyads(intervals: [2, 3, 4])
+            ),
+            // a two at once moved by step (G+B, A+C, B+D), and broken then together (G B, G+B)
+            Lesson(
+                "4.5", level: 4, title: "Same shape, moved", focus: .both,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 3...5, octavePolicy: .strict, keySignature: .gMajor, texture: .dyads(intervals: [2, 3, 4]),
+                drills: [.movedTwo, .brokenTwo], isDrillLesson: true
             ),
         ]),
         // rhythm on notes he knows (G position). 2 bars at most: wider lines don't fit
@@ -376,6 +396,14 @@ extension Curriculum {
                 treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
                 sizes: 2...2, octavePolicy: .strict, keySignature: .gMajor,
                 texture: .rhythm(values: [.eighth, .quarter, .half], oneNote: false)
+            ),
+            // a one-bar rhythm repeated a step higher, or the same notes with a new rhythm
+            Lesson(
+                "5.6", level: 5, title: "Rhythm motifs", focus: .both,
+                treble: ClefNotes(known: trebleG), bass: ClefNotes(known: bassG),
+                sizes: 2...2, octavePolicy: .strict, keySignature: .gMajor,
+                texture: .rhythm(values: [.eighth, .quarter, .half], oneNote: false),
+                drills: [.rhythmMotif], isDrillLesson: true
             ),
         ]),
     ])

@@ -66,9 +66,10 @@ import Testing
     }
 
     /// The notes-per-screen ramp holds: a reading screen has his size (one more on a
-    /// stretch), except that a 3/4 screen tops out at 6 notes.
+    /// stretch), except that a 3/4 screen tops out at 6 notes. (A drill lesson's screens
+    /// are drills, shaped by the drill: DrillLessonTests.)
     @Test func readingScreensHaveHisSize() {
-        for lesson in Curriculum.standard.lessons where !lesson.texture.isRhythm {
+        for lesson in Curriculum.standard.lessons where !lesson.texture.isRhythm && !lesson.isDrillLesson {
             var engine = engine(in: lesson.id, config: stay)
             var rng = SeededRandom(seed: 3)
             var sizes = Set<Int>()
@@ -120,7 +121,7 @@ import Testing
     }
 
     @Test func grandStaffBarsAreOneStaffEach() {
-        for id in ["2.5", "3.6", "4.4", "5.5"] {
+        for id in ["2.3", "3.6", "4.4", "5.5"] {
             for pick in screens(id, count: 60) where pick.intro == nil && !pick.isLessonIntro {
                 let item = pick.item
                 #expect(item.layout == .grand)

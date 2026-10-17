@@ -36,7 +36,7 @@ import Testing
 
     @Test func drillScreensHaveTheirShape() throws {
         var seen = Set<Drill>()
-        for id in ["1.4", "2.1", "2.5", "3.6", "4.1", "5.3"] {
+        for id in ["1.4", "2.1", "2.3", "3.6", "4.1", "5.3"] {
             var previous: Drill?
             for pick in drills(id, clef: id == "2.1" ? .bass : .treble) {
                 let drill = try #require(pick.drill, "\(id): a drill screen has its drill")
@@ -99,7 +99,7 @@ import Testing
 
     /// One hand position per bar, every note inside it.
     @Test func drillScreensStayInAHandPosition() throws {
-        for id in ["1.2", "2.5", "3.1", "3.5", "3.6", "4.4"] {
+        for id in ["1.2", "2.3", "3.1", "3.5", "3.6", "4.4"] {
             for pick in drills(id, count: 120) {
                 try #require(pick.positions.count == pick.item.notes.count, "\(id) \(pick.item.id)")
                 for range in pick.item.barRanges {
@@ -209,7 +209,7 @@ import Testing
     /// One burst of 3-4 drill screens a session, inside one clef run, the first run about
     /// half the time, never the same drill twice running.
     @Test func oneBurstASessionInsideOneRun() {
-        for id in ["1.2", "2.2", "3.3", "4.1", "5.4", "2.5"] {
+        for id in ["1.2", "2.2", "3.3", "4.1", "5.4", "2.3"] {
             var firstRuns = 0
             for seed: UInt64 in 1...40 {
                 let s = shape(id, seed: seed)

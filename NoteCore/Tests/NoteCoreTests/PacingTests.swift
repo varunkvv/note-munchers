@@ -99,7 +99,8 @@ import Testing
         // a burst of drill screens a session takes some screens from the newest note: G
         // position by session 6 (5 before the drills round), level 2 still by session 8
         #expect(logs[5].treble >= 5 && logs[5].bass >= 5, "all of G position within 6 sessions")
-        #expect(logs[logs.count - 1].lesson.hasPrefix("2.") || logs[logs.count - 1].lesson.hasPrefix("3."), "past level 1 within 8 sessions")
+        // level 1 ends on its drill lesson (1.5) since the drills round
+        #expect(logs[logs.count - 1].lesson == "1.5" || !logs[logs.count - 1].lesson.hasPrefix("1."), "at level 1's last lesson within 8 sessions")
         #expect(logs[logs.count - 1].size >= 3)
     }
 }

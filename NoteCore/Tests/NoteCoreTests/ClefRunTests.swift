@@ -43,7 +43,7 @@ import Testing
     }
 
     @Test func aSessionIsTwoRunsWithOneSwitch() {
-        for id in ["1.1", "1.4", "2.3"] {
+        for id in ["1.1", "1.4", "2.1"] {
             for seed: UInt64 in 1...5 {
                 let played = Self.play(engine(in: id), seed: seed, missEvery: 4)
                 #expect(Self.switches(played.clefs) == 1, "\(id) seed \(seed): \(played.clefs.map(\.rawValue.first!))")
@@ -72,7 +72,7 @@ import Testing
     }
 
     @Test func aFocusClefGoesFirstForAboutTwoThirds() {
-        for (id, focus) in [("2.1", Clef.treble), ("2.4", .bass)] {
+        for (id, focus) in [("3.1", Clef.treble), ("3.2", .bass)] {
             var engine = engine(in: id, config: Self.stay)
             engine.state.lastFirstClef = focus == .treble ? .bass : .treble // would be its turn anyway
             for seed: UInt64 in 1...3 {
@@ -128,7 +128,7 @@ import Testing
     }
 
     @Test func grandStaffLessonsHaveNoRuns() {
-        var bench = Bench(engine(in: "2.5"), seed: 1)
+        var bench = Bench(engine(in: "2.3"), seed: 1)
         _ = bench.start()
         #expect(bench.session.runClef == nil)
         #expect(bench.session.item!.layout == .grand)

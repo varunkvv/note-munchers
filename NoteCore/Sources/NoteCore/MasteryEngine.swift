@@ -496,7 +496,7 @@ public struct MasteryEngine: Sendable {
         // rhythm lessons: the rhythm track too (a rhythm slip never holds back notes,
         // but a rhythm lesson is about the rhythm)
         if lesson.texture.isRhythm, !isRhythmSolid { return false }
-        return state.introduced.contains(lessonIntroID) || lesson.texture == .single
+        return state.introduced.contains(lessonIntroID) || lesson.texture == .single || lesson.isDrillLesson
     }
 
     /// Starts a lesson: fresh windows, then its notes.

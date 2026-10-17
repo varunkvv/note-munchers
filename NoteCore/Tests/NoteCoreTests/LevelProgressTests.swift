@@ -21,7 +21,7 @@ import Testing
         let engine = MasteryEngine(state: MasteryState(seed: 3))
         let path = engine.levelProgress
         #expect(path.level == 1)
-        #expect(path.stones.count == 4)
+        #expect(path.stones.count == 5, "1.1-1.4 and the drill lesson")
         #expect(path.current == 0)
         #expect(path.stones.allSatisfy { $0 == 0 }, "\(path.stones)")
         #expect(path.value == 0)
@@ -99,15 +99,15 @@ import Testing
 
     /// Finishing the last lesson of a level: the new level's path, empty.
     @Test func finishingALevelStartsAnEmptyPath() {
-        var engine = engine("1.4")
+        var engine = engine("1.5")
         solid(&engine)
         for _ in 0..<40 where engine.lesson.level == 1 {
             engine.play(engine.pool, reason: .normal)
         }
         #expect(engine.lesson.id == "2.1")
         let path = engine.levelProgress
-        #expect(path.level == 2 && path.stones.count == 5 && path.current == 0)
-        #expect(engine.levelProgress(ofLevel: 1).stones[3] == 1)
+        #expect(path.level == 2 && path.stones.count == 4 && path.current == 0)
+        #expect(engine.levelProgress(ofLevel: 1).stones[4] == 1)
         #expect(engine.levelProgress(ofLevel: 1).current == nil)
     }
 

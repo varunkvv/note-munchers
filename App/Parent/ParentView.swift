@@ -417,7 +417,7 @@ struct LevelsView: View {
                 } header: {
                     Text("Lessons")
                 } footer: {
-                    Text("Tap a lesson to jump there. Every session mixes treble and bass. Which notes he starts with and which come next are picked at random inside each lesson, so it doesn't feel the same every time.")
+                    Text("Tap a lesson to jump there. Every session mixes treble and bass, and has a short burst of patterns (runs, motifs, echoes) on notes he has met. Each level ends with a lesson of only patterns.")
                 }
             }
         }
@@ -436,6 +436,21 @@ struct LevelsView: View {
         }
     }
 
+    static func drillName(_ drill: Drill) -> String {
+        switch drill {
+        case .run: "runs"
+        case .motif: "motifs"
+        case .home: "home note"
+        case .repeatNote: "repeats"
+        case .echo: "echoes"
+        case .shift: "position shifts"
+        case .movedTwo: "two at once moved"
+        case .brokenTwo: "broken then together"
+        case .rhythmMotif: "rhythm motifs"
+        case .tune: "bits of tunes"
+        }
+    }
+
     /// "treble focus, 2-3 notes a screen, new: E5 G5"
     static func detail(_ lesson: Lesson) -> String {
         let focus = switch lesson.focus {
@@ -446,7 +461,10 @@ struct LevelsView: View {
         let staff = lesson.layout == .grand ? ", grand staff" : ""
         let sizes = lesson.sizes.count == 1 ? "\(lesson.sizes.lowerBound)" : "\(lesson.sizes.lowerBound)-\(lesson.sizes.upperBound)"
         let new = lesson.newKeys.map(\.pitch.name)
-        let notes = new.isEmpty ? "practice" : "new: " + new.joined(separator: " ")
+        var notes = new.isEmpty ? "practice" : "new: " + new.joined(separator: " ")
+        if lesson.isDrillLesson {
+            notes = "patterns: \(lesson.drills.map(Self.drillName).joined(separator: ", "))"
+        }
         let key = lesson.keySignature == .gMajor ? ", G major" : ""
         return "\(focus)\(staff), \(sizes) notes a screen\(key), \(notes)"
     }

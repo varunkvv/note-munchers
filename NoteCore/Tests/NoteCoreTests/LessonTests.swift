@@ -29,11 +29,30 @@ import Testing
     }
 
     /// Level 1 is G and A then one letter a lesson, both clefs every lesson (round 3).
+    /// Level 2 is steps and skips on both clefs (the drills round merged its four
+    /// one-clef lessons: sessions run in clef blocks). From level 3 a level has lessons
+    /// that lean treble, lean bass, and mix.
     @Test func everyLevelHasTrebleBassAndMixedLessons() {
-        for level in curriculum.levels.dropFirst() {
+        for level in curriculum.levels.prefix(2) {
+            #expect(level.lessons.allSatisfy { $0.focus == .both }, "level \(level.number)")
+        }
+        for level in curriculum.levels.dropFirst(2) {
             let focuses = Set(level.lessons.map(\.focus))
             #expect(focuses == [.treble, .bass, .both], "level \(level.number)")
         }
+    }
+
+    /// Each level ends on a drill lesson, a new stone on the path, with no new notes.
+    @Test func everyLevelEndsOnADrillLesson() {
+        for level in curriculum.levels {
+            #expect(level.lessons.last!.isDrillLesson, "level \(level.number)")
+            #expect(level.lessons.dropLast().allSatisfy { !$0.isDrillLesson }, "level \(level.number)")
+            #expect(level.lessons.last!.newKeys.isEmpty, "level \(level.number)")
+        }
+        #expect(curriculum.lesson("1.5")!.keys.count == 10, "all of G position")
+        #expect(curriculum.lesson("2.4")!.layout == .grand && curriculum.lesson("2.4")!.drills == [.motif, .echo])
+        #expect(curriculum.lesson("3.7")!.drills.contains(.shift))
+        #expect(curriculum.lesson("4.5")!.texture != .single && curriculum.lesson("5.6")!.texture.isRhythm)
     }
 
     /// Something to show on each clef the moment a lesson starts.
@@ -68,7 +87,8 @@ import Testing
         for lesson in curriculum.lessons {
             #expect(lesson.sizes.lowerBound >= 1 && lesson.sizes.upperBound <= 8, "\(lesson.id)")
         }
-        #expect(curriculum.level(1)!.lessons.allSatisfy { $0.sizes == 2...3 }, "2 notes a screen, 3 when he's doing well")
+        #expect(curriculum.level(1)!.lessons.filter { !$0.isDrillLesson }.allSatisfy { $0.sizes == 2...3 }, "2 notes a screen, 3 when he's doing well")
+        #expect(curriculum.lessons.allSatisfy { $0.drillSizes.upperBound <= 6 }, "drill screens fit too")
         #expect(curriculum.level(2)!.lessons.filter { $0.layout == .alternating }.allSatisfy { $0.sizes == 3...4 })
     }
 
@@ -159,7 +179,7 @@ import Testing
     }
 
     @Test func grandStaffScreensAreATrebleBarAndABassBar() throws {
-        var engine = engine(in: "2.5", config: stay)
+        var engine = engine(in: "2.3", config: stay)
         #expect(engine.screenSize == 4)
         var rng = SeededRandom(seed: 2)
         var firstClefs = Set<Clef>()
@@ -178,7 +198,7 @@ import Testing
     }
 
     @Test func grandStaffSizeGrowsPastOneClefsRoom() {
-        var engine = engine(in: "2.5", config: stay)
+        var engine = engine(in: "2.3", config: stay)
         var rng = SeededRandom(seed: 4)
         for _ in 0..<40 {
             let pick = engine.pickScreen(using: &rng)
@@ -201,7 +221,7 @@ import Testing
             }
             return (steps, skips)
         }
-        let steps = moves("2.1"), skips = moves("2.3")
+        let steps = moves("2.1"), skips = moves("2.2")
         #expect(steps.steps > steps.skips * 2, "\(steps)")
         #expect(skips.skips > skips.steps * 2, "\(skips)")
     }

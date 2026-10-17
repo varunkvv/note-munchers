@@ -54,8 +54,10 @@ import Testing
 
     /// Each level 3 screen stays inside one five-finger position per staff.
     @Test func levelThreeScreensStayInOneHandPosition() throws {
+        var stay = NoteCoreConfig()
+        stay.lessonMinScreens = 10_000
         for id in ["3.1", "3.2", "3.3", "3.4", "3.5", "3.6"] {
-            var engine = engine(in: id)
+            var engine = engine(in: id, config: stay)
             var rng = SeededRandom(seed: 11)
             var used = Set<HandPosition>()
             for _ in 0..<150 {
