@@ -43,6 +43,10 @@ public struct ItemStats: Hashable, Codable, Sendable {
     public var inLine: [AttemptSample] = []
     /// Its first showing in each of his last few sessions.
     public var sessionFirsts: [SessionFirst] = []
+    /// "Come back to it": the band played it for him in a song, so practice shows it a bit
+    /// more often (`comeBackBoost`) until he has played it right first try this many more
+    /// times. Not a miss: the box doesn't move for it.
+    public var comeBack = 0
 
     public init() {}
 
@@ -429,6 +433,8 @@ public struct MasteryEngine: Sendable {
                 let first = SessionFirst(session: state.session, day: state.sessionDay, clean: automatic)
                 s.sessionFirsts = Array((s.sessionFirsts + [first]).suffix(6))
             }
+            // a note the band helped with in a song: back to normal after a couple right first try
+            if attempt.firstTry, s.comeBack > 0 { s.comeBack -= 1 }
             // stuck isn't wrong: a hint from being stuck alone holds the box where it is
             if attempt.firstTry {
                 s.box = min(config.boxCount, s.box + 1)
@@ -460,6 +466,23 @@ public struct MasteryEngine: Sendable {
         // after moving on: a new lesson starts its stone from empty
         state.lessonPeak = max(state.lessonPeak, liveLessonFraction)
         return update
+    }
+
+    /// The band played these notes for him in a song (he was stuck): practice shows them
+    /// a bit more often until he has played each right first try `comeBackPlays` times.
+    /// Nothing else changes: no box drop, no miss, no stats (songs touch no stats).
+    public mutating func comeBack(to keys: [NoteKey]) {
+        for key in Set(keys) {
+            var s = stats(for: key)
+            s.comeBack = max(s.comeBack, config.comeBackPlays)
+            state.stats[key.id] = s
+        }
+    }
+
+    /// How much more a note is picked on a practice screen: `comeBackBoost` while the band
+    /// helped with it lately, else 1.
+    func comeBackWeight(_ key: NoteKey) -> Double {
+        stats(for: key).comeBack > 0 ? config.comeBackBoost : 1
     }
 
     /// Parent jump: to any lesson, in any level. Lessons in between are not marked done.
@@ -729,6 +752,7 @@ extension ItemStats {
         peakFluency = try c.value(.peakFluency, or: d.peakFluency)
         inLine = try c.value(.inLine, or: d.inLine)
         sessionFirsts = try c.value(.sessionFirsts, or: d.sessionFirsts)
+        comeBack = try c.value(.comeBack, or: d.comeBack)
     }
 }
 

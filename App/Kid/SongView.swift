@@ -5,8 +5,8 @@ import SwiftUI
 ///
 /// Calm on purpose: only the page fade moves in the staff area, one muncher at a time
 /// moves in the lane, and reduce motion makes everything still or instant. Text is only
-/// "Song time!", the title, "Let's play!", "You played it!", "Listen", "New song",
-/// "All done".
+/// "Song time!", the title, "Let's play!", "One more time!" over the come-back bar,
+/// "You played it!", "Listen", "New song", "All done".
 struct SongView: View {
     let controller: SongController
     let input: InputHub
@@ -142,10 +142,18 @@ struct SongPageView: View {
     private var staffColumn: some View {
         GeometryReader { proxy in
             VStack(spacing: 0) {
-                ZStack {
+                ZStack(alignment: .top) {
                     systems
                         .id(controller.page)
                         .transition(.opacity)
+                    // the bar the band helped with, once more before the end
+                    if controller.isComeBackPage {
+                        Text("One more time!")
+                            .font(Theme.kidFont(min(44, proxy.size.height * 0.06), weight: .heavy))
+                            .foregroundStyle(Theme.kidTextSoft)
+                            .padding(.top, 8)
+                            .transition(.opacity)
+                    }
                 }
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: controller.page)
                 .padding(.horizontal, 8)

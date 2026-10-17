@@ -443,7 +443,7 @@ extension MasteryEngine {
                 let fitting = candidates.filter { Self.fits(move, from: previous, to: $0, widest: widest) }
                 if !fitting.isEmpty { candidates = fitting }
             }
-            let weights = candidates.map { Double(config.boxCount + 1 - stats(for: $0).box) }
+            let weights = candidates.map { Double(config.boxCount + 1 - stats(for: $0).box) * comeBackWeight($0) }
             out.append(candidates[weightedIndex(weights, using: &rng)])
         }
         return (out, owed)

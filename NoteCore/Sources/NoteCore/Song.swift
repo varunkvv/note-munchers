@@ -86,10 +86,13 @@ public struct Song: Hashable, Codable, Sendable {
     public let layout: StaffLayout
     /// Made from the hand-written fallback (every candidate broke a rule). Should be rare.
     public let isFallback: Bool
+    /// The bar that comes back once at the end, as its own page (`withComeBack`): the bar
+    /// he needed the band's help with. nil for the song as written.
+    public let comeBack: Int?
 
     public init(seed: UInt64, level: Int, meter: Meter, keySignature: KeySignature, form: SongForm, bars: [SongBar],
-                title: String, layout: StaffLayout, isFallback: Bool = false) {
-        precondition(bars.count == 4 || bars.count == 8)
+                title: String, layout: StaffLayout, isFallback: Bool = false, comeBack: Int? = nil) {
+        precondition(!bars.isEmpty)
         for bar in bars {
             precondition(bar.notes.reduce(0) { $0 + $1.span } == Double(meter.beats), "a \(meter.rawValue) bar")
             precondition(layout.contains(bar.clef))
@@ -104,7 +107,23 @@ public struct Song: Hashable, Codable, Sendable {
         self.title = title
         self.layout = layout
         self.isFallback = isFallback
+        self.comeBack = comeBack
     }
+
+    /// The song with bar `bar` once more after its last bar, on a page of its own: the bar
+    /// he needed the band's help with ("come back to it later on", varun). The tag at the
+    /// end moves to after it. Once a song: a song that already has one stays as it is.
+    public func withComeBack(bar: Int) -> Song {
+        guard comeBack == nil, bars.indices.contains(bar) else { return self }
+        return Song(seed: seed, level: level, meter: meter, keySignature: keySignature, form: form, bars: bars + [bars[bar]],
+                    title: title, layout: layout, isFallback: isFallback, comeBack: bar)
+    }
+
+    /// Bars of the song as written (not the come-back bar).
+    public var writtenBars: Int { comeBack == nil ? bars.count : bars.count - 1 }
+
+    /// Notes of the song as written: the come-back bar's notes start here.
+    public var writtenNotes: Int { bars.prefix(writtenBars).reduce(0) { $0 + $1.notes.count } }
 
     /// Every note, in the order he plays them.
     public var notes: [WrittenNote] { bars.flatMap(\.notes) }
@@ -122,10 +141,10 @@ public struct Song: Hashable, Codable, Sendable {
     public var barOfNote: [Int] { bars.indices.flatMap { b in Array(repeating: b, count: bars[b].notes.count) } }
 
     /// The hand (clef) of phrase 1 and phrase 2.
-    public var hands: [Clef] { [bars[0].clef, bars[bars.count - 1].clef] }
+    public var hands: [Clef] { [bars[0].clef, bars[writtenBars - 1].clef] }
 
     /// The last bar of phrase 1 (its last note is the half cadence).
-    public var phraseOneEnd: Int { bars.count / 2 - 1 }
+    public var phraseOneEnd: Int { writtenBars / 2 - 1 }
 
     /// What the song is, note for note: clef, keys and value of every note, and the
     /// meter. Two seeds that make the same song have the same signature, so "not one of
@@ -142,15 +161,16 @@ public struct Song: Hashable, Codable, Sendable {
 
     /// How the song is laid out to read: 2 bars a system. A one-staff song puts 2
     /// systems on a page, so a 4 bar song is one page he sees whole. A grand staff song
-    /// is one system a page.
+    /// is one system a page. The come-back bar is a page of its own.
     public var pages: [SongPage] {
         let systemsPerPage = layout == .grand ? 1 : 2
         var pages: [SongPage] = []
         var systems: [PracticeItem] = []
         var first = 0
         var next = 0
-        for start in stride(from: 0, to: bars.count, by: 2) {
-            let pair = Array(bars[start..<min(start + 2, bars.count)])
+        let written = writtenBars
+        for start in stride(from: 0, to: written, by: 2) {
+            let pair = Array(bars[start..<min(start + 2, written)])
             let item = PracticeItem(pair.flatMap(\.notes), layout: layout, keySignature: keySignature,
                                     bars: pair.map(\.notes.count), meter: meter)
             systems.append(item)
@@ -162,6 +182,10 @@ public struct Song: Hashable, Codable, Sendable {
             }
         }
         if !systems.isEmpty { pages.append(SongPage(systems: systems, firstNote: first)) }
+        if comeBack != nil, let bar = bars.last {
+            let item = PracticeItem(bar.notes, layout: layout, keySignature: keySignature, bars: [bar.notes.count], meter: meter)
+            pages.append(SongPage(systems: [item], firstNote: next))
+        }
         return pages
     }
 

@@ -55,6 +55,10 @@ import NoteCore
 ///     -demoSongPage <n>    the song script stops when page n (1 = first) comes up
 ///     -demoSongStop <n>    ...or after n notes
 ///     -demoSongEnd YES     ...or jumps straight to the end card
+///     -demoSongStuck <n>   on note n (1 = first) he's stuck: two wrong keys (the key lights),
+///                          a look, two more (the band plays it). The bar comes back as an extra
+///                          page at the end, where the script waits 4s x -demoSlow
+///     -demoSongIdle YES    ...stuck without pressing anything instead (8s, then 10s more)
 ///     -demoPath <x>        the level path: every lesson before his in the level done, his
 ///                          stone at x (0...0.9), for home / lane screenshots
 ///     -demoLevelUp YES     he has just reached his level by finishing the one before, so the
@@ -87,6 +91,8 @@ struct DemoOptions {
     var songPage: Int?
     var songStop: Int?
     var songEnd = false
+    var songStuck: Int?
+    var songIdle = false
     var path: Double?
     var levelUp = false
 
@@ -114,6 +120,8 @@ struct DemoOptions {
         songPage = defaults.string(forKey: "demoSongPage").flatMap(Int.init)
         songStop = defaults.string(forKey: "demoSongStop").flatMap(Int.init)
         songEnd = defaults.bool(forKey: "demoSongEnd")
+        songStuck = defaults.string(forKey: "demoSongStuck").flatMap(Int.init)
+        songIdle = defaults.bool(forKey: "demoSongIdle")
         path = defaults.string(forKey: "demoPath").flatMap(Double.init)
         levelUp = defaults.bool(forKey: "demoLevelUp")
     }
@@ -656,7 +664,39 @@ final class DemoRunner {
         await sleep(1.6 * options.slow)
         var heard = false
         var played = 0
+        var stuck = false
+        var cameBack = false
         while c.phase == .playing {
+            if c.isComeBackPage, !cameBack {
+                cameBack = true
+                log("song: come back page, bar \(c.song.comeBack.map { $0 + 1 } ?? 0)")
+                await sleep(4 * options.slow)
+            }
+            if let at = options.songStuck, played + 1 == at, !stuck {
+                stuck = true
+                let index = c.noteIndex
+                log("song: stuck on note \(at) \(c.expected.map(\.name))")
+                if options.songIdle {
+                    await waitUntil(seconds: 12 * options.slow) { !c.keyboardHint.isEmpty }
+                    log("song: key lit")
+                } else {
+                    for _ in 0..<2 {
+                        await press(c.expected.map { whiteKey($0, steps: 2) })
+                        await sleep(0.8 * options.slow)
+                    }
+                    log("song: key lit \(c.keyboardHint.map(\.name))")
+                    await sleep(3 * options.slow)
+                    for _ in 0..<2 {
+                        await press(c.expected.map { whiteKey($0, steps: 2) })
+                        await sleep(0.8 * options.slow)
+                    }
+                }
+                await waitUntil(seconds: 30 * options.slow) { c.noteIndex != index }
+                log("song: the band played it, on to note \(c.noteIndex + 1)")
+                played += 1
+                await sleep(1.2 * options.slow)
+                continue
+            }
             if let page = options.songPage, c.page + 1 >= page {
                 log("song: on page \(c.page + 1)")
                 return

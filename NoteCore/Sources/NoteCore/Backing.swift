@@ -227,7 +227,7 @@ public struct TimedBackingEvent: Hashable, Sendable {
 /// 0.35-1.5s a quarter. A gap more than 2.5 times what his beat expects is him reading,
 /// not his tempo, so it doesn't count: the chord just decays while he looks.
 public struct BackingFollower: Sendable {
-    public let plan: BackingPlan
+    public private(set) var plan: BackingPlan
     /// Seconds a quarter, his tempo so far.
     public private(set) var beat: Double
     private var samples: [Double] = []
@@ -246,6 +246,12 @@ public struct BackingFollower: Sendable {
     /// the gap to his next key isn't counted.
     public mutating func rest() {
         last = nil
+    }
+
+    /// The song grew (a come-back bar at the end): the same notes up to there, so his
+    /// tempo and the last key carry over.
+    public mutating func replan(_ plan: BackingPlan) {
+        self.plan = plan
     }
 
     public mutating func played(_ index: Int, at time: Double) -> [TimedBackingEvent] {

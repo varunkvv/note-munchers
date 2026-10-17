@@ -203,11 +203,19 @@ final class AppModel {
         )
         controller.onAllDone = { [weak self] in self?.songAllDone() }
         controller.onNewSong = { [weak self] in self?.startSong() }
+        controller.onHelped = { [weak self] keys in self?.songHelped(keys) }
         song = controller
         screen = .song
         #if DEBUG
         print("song: \(made.title), level \(made.level), \(made.meter.rawValue), \(made.form.rawValue)\(made.isFallback ? " (fallback)" : ""): \(made.signature)")
         #endif
+    }
+
+    /// The band played these notes for him in a song: practice shows them a bit more for
+    /// a while ("come back to it later on"). Saved straight away, like a screen.
+    private func songHelped(_ keys: [NoteKey]) {
+        engine.comeBack(to: keys)
+        store.saveMastery(engine.state, settings: ParentSettings(config))
     }
 
     /// "All done" or the door on a song: home.

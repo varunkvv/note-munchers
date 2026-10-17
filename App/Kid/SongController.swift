@@ -7,16 +7,24 @@ import Observation
 ///
 /// Judging is `AttemptJudge` directly, one note at a time. Nothing is recorded: no stats,
 /// no warm-up, easing, hatches or unlocks, no rhythm judging. A wrong key wobbles and the
-/// backing waits (nothing new plays, the chord keeps ringing). After 2 wrong tries or ~8s
-/// stuck the key lights up on the keyboard picture. The play button plays the page.
+/// backing waits (nothing new plays, the chord keeps ringing). He never gets stuck
+/// (`BandHelp`): after 2 wrong tries or ~8s stuck the key lights up on the keyboard
+/// picture, and 2 more wrong tries or ~10s more the band plays it for him, silently, and
+/// the song goes on. That bar comes back once as an extra page after the last one, and
+/// the notes the band played get a "come back to it" flag for practice (`onHelped`).
+/// The play button plays the page.
 @MainActor @Observable
 final class SongController {
     enum Phase: Equatable {
         case title, playing, ending, end, listening
     }
 
-    let song: Song
-    let pages: [SongPage]
+    /// The song as he plays it: the song as written, plus the come-back bar once the
+    /// band helped him.
+    private(set) var song: Song
+    /// The song as written (the title, Listen).
+    let written: Song
+    private(set) var pages: [SongPage]
     /// Three of his munchers. On each right note the next one in the row hops.
     let band: [NoteKey]
     /// What the staff is sized for: the widest system in the song, so it never changes size.
@@ -29,8 +37,8 @@ final class SongController {
     /// The next note to play, in `song.notes`.
     private(set) var noteIndex = 0
     private(set) var page = 0
-    /// Keys lit on the keyboard picture (2 wrong tries, stuck, or the right letter in the
-    /// wrong octave). Empty = no picture.
+    /// Keys lit on the keyboard picture (2 wrong tries, stuck, the right letter in the
+    /// wrong octave, or the band playing it). Empty = no picture.
     private(set) var keyboardHint: [Pitch] = []
     /// The page playing with the play button: the keys sounding now, [] between notes.
     private(set) var playingKeys: [Pitch]?
@@ -47,6 +55,8 @@ final class SongController {
     /// The kid left (the door, or "All done") or asked for a new song.
     var onAllDone: (() -> Void)?
     var onNewSong: (() -> Void)?
+    /// The band played these notes for him: practice shows them a bit more for a while.
+    var onHelped: (([NoteKey]) -> Void)?
 
     /// DEBUG demo: stretch every delay.
     var timeScale = 1.0 {
@@ -57,11 +67,15 @@ final class SongController {
     private let sounds: Sounds
     private let voice: Voice
     private let piano: Piano?
-    private let plan: BackingPlan
+    private var plan: BackingPlan
     private let octavePolicy: OctavePolicy
     @ObservationIgnored private var judge: AttemptJudge
     @ObservationIgnored private var follower: BackingFollower
-    @ObservationIgnored private var wrongTries = 0
+    /// When the key lights and when the band plays it, for the note he's on.
+    @ObservationIgnored private var help = BandHelp(at: 0)
+    /// The last bar of the song as written where the band played a note for him. It comes
+    /// back once at the end.
+    @ObservationIgnored private var helpedBar: Int?
     @ObservationIgnored private var listenTask: Task<Void, Never>?
     @ObservationIgnored private var stuckTask: Task<Void, Never>?
     @ObservationIgnored private var windowTask: Task<Void, Never>?
@@ -70,22 +84,20 @@ final class SongController {
     @ObservationIgnored private var endTask: Task<Void, Never>?
     @ObservationIgnored private var track: SongMix.Track?
 
-    /// ~8s with no key on a note lights it on the keyboard picture.
-    static let stuckAfter = 8.0
-    /// Two wrong tries light it too.
-    static let wrongTriesForHint = 2
     /// The play button's tempo, seconds a quarter.
     static let hearItBeat = 0.75
 
     init(song: Song, octavePolicy: OctavePolicy, fluency: (NoteKey) -> Double, input: InputHub, sounds: Sounds, voice: Voice, piano: Piano?) {
         self.song = song
+        written = song
         self.octavePolicy = octavePolicy
         self.input = input
         self.sounds = sounds
         self.voice = voice
         self.piano = piano
         pages = song.pages
-        plan = BackingPlan(song: song)
+        let plan = BackingPlan(song: song)
+        self.plan = plan
         follower = BackingFollower(plan: plan)
         judge = AttemptJudge(expected: song.notes[0].pitches, octavePolicy: octavePolicy)
         band = Self.band(for: song)
@@ -112,6 +124,8 @@ final class SongController {
     // MARK: what the views read
 
     var currentPage: SongPage { pages[page] }
+    /// He's on the come-back page: the bar the band helped with, once more.
+    var isComeBackPage: Bool { song.comeBack != nil && page == pages.count - 1 }
     var isOnPages: Bool { phase == .playing || phase == .ending }
     var expected: [Pitch] { noteIndex < song.notes.count ? song.notes[noteIndex].pitches : [] }
 
@@ -146,6 +160,7 @@ final class SongController {
         guard phase == .title else { return }
         phase = .playing
         if let piano { sounds.playBacking(SongMix.intro(song, piano: piano), held: true) }
+        help = BandHelp(at: helpNow)
         restartStuckClock()
     }
 
@@ -183,6 +198,7 @@ final class SongController {
             isPaused = !connected
             if connected, phase == .playing {
                 follower.rest()
+                help.touch(at: helpNow)
                 restartStuckClock()
             } else {
                 stuckTask?.cancel()
@@ -192,6 +208,7 @@ final class SongController {
 
     private func noteOn(_ pitch: Pitch, at time: Double) {
         guard phase == .playing, !isPaused else { return }
+        help.touch(at: helpNow)
         if let verdict = judge.noteOn(pitch, at: time) {
             judged(verdict, at: time)
         }
@@ -207,23 +224,63 @@ final class SongController {
         case .almost:
             // the right letter: he's close, show him where (no voice in songs)
             wobble()
-            wrongTries += 1
-            keyboardHint = expected
+            helpStep(help.wrong(at: helpNow, almost: true))
         case .wrong:
             wobble()
-            wrongTries += 1
             // the backing waits: nothing new plays, the chord keeps ringing
             cancelFillers()
-            if wrongTries >= Self.wrongTriesForHint { keyboardHint = expected }
+            helpStep(help.wrong(at: helpNow))
         }
+    }
+
+    /// The help clock, in the demo's stretched seconds (8s stuck is 8s x timeScale).
+    private var helpNow: Double { HostClock.now / max(0.01, timeScale) }
+
+    private func helpStep(_ step: BandHelp.Step) {
+        switch step {
+        case .wait: break
+        case .light: keyboardHint = expected
+        case .play: bandPlays()
+        }
+    }
+
+    /// Still stuck with the key lit: the band plays the note (the piano, the backing that
+    /// goes with it, the note softly highlighted), it counts as played and the song moves
+    /// on. No voice. The bar comes back once at the end, and the note gets practice's
+    /// "come back to it" flag.
+    private func bandPlays() {
+        guard phase == .playing, noteIndex < song.notes.count else { return }
+        let note = song.notes[noteIndex]
+        if noteIndex < song.writtenNotes { helpedBar = song.barOfNote[noteIndex] }
+        onHelped?(note.keys)
+        #if DEBUG
+        print("song: the band played note \(noteIndex) \(note.pitches.map(\.name)) (bar \(song.barOfNote[noteIndex] + 1))")
+        #endif
+        let (system, column) = position(of: noteIndex)
+        effects[system].add(.follow, column: column, duration: note.value.beats * follower.beat)
+        if let piano { sounds.playBacking(SongMix.melody(note.pitches, length: max(0.6, note.value.beats * follower.beat), piano: piano), held: false) }
+        // a played note isn't his tempo
+        follower.rest()
+        correct(at: HostClock.now)
+        if phase == .playing { restartStuckClock() }
     }
 
     private func correct(at time: Double) {
         let index = noteIndex
+        // his last G, and the band helped him somewhere: that bar once more first, then the tag
+        if index == song.notes.count - 1, song.comeBack == nil, let bar = helpedBar {
+            song = song.withComeBack(bar: bar)
+            pages = song.pages
+            plan = BackingPlan(song: song)
+            follower.replan(plan)
+            #if DEBUG
+            print("song: bar \(bar + 1) comes back")
+            #endif
+        }
         if let piano { sound(follower.played(index, at: time), piano: piano) }
         hops += 1
         noteIndex += 1
-        wrongTries = 0
+        help.next(at: helpNow)
         keyboardHint = []
         guard noteIndex < song.notes.count else {
             finish(at: time)
@@ -305,14 +362,19 @@ final class SongController {
 
     // MARK: timers
 
-    /// ~8s with no key: light the key. Restarts on every key and every new note.
+    /// No key for a while: light the key (~8s), then the band plays it (~10s more).
+    /// Restarts on every key and every new note.
     private func restartStuckClock() {
         stuckTask?.cancel()
         let index = noteIndex
+        let wait = (help.deadline - helpNow) * timeScale
         stuckTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(Self.stuckAfter * (self?.timeScale ?? 1)))
-            guard let self, !Task.isCancelled, self.phase == .playing, self.noteIndex == index else { return }
-            self.keyboardHint = self.expected
+            if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+            guard let self, !Task.isCancelled, self.phase == .playing, self.noteIndex == index, !self.isPaused,
+                  !self.isPlayingBack else { return }
+            let step = self.help.tick(at: max(self.help.deadline, self.helpNow))
+            self.helpStep(step)
+            if step != .play { self.restartStuckClock() } // the band's note restarts it for the next one
         }
     }
 
@@ -354,6 +416,8 @@ final class SongController {
         }
         sounds.playTrack(Piano.buffer(piano.render(melody, duration: start)))
         isPlayingBack = true
+        // listening isn't being stuck
+        stuckTask?.cancel()
         playingKeys = []
         let end = start
         playbackTask?.cancel()
@@ -377,8 +441,9 @@ final class SongController {
             guard let self, !Task.isCancelled else { return }
             self.playingKeys = nil
             self.isPlayingBack = false
-            // listening isn't his tempo
+            // listening isn't his tempo, or being stuck
             self.follower.rest()
+            self.help.touch(at: self.helpNow)
             self.restartStuckClock()
         }
     }
@@ -389,11 +454,12 @@ final class SongController {
     /// tempo. The band hops on the beat, one muncher at a time.
     func listen() {
         guard phase == .end, let piano else { return }
-        let track = self.track ?? SongMix.listen(song, piano: piano)
+        // the song as written, without the come-back bar
+        let track = self.track ?? SongMix.listen(written, piano: piano)
         self.track = track
         sounds.playTrack(Piano.buffer(track.samples))
         phase = .listening
-        let beats = Int(song.totalBeats)
+        let beats = Int(written.totalBeats)
         endTask?.cancel()
         endTask = Task { @MainActor [weak self] in
             let clock = ContinuousClock()

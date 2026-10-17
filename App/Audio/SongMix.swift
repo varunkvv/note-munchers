@@ -62,6 +62,13 @@ enum SongMix {
         return Piano.buffer(samples)
     }
 
+    /// One melody note at the melody's level: the band playing a note for him when he's stuck.
+    static func melody(_ pitches: [Pitch], length: Double, piano: Piano) -> AVAudioPCMBuffer? {
+        let gain = melodyGain / Double(max(1, pitches.count)).squareRoot()
+        let notes = pitches.map { Piano.Note(time: 0, midi: $0.midi, gain: gain, length: length) }
+        return Piano.buffer(piano.render(notes, duration: 0))
+    }
+
     /// The intro: one soft rolled G chord, to set the key.
     static func intro(_ song: Song, piano: Piano) -> AVAudioPCMBuffer? {
         let notes = Piano.notes(BackingPlan(song: song).intro, at: 0, beat: 0.8, gain: liveGain, length: 2.4)

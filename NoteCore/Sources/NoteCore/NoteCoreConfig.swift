@@ -94,6 +94,14 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// reader never gets stuck at the end of a level.
     public var drillLessonMaxDays = 4
 
+    // MARK: song time
+
+    /// A note the band played for him in a song comes back in practice a bit more often
+    /// (its pick weight times this)...
+    public var comeBackBoost = 2.0
+    /// ...until he has played it right first try this many times.
+    public var comeBackPlays = 2
+
     // MARK: session shape
 
     /// Easing: when this many of his last `easingWindow` notes in a session weren't
@@ -209,6 +217,8 @@ extension NoteCoreConfig {
         habitCV = try c.value(.habitCV, or: d.habitCV)
         habitDays = try c.value(.habitDays, or: d.habitDays)
         drillLessonMaxDays = try c.value(.drillLessonMaxDays, or: d.drillLessonMaxDays)
+        comeBackBoost = try c.value(.comeBackBoost, or: d.comeBackBoost)
+        comeBackPlays = try c.value(.comeBackPlays, or: d.comeBackPlays)
         easingTrigger = try c.value(.easingTrigger, or: d.easingTrigger)
         easingWindow = try c.value(.easingWindow, or: d.easingWindow)
         easingItems = try c.value(.easingItems, or: d.easingItems)

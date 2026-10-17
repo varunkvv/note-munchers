@@ -68,7 +68,7 @@ extension MasteryEngine {
     /// How much a note wants practice on a drill screen: low boxes more, and the further
     /// a note is from habit the more (up to 10 times a note that's habit).
     func drillWeight(_ key: NoteKey) -> Double {
-        Double(config.boxCount + 1 - stats(for: key).box) * (1 + 9 * (1 - habit(key).fraction))
+        Double(config.boxCount + 1 - stats(for: key).box) * (1 + 9 * (1 - habit(key).fraction)) * comeBackWeight(key)
     }
 
     /// The key that can't come next (it was the last `maxRepeats` columns), if any.
