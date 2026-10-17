@@ -40,11 +40,16 @@ import Testing
         #expect(engine.solidNotes(.bass).isEmpty)
     }
 
-    @Test func noAMeansNoSongYet() {
+    /// G plus any 2 others: songs don't wait on A (plans/2026-10-16-progress-and-tunes.md).
+    @Test func gPlusAnyTwoIsASong() {
         var engine = engine("2.1")
-        solid(&engine, ["treble:G4", "treble:B4", "treble:C5", "treble:D5"])
-        #expect(engine.solidNotes(.treble).count == 4)
-        #expect(engine.songClefs.isEmpty, "every level 1 song ends A to G")
+        solid(&engine, ["treble:G4", "treble:B4", "treble:C5"])
+        #expect(engine.solidNotes(.treble).count == 3)
+        #expect(engine.songClefs == [.treble], "no A needed")
+        // ...and it ends in 4/4, where B can come down to G inside the last bar
+        for seed in UInt64(0)..<20 { #expect(engine.songRequest(seed: seed)!.meter == .fourFour) }
+        solid(&engine, ["bass:A2", "bass:B2", "bass:C3"])
+        #expect(!engine.songClefs.contains(.bass), "no G, no song: every song ends on G")
     }
 
     /// Level 1 songs need G, A and one more: none in 1.1, and in 1.2 once B is drilled

@@ -41,11 +41,12 @@ public struct SongRequest: Hashable, Sendable {
 ///
 /// Hard rules (`violations`): start on G, B or D. Phrase 1 ends on a half cadence (D or A
 /// over V, F# too from level 3, or B or D over I), phrase 2 on a long G on a strong beat
-/// reached from A, F# or D. Beat 1 is always a chord tone, other notes are chord tones or
-/// stepped into and out of. Both ends of a skip are chord tones, a 4th or 5th steps back,
-/// no C-F# leap, the same key at most 4 times running. Only his notes, every one of them,
-/// moves no bigger than a 2nd in level 1 (a 3rd across a note he doesn't have) and a 5th
-/// from level 2.
+/// reached from A, F# or D, or from B in level 1 and in a hand without an A (a falling
+/// third B-G is a normal ending too). Beat 1 is always a chord tone, other notes are
+/// chord tones or stepped into and out of. Both ends of a skip are chord tones, a 4th or
+/// 5th steps back, no C-F# leap, the same key at most 4 times running. Only his notes,
+/// every one of them, moves no bigger than a 2nd in level 1 (a 3rd across a note he
+/// doesn't have, and the last move falling from B or D into G) and a 5th from level 2.
 ///
 /// Repetition is the point, so the practice generator's "no screen like the last ones"
 /// and "no key 3 times running" rules don't apply.
@@ -67,6 +68,13 @@ public enum SongGenerator {
             if round == rounds - 1 {
                 // the last try leaves out IV, whose C and E he may not have in that hand
                 chords = chords.map { bar in bar == [.IV, .V] ? [.V] : bar.map { $0 == .IV ? .I : $0 } }
+                // and a hand with nothing to end phrase 1 on over V (no A or D, "G, B and C")
+                // ends it over I, on B
+                let mid = request.bars / 2 - 1
+                let hand = request.notes(request.hands[0])
+                if chords[mid].contains(where: \.isDominant), !hand.contains(where: { midCadenceAllowed($0, chord: .V, level: request.level) }) {
+                    chords[mid] = [.I]
+                }
             }
             for _ in 0..<candidateCount {
                 guard let song = candidate(request, form: form, chords: chords, title: title, seed: seed, using: &rng),
@@ -221,7 +229,7 @@ public enum SongGenerator {
         let prevSlot = slots.indices.map { i in i > 0 && slots[i - 1].clef == slots[i].clef ? i - 1 : -1 }
         let handLeft = slots.indices.map { i in slots[(i + 1)...].filter { $0.clef == slots[i].clef }.count }
         let midGoals = sets[midSlot].filter { midCadenceAllowed($0, chord: slots[midSlot].chord, level: request.level) }
-        let finalGoals = sets[finalSlot].filter(approachesFinal)
+        let finalGoals = sets[finalSlot].filter { approachesFinal($0, level: request.level, set: sets[finalSlot]) }
 
         // what can go at slot i after `melody` (slots 0..<i), best guess first
         func options(_ i: Int, _ melody: [Pitch], using rng: inout SeededRandom) -> [Pitch] {
@@ -253,7 +261,7 @@ public enum SongGenerator {
                     return isChordTone
                 }
                 let d = p.diatonicIndex - prev.diatonicIndex
-                if !moveAllowed(from: prev, to: p, level: request.level, set: set) { return false }
+                if !moveAllowed(from: prev, to: p, level: request.level, set: set, final: i == finalSlot) { return false }
                 if let prevMove, abs(prevMove) >= 3, !(abs(d) == 1 && d.signum() == -prevMove.signum()) { return false }
                 if stepOnly, abs(d) != 1 { return false }
                 if abs(d) >= 2, !(isChordTone && prevChordTone) { return false }
@@ -276,7 +284,7 @@ public enum SongGenerator {
                 allowed = allowed.filter { $0.letter == .g }
             } else if i == finalSlot - 1, slots[finalSlot].clef == slot.clef {
                 allowed = allowed.filter { p in
-                    finalGoals.contains(p) && set.contains { $0.letter == .g && moveAllowed(from: p, to: $0, level: request.level, set: set) }
+                    finalGoals.contains(p) && set.contains { $0.letter == .g && moveAllowed(from: p, to: $0, level: request.level, set: set, final: true) }
                 }
             } else {
                 // keep the next fixed note in reach
@@ -367,10 +375,13 @@ public enum SongGenerator {
     }
 
     /// Level 1: a 2nd, or a 3rd over a note he doesn't have. From level 2: up to a 5th.
-    static func moveAllowed(from a: Pitch, to b: Pitch, level: Int, set: [Pitch]) -> Bool {
+    /// `final`: the move into the song's last G, which in level 1 can also fall a 3rd from
+    /// B or a 5th from D (G is home, he finds it from anywhere).
+    static func moveAllowed(from a: Pitch, to b: Pitch, level: Int, set: [Pitch], final: Bool = false) -> Bool {
         let d = abs(b.diatonicIndex - a.diatonicIndex)
         if level >= 2 { return d <= 4 }
         if d <= 1 { return true }
+        if final, b.letter == .g, a.diatonicIndex > b.diatonicIndex, a.letter == .b || a.letter == .d, d <= 4 { return true }
         guard d == 2 else { return false }
         let between = min(a.diatonicIndex, b.diatonicIndex) + 1
         return !set.contains { $0.diatonicIndex == between }
@@ -390,9 +401,12 @@ public enum SongGenerator {
         return false
     }
 
-    static func approachesFinal(_ p: Pitch) -> Bool {
+    /// The last note before the final G: A, F# or D. B too in level 1 (a falling third is a
+    /// normal ending, and level 1 songs shouldn't need A) and in a hand without an A.
+    static func approachesFinal(_ p: Pitch, level: Int, set: [Pitch]) -> Bool {
         guard let name = NoteName(p) else { return false }
-        return name == .a || name == .fSharp || name == .d
+        if name == .a || name == .fSharp || name == .d { return true }
+        return name == .b && (level == 1 || !set.contains { $0.letter == .a })
     }
 
     // MARK: two at once (level 4)
@@ -472,7 +486,7 @@ public enum SongGenerator {
         if line[n - 1].letter != .g { out.append("ends on \(line[n - 1].name)") }
         if !strong(n - 1) { out.append("the last note isn't on a strong beat") }
         if notes.contains(where: { $0.value.beats > notes[n - 1].value.beats }) { out.append("the last note isn't the longest") }
-        if let approach = line[..<(n - 1)].last(where: { $0.letter != .g }), !approachesFinal(approach) {
+        if let approach = line[..<(n - 1)].last(where: { $0.letter != .g }), !approachesFinal(approach, level: song.level, set: setFor(clefs[n - 1])) {
             out.append("the last G comes from \(approach.name)")
         }
         // harmony and moves, one hand at a time
@@ -493,7 +507,7 @@ public enum SongGenerator {
             }
             guard let d = into else { run = 1; continue }
             let set = setFor(clefs[i])
-            if !moveAllowed(from: line[i - 1], to: line[i], level: song.level, set: set) { out.append("note \(i + 1): a move of \(abs(d) + 1)") }
+            if !moveAllowed(from: line[i - 1], to: line[i], level: song.level, set: set, final: i == n - 1) { out.append("note \(i + 1): a move of \(abs(d) + 1)") }
             if abs(d) >= 2, !(chordAt[i - 1].contains(line[i - 1]) && chord.contains(line[i])) { out.append("note \(i + 1): a skip between non-chord tones") }
             if Set([line[i].pitchClass, line[i - 1].pitchClass]) == [0, 6] { out.append("note \(i + 1): a C-F# leap") }
             if i >= 2, clefs[i - 2] == clefs[i] {
@@ -587,7 +601,8 @@ public enum SongGenerator {
 
     /// Hand-written songs for when every candidate broke a rule: G and the note next to
     /// it (A, or the F# under G in level 3's upper five), and B when he has it. Plain, but
-    /// always a song.
+    /// always a song. A hand with no note next to G ("G, B and C") gets a simpler one on
+    /// the G chord instead: its B or D, the note a step from it, and the last G from there.
     static func fallback(_ request: SongRequest, title: String, seed: UInt64) -> Song {
         let q = NoteValue.quarter, h = NoteValue.half, w = NoteValue.whole, dh = NoteValue.dottedHalf
         // 0 = G, 1 = its neighbour (A or F#), 2 = B (or G again)
@@ -611,12 +626,23 @@ public enum SongGenerator {
             bars = a + b + a + c
         }
         let n = bars.count
+        let long = four ? w : dh
         let songBars = bars.enumerated().map { b, bar in
             let clef = b < n / 2 ? request.hands[0] : request.hands[1]
             let set = request.notes(clef)
             let g = set.first { $0.letter == .g } ?? (clef == .treble ? Pitch(.g, 4) : Pitch(.g, 2))
             let up = set.first { $0.diatonicIndex == g.diatonicIndex + 1 }
-            let neighbour = up ?? set.first { $0.diatonicIndex == g.diatonicIndex - 1 } ?? Pitch(.a, g.octave)
+            let down = set.first { $0.diatonicIndex == g.diatonicIndex - 1 }
+            guard let neighbour = up ?? down else {
+                // nothing next to G: x y x | x (phrase ends on x over I) ... | G from x
+                let x = set.first { $0.letter == .b } ?? set.first { $0.letter == .d } ?? g
+                let y = set.first { abs($0.diatonicIndex - x.diatonicIndex) == 1 }
+                    ?? set.first { $0 != x && [.b, .d].contains($0.letter) && abs($0.diatonicIndex - x.diatonicIndex) == 2 } ?? x
+                let notes: [(Pitch, NoteValue)] = b == n - 1 ? [(g, long)]
+                    : b.isMultiple(of: 2) ? (four ? [(x, q), (y, q), (x, h)] : [(x, q), (y, q), (x, q)])
+                    : [(x, long)]
+                return SongBar(notes.map { WrittenNote(clef, [$0.0], $0.1) }, chords: [.I])
+            }
             let third = up != nil ? set.first { $0.diatonicIndex == g.diatonicIndex + 2 } ?? g : g
             let notes = bar.notes.map { step, value in WrittenNote(clef, [[g, neighbour, third][step]], value) }
             return SongBar(notes, chords: bar.chords)

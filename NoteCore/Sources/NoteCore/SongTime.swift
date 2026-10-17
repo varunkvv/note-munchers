@@ -2,8 +2,9 @@
 ///
 /// - only notes he's solid on: met, box 3 or more, never the newest batch, inside the
 ///   song range for his level (G position, an octave G to G in level 3)
-/// - a clef qualifies with 3 or more of those, G and A among them. Every song ends on G,
-///   and in level 1 (steps only) the last G comes from A
+/// - a clef qualifies with 3 or more of those, G among them (G, the home note, plus any 2
+///   others: songs open early, they don't wait on A). Every song ends on G, from A, F# or
+///   D, or from B in level 1 and in a hand without an A
 /// - level 1: one clef a song, taking turns, the weaker clef a bit more often. Level 2+:
 ///   call and response, phrase 1 in one hand and phrase 2 in the other, when both clefs
 ///   qualify (otherwise one clef)
@@ -33,11 +34,12 @@ extension MasteryEngine {
         }
     }
 
-    /// Clefs a song can be in right now: 3 or more solid notes, G and A among them.
+    /// Clefs a song can be in right now: 3 or more solid notes, G among them (varun: "dont
+    /// let him get stuck there", so G plus any 2 others, not G and A).
     public var songClefs: [Clef] {
         Clef.allCases.filter { clef in
             let notes = solidNotes(clef)
-            return notes.count >= 3 && notes.contains { $0.pitch.letter == .g } && notes.contains { $0.pitch.letter == .a }
+            return notes.count >= 3 && notes.contains { $0.pitch.letter == .g }
         }
     }
 
@@ -78,7 +80,12 @@ extension MasteryEngine {
             }
             return all.filter(Array(range.prefix(5)).contains)
         }
-        return SongRequest(level: level, meter: meter, hands: hands, treble: notes(.treble), bass: notes(.bass),
+        let treble = notes(.treble), bass = notes(.bass)
+        // a 3/4 song ends on a dotted half G from the V7 bar before it, so the hand needs
+        // A, D or F# there. Without them (G, B and C) it ends in 4/4, B-G inside the last bar
+        let last = hands[1] == .treble ? treble : bass
+        let endsInThree = last.contains { $0.letter == .a || $0.letter == .d || !$0.isWhiteKey }
+        return SongRequest(level: level, meter: endsInThree ? meter : .fourFour, hands: hands, treble: treble, bass: bass,
                            bars: short ? 4 : 8, recent: state.recentSongs.map(\.signature))
     }
 
