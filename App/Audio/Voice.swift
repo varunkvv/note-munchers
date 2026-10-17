@@ -25,6 +25,8 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
         case showGrownUp
         /// end screen after the "done for now" door, nothing played
         case seeYou
+        /// the level-up splash (once per level, ever)
+        case levelUp
     }
 
     private struct Clip {
@@ -74,6 +76,7 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
         let parts: [(String, NoteName?)] = switch line {
         case .showGrownUp: [("showGrownUp", nil)]
         case .seeYou: [("bye", nil)]
+        case .levelUp: [("levelUp", nil)]
         }
         return speak(parts)
     }
@@ -238,7 +241,7 @@ final class Voice: NSObject, AVAudioPlayerDelegate {
     func audit() -> [String] {
         let speeches: [Speech] = [.keptTrying, .lookedCarefully, .turnOnPiano, .sessionDone]
         var asks = speeches.map(Self.situation(of:))
-        asks += ["showGrownUp", "bye"].map { ($0, nil) }
+        asks += ["showGrownUp", "bye", "levelUp"].map { ($0, nil) }
         return asks.filter { clips($0.0, note: $0.1).isEmpty }.map { $0.0 + ($0.1.map { " " + $0.rawValue } ?? "") }
     }
     #endif

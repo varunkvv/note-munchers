@@ -1454,5 +1454,29 @@
   "note": null,
   "text": "that's okay. let's keep going.",
   "tag": "warmly"
+ },
+ {
+  "id": "levelUp-85",
+  "situation": "levelUp",
+  "line": 85,
+  "note": null,
+  "text": "you did it! a new level!",
+  "tag": "delighted"
+ },
+ {
+  "id": "levelUp-86",
+  "situation": "levelUp",
+  "line": 86,
+  "note": null,
+  "text": "hooray, a whole new level! you kept practicing.",
+  "tag": "delighted"
+ },
+ {
+  "id": "levelUp-87",
+  "situation": "levelUp",
+  "line": 87,
+  "note": null,
+  "text": "look at you! you finished a whole level!",
+  "tag": "delighted"
  }
 ]

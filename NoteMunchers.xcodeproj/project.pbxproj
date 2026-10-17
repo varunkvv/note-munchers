@@ -29,6 +29,7 @@
 		50ABE4ABA2992BE3291BFDC9 /* Piano.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09B9084B046A7AADB8AD4C0D /* Piano.swift */; };
 		5D79C07B1F1CCFBD5CBC542A /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = DC0E6CF142C5E0FCE48D39A4 /* AppIcon.icon */; };
 		5D92844BD2311C209801D421 /* TurnOnPianoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 318DCBD3514202F91421554B /* TurnOnPianoView.swift */; };
+		626D3D8F05AF97BC8779BEF3 /* LevelUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45A4D1B58F7306C56B677453 /* LevelUpView.swift */; };
 		6CCEB49262ECFE01DA0CEC1C /* StaffEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF398496C6FC25696D1CA8E /* StaffEffects.swift */; };
 		8D061F6EE67C6DE5FAD1A204 /* Bravura-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = F9338F512C1757517B46A5ED /* Bravura-OFL.txt */; };
 		8FAEB7674BE31A627DAED064 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0D16CFDCBDE056B0F9D55 /* AppModel.swift */; };
@@ -64,6 +65,7 @@
 		349A99AF7DACB9AA0D8A5841 /* MIDIInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIInput.swift; sourceTree = "<group>"; };
 		36F2A602E8D5C4D245583757 /* NoteCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NoteCore; path = NoteCore; sourceTree = SOURCE_ROOT; };
 		3C1713511455EDBBE5B7E7D2 /* StaffGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffGallery.swift; sourceTree = "<group>"; };
+		45A4D1B58F7306C56B677453 /* LevelUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelUpView.swift; sourceTree = "<group>"; };
 		4A16A64520891B807314A5B7 /* SessionEndView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEndView.swift; sourceTree = "<group>"; };
 		4BA41529561D15F67CC19B19 /* NoteMunchers.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = NoteMunchers.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4D3FA7A978845FA1A0F672B9 /* DemoRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoRunner.swift; sourceTree = "<group>"; };
@@ -206,6 +208,7 @@
 				5410B640125C9BDC3D366429 /* HomeView.swift */,
 				C5E2F63D22C871D71A27449B /* KeyboardPicture.swift */,
 				5ADD1982896496EF6906F610 /* LevelPath.swift */,
+				45A4D1B58F7306C56B677453 /* LevelUpView.swift */,
 				03A84F809154A8D319B98CA9 /* MuncherLane.swift */,
 				CAE8D594DCE24B32A4C800E6 /* PracticeController.swift */,
 				759D1542CEFCE31BBA18F2E1 /* PracticeView.swift */,
@@ -345,6 +348,7 @@
 				10CE762EB870434791DA6EC8 /* InputHub.swift in Sources */,
 				F79252E6EF19B482742C8010 /* KeyboardPicture.swift in Sources */,
 				FB5C6FC48C32B880FF7856B2 /* LevelPath.swift in Sources */,
+				626D3D8F05AF97BC8779BEF3 /* LevelUpView.swift in Sources */,
 				12C47B9BF900D032E9EBC506 /* MIDIInput.swift in Sources */,
 				3874071E905F91A711F4DF3E /* MIDIMonitorView.swift in Sources */,
 				1A934E13F309D95398F998E3 /* Models.swift in Sources */,

@@ -110,6 +110,11 @@ final class AppModel {
             self?.muncherColors.set(index, for: id)
             self?.store.saveMuncherColor(index, for: id)
         }
+        controller.onStateChanged = { [weak self] state in
+            guard let self else { return }
+            self.engine = MasteryEngine(config: self.config, state: state)
+            self.store.saveMastery(state, settings: ParentSettings(self.config))
+        }
         #if DEBUG
         if demo.isActive { controller.demoAutoPick = demo.autoPick }
         if let drill = demo.drill { controller.demoOpen(with: drill) }

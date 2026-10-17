@@ -57,6 +57,10 @@ import NoteCore
 ///     -demoSongEnd YES     ...or jumps straight to the end card
 ///     -demoPath <x>        the level path: every lesson before his in the level done, his
 ///                          stone at x (0...0.9), for home / lane screenshots
+///     -demoLevelUp YES     he has just reached his level by finishing the one before, so the
+///                          level-up splash comes up after his first screen (use -demoLevel 2+)
+///     -demoScript levelUp  plays screens until the splash is up, holds it -demoSlow x 6s,
+///                          taps "Let's go!" and plays one more screen
 struct DemoOptions {
     var script: String?
     var screen: String?
@@ -84,6 +88,7 @@ struct DemoOptions {
     var songStop: Int?
     var songEnd = false
     var path: Double?
+    var levelUp = false
 
     init(defaults: UserDefaults = .standard) {
         script = defaults.string(forKey: "demoScript")
@@ -110,6 +115,7 @@ struct DemoOptions {
         songStop = defaults.string(forKey: "demoSongStop").flatMap(Int.init)
         songEnd = defaults.bool(forKey: "demoSongEnd")
         path = defaults.string(forKey: "demoPath").flatMap(Double.init)
+        levelUp = defaults.bool(forKey: "demoLevelUp")
     }
 
     var isActive: Bool { script != nil || screen != nil }
@@ -162,6 +168,12 @@ final class DemoRunner {
                 state.completedLessons.insert(lesson.id)
             }
             state.lessonPeak = path
+            engine = MasteryEngine(config: engine.config, state: state)
+        }
+        if options.levelUp {
+            var state = engine.state
+            state.levelUps = [engine.lesson.level]
+            state.celebratedLevels.remove(engine.lesson.level)
             engine = MasteryEngine(config: engine.config, state: state)
         }
         model.demoReplaceEngine(engine)
@@ -411,6 +423,27 @@ final class DemoRunner {
             logClefs(c)
         case "kid":
             await kid(c)
+        case "levelUp":
+            // right screens until the splash is up, a long look at it, then "Let's go!"
+            await skipIntros(c)
+            for _ in 0..<40 where c.levelUp == nil {
+                let shown = c.itemsShown
+                await playItem(c)
+                await waitUntil(seconds: 20) { c.levelUp != nil || c.itemsShown > shown || c.phase == .done }
+            }
+            guard c.levelUp != nil else {
+                log("no level-up splash (try -demoLevelUp YES -demoLevel 2)", c)
+                break
+            }
+            log("level-up splash: level \(c.levelUp!.level), band \(c.levelUp!.band.map(\.id))", c)
+            await sleep(6 * options.slow)
+            c.levelUpDone()
+            log("let's go", c)
+            await waitUntil(seconds: 20) { c.phase.isPlaying }
+            let shown = c.itemsShown
+            await playItem(c)
+            await waitForNext(c, after: shown)
+            log("after the splash", c)
         default:
             log("unknown script \(script)")
         }

@@ -75,8 +75,8 @@ struct LevelPathPainter {
             let y = from.y + (to.y - from.y) * t
             let side = w * 1.6
             let lift = side * 0.32 * sin(.pi * t)
-            // at the flag he stands just in front of the pole
-            let dx = muncherAt >= Double(n) - 0.001 ? -w * 0.45 : 0
+            // at the flag he stands just before the pole, so the pennant shows going up
+            let dx = muncherAt >= Double(n) - 0.001 ? -w * 0.85 : 0
             // feet on the stone's far edge, so its fill shows in front of him
             let rect = CGRect(x: x - side / 2 + dx, y: y - h * 0.32 - side - lift, width: side, height: side)
             var pose = MuncherPose(fluency: muncherFluency)

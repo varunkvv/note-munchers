@@ -396,6 +396,11 @@ public struct PracticeSession: Sendable {
         return cues
     }
 
+    /// The level-up splash is showing (`engine.pendingLevelUp`): it's had its celebration.
+    public mutating func celebrateLevelUp() {
+        engine.celebrateLevelUp()
+    }
+
     /// The app put something over the screen before he could play (a new muncher
     /// hatching before its intro). Starts the response clock and the stuck timer for
     /// the current note again, so the hatch doesn't count as time to find it. Only

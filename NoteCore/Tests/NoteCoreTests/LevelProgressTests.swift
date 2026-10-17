@@ -166,3 +166,104 @@ import Testing
         #expect(old.stats == engine.state.stats)
     }
 }
+
+/// The level-up splash (plans/2026-10-16-progress-and-tunes.md, section 2): once per
+/// level, ever, only when he finished the level before.
+@Suite struct LevelUpTests {
+    func engine(_ lesson: LessonID) -> MasteryEngine {
+        NoteCoreTests.engine(in: lesson, seed: 3)
+    }
+
+    /// Plays right screens, a session a day, until he leaves `level` (each level ends on
+    /// its drill lesson, which finishes on habit over two days). Returns the updates.
+    @discardableResult
+    func finish(level: Int, _ engine: inout MasteryEngine, seed: UInt64 = 4) -> [MasteryUpdate] {
+        var rng = SeededRandom(seed: seed)
+        var updates: [MasteryUpdate] = []
+        var day = (engine.state.sessionDay) + 1
+        for i in 0..<1200 where engine.lesson.level == level {
+            if i % 20 == 0 {
+                engine.beginSession(day: day)
+                day += 1
+            }
+            updates.append(engine.playPick(engine.pickScreen(using: &rng)))
+        }
+        return updates
+    }
+
+    @Test func finishingALevelWaitsForItsSplash() {
+        var engine = engine("1.4")
+        #expect(engine.pendingLevelUp == nil)
+        let updates = finish(level: 1, &engine)
+        #expect(engine.lesson.id == "2.1")
+        #expect(updates.compactMap(\.levelUp) == [2])
+        #expect(engine.pendingLevelUp == 2)
+        engine.celebrateLevelUp()
+        #expect(engine.pendingLevelUp == nil)
+        #expect(engine.state.celebratedLevels == [2])
+    }
+
+    @Test func aLessonInsideALevelIsNoLevelUp() {
+        var engine = engine("1.2")
+        let updates = finish(level: 1, &engine)
+        let entered = updates.compactMap(\.enteredLesson)
+        #expect(entered.first == "1.3")
+        // 1.2 -> 1.3 -> 1.4 -> 1.5 -> 2.1: only the last one is a new level
+        #expect(updates.compactMap(\.levelUp) == [2])
+    }
+
+    @Test func oncePerLevelEver() {
+        var engine = engine("1.4")
+        finish(level: 1, &engine)
+        engine.celebrateLevelUp()
+        // a parent moves him back, and he finishes level 1 again
+        engine.moveToLesson("1.5")
+        let updates = finish(level: 1, &engine)
+        #expect(engine.lesson.level == 2)
+        #expect(updates.compactMap(\.levelUp).isEmpty)
+        #expect(engine.pendingLevelUp == nil)
+    }
+
+    @Test func theLevelPickerIsNoLevelUp() {
+        var engine = engine("1.2")
+        engine.moveToLevel(2)
+        #expect(engine.lesson.level == 2)
+        #expect(engine.pendingLevelUp == nil)
+        engine.moveToLevel(3)
+        #expect(engine.pendingLevelUp == nil)
+        #expect(engine.state.celebratedLevels.isEmpty)
+    }
+
+    /// A parent move while a splash is waiting drops it: it would be for a level he isn't in.
+    @Test func aParentMoveDropsAWaitingSplash() {
+        var engine = engine("1.4")
+        finish(level: 1, &engine)
+        #expect(engine.pendingLevelUp == 2)
+        engine.moveToLesson("1.2")
+        #expect(engine.pendingLevelUp == nil)
+    }
+
+    @Test func theSessionPassesItOn() {
+        var engine = engine("1.4")
+        finish(level: 1, &engine)
+        var session = PracticeSession(engine: engine, seed: 1, pianoConnected: true)
+        #expect(session.engine.pendingLevelUp == 2)
+        session.celebrateLevelUp()
+        #expect(session.engine.pendingLevelUp == nil)
+        #expect(session.engine.state.celebratedLevels.contains(2))
+    }
+
+    @Test func savedStateWithoutLevelUpsStillDecodes() throws {
+        var engine = engine("1.4")
+        finish(level: 1, &engine)
+        let data = try JSONEncoder().encode(engine.state)
+        let back = try JSONDecoder().decode(MasteryState.self, from: data)
+        #expect(back.levelUps == [2])
+        var json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        json.removeValue(forKey: "levelUps")
+        json.removeValue(forKey: "celebratedLevels")
+        let old = try JSONDecoder().decode(MasteryState.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(old.levelUps.isEmpty && old.celebratedLevels.isEmpty)
+        #expect(old.lesson == engine.state.lesson)
+    }
+}

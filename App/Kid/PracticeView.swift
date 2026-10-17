@@ -55,6 +55,14 @@ struct PracticeView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: controller.hatchQueue.first)
         .overlay {
+            // he finished a level: the splash, until "Let's go!" (the door stays on top)
+            if let moment = controller.levelUp {
+                LevelUpView(controller: controller, moment: moment)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.4), value: controller.levelUp != nil)
+        .overlay {
             if controller.isPaused {
                 TurnOnPianoView().transition(.opacity)
             }

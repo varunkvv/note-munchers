@@ -132,6 +132,11 @@ public struct MasteryState: Hashable, Codable, Sendable {
     /// Per clef (`Clef.rawValue`): the note of its last intro. With `introGap` it makes
     /// the blocked screens that follow an intro.
     public var lastIntro: [String: ItemID] = [:]
+    /// Levels he reached by finishing the level before, waiting for their celebration
+    /// (the level-up splash). A parent moving him never adds one.
+    public var levelUps: [Int] = []
+    /// Levels whose splash he has had. Once per level, ever.
+    public var celebratedLevels: Set<Int> = []
     /// The engine's own dice for curriculum choices: which notes a lesson starts with
     /// and which come next. Seeded once per kid (the app seeds it at first launch),
     /// saved with everything else, so the same state always makes the same choice.
@@ -151,6 +156,8 @@ public struct MasteryUpdate: Hashable, Codable, Sendable {
     public var enteredLesson: LessonID?
     /// Set when notes per screen changed.
     public var screenSize: Int?
+    /// Set when finishing a level moved him into this one (and it hasn't been celebrated).
+    public var levelUp: Int?
     public init() {}
 }
 
@@ -461,10 +468,21 @@ public struct MasteryEngine: Sendable {
     @discardableResult
     public mutating func moveToLesson(_ id: LessonID) -> [ItemID] {
         guard curriculum.lesson(id) != nil, id != state.lesson else { return [] }
+        // a parent moving him isn't a level-up, and a splash for a level he isn't in would be odd
+        state.levelUps = []
         let unlocked = enter(id)
         // between sessions: his last session's day isn't a day in this lesson
         state.lessonDays = []
         return unlocked
+    }
+
+    /// A level he reached by finishing the one before, still to be celebrated.
+    public var pendingLevelUp: Int? { state.levelUps.first }
+
+    /// The level-up splash is up: it's had its celebration, it never comes back.
+    public mutating func celebrateLevelUp() {
+        guard !state.levelUps.isEmpty else { return }
+        state.celebratedLevels.insert(state.levelUps.removeFirst())
     }
 
     /// Parent picks a level: its first lesson that isn't done (or its first lesson).
@@ -522,6 +540,10 @@ public struct MasteryEngine: Sendable {
               let next = curriculum.lessons[(index + 1)...].first(where: { !state.completedLessons.contains($0.id) })
         else { return }
         update.enteredLesson = next.id
+        if next.level > lesson.level, !state.celebratedLevels.contains(next.level), !state.levelUps.contains(next.level) {
+            state.levelUps.append(next.level)
+            update.levelUp = next.level
+        }
         update.unlocked += enter(next.id)
     }
 
@@ -690,6 +712,8 @@ extension MasteryState {
         sessionDay = try c.value(.sessionDay, or: d.sessionDay)
         lessonDays = try c.value(.lessonDays, or: d.lessonDays)
         lessonHabit = try c.value(.lessonHabit, or: d.lessonHabit)
+        levelUps = try c.value(.levelUps, or: d.levelUps)
+        celebratedLevels = try c.value(.celebratedLevels, or: d.celebratedLevels)
         dice = try c.value(.dice, or: d.dice)
     }
 }

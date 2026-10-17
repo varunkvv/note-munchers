@@ -33,6 +33,23 @@ final class PracticeController {
     private(set) var playingKeys: [Pitch]?
     /// The screen is being played (with or without the keyboard).
     private(set) var isPlayingBack = false
+    /// He just finished a level: the level-up splash is up, and the session waits for
+    /// "Let's go!" (or the door).
+    private(set) var levelUp: LevelUpMoment?
+
+    /// What the level-up splash shows.
+    struct LevelUpMoment: Equatable {
+        /// The level he's in now.
+        let level: Int
+        /// The new level's path (empty, or nearly).
+        let path: LevelProgress
+        /// The finished level's lesson count, for its full path.
+        let finishedStones: Int
+        /// The muncher that walks to the flag, and the ones that cheer.
+        let guide: NoteKey?
+        let band: [NoteKey]
+        let fluencies: [NoteKey: Double]
+    }
 
     /// Called after each finished screen, with the result and the state to save.
     var onScreenDone: ((ScreenResult, MasteryState) -> Void)?
@@ -42,6 +59,8 @@ final class PracticeController {
     var needsColor: (ItemID) -> Bool = { _ in false }
     /// He picked a colour for a new muncher.
     var onColorChosen: ((ItemID, Int) -> Void)?
+    /// The saved state changed between screens (the level-up splash came up).
+    var onStateChanged: ((MasteryState) -> Void)?
 
     /// DEBUG demo: stay on the success state instead of moving on.
     var holdAfterSuccess = false
@@ -61,6 +80,11 @@ final class PracticeController {
     @ObservationIgnored private var playbackTask: Task<Void, Never>?
     @ObservationIgnored private var savedScreens = 0
     @ObservationIgnored private var finished = false
+    /// Stopped (the door, or the session's end): nothing more comes up.
+    @ObservationIgnored private var stopped = false
+    /// The level-up splash is due or up: from the end of the screen that finished the
+    /// level until "Let's go!". The session doesn't move on in between.
+    @ObservationIgnored private var levelUpDue = false
     /// The intro's sound and words wait until its muncher has hatched.
     @ObservationIgnored private var afterHatch: [Cue]?
 
@@ -126,6 +150,7 @@ final class PracticeController {
 
     /// Leaves early (the "done for now" door). Whatever he finished is already saved.
     func stop() {
+        stopped = true
         listenTask?.cancel()
         tickTask?.cancel()
         nextTask?.cancel()
@@ -238,7 +263,7 @@ final class PracticeController {
                 finishSession()
             }
         }
-        if cues.contains(.resumed), session.phase == .success {
+        if cues.contains(.resumed), session.phase == .success, !levelUpDue {
             // the piano dropped during the celebration. pick it up again
             scheduleNext(after: celebrate)
         }
@@ -247,7 +272,13 @@ final class PracticeController {
             if let screen = session.summary.screens.last {
                 onScreenDone?(screen, session.engine.state)
             }
-            scheduleNext(after: celebrate)
+            if session.engine.pendingLevelUp != nil {
+                // a level done: the splash once this screen's celebration is over, then the
+                // session goes on (or ends) when he's ready
+                showLevelUp(after: celebrate)
+            } else {
+                scheduleNext(after: celebrate)
+            }
         }
         scheduleTick()
     }
@@ -336,6 +367,43 @@ final class PracticeController {
         }
     }
 
+    // MARK: level up
+
+    /// The splash comes up once this screen's celebration is over. It's had its
+    /// celebration once it's up (leaving by the door then doesn't bring it back). Leaving
+    /// before it's up keeps it for the next calm moment: the end of his next screen.
+    private func showLevelUp(after delay: Double) {
+        levelUpDue = true
+        later(delay) { c in
+            guard !c.stopped, !c.finished, let level = c.session.engine.pendingLevelUp else { return }
+            let engine = c.session.engine
+            let finished = engine.curriculum.level(level - 1)?.lessons.count ?? 4
+            // the most grown of all walks to the flag, the next most grown cheer
+            let guide = LevelPathPainter.guide(engine)
+            let band = engine.metNotes.filter { $0 != guide }
+                .sorted { engine.stats(for: $0).peakFluency > engine.stats(for: $1).peakFluency }.prefix(4)
+            c.levelUp = LevelUpMoment(
+                level: level, path: engine.levelProgress, finishedStones: finished, guide: guide,
+                band: Array(band), fluencies: Dictionary(uniqueKeysWithValues: band.map { ($0, engine.stats(for: $0).peakFluency) })
+            )
+            c.session.celebrateLevelUp()
+            c.onStateChanged?(c.session.engine.state)
+            c.voice.say(.levelUp)
+            // a little "ta-da" up the G chord
+            let notes = ["G4", "B4", "D5"].compactMap { Pitch($0) }
+            for (i, p) in notes.enumerated() { c.later(0.14 * Double(i)) { $0.sounds.play([p]) } }
+            c.later(0.45) { $0.sounds.play(["G4", "B4", "D5", "G5"].compactMap { Pitch($0) }) }
+        }
+    }
+
+    /// "Let's go!" on the splash: the session goes on (or ends, if this was its last screen).
+    func levelUpDone() {
+        guard levelUp != nil else { return }
+        levelUp = nil
+        levelUpDue = false
+        scheduleNext(after: 0.5)
+    }
+
     /// Runs `action` after `delay` seconds (stretched in demo runs).
     private func later(_ delay: Double, _ action: @escaping @MainActor (PracticeController) -> Void) {
         let scaled = delay * timeScale
@@ -372,7 +440,7 @@ final class PracticeController {
 
     private func scheduleNext(after delay: Double) {
         nextTask?.cancel()
-        guard !holdAfterSuccess else { return }
+        guard !holdAfterSuccess, !levelUpDue else { return }
         nextTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(delay * (self?.timeScale ?? 1)))
             guard !Task.isCancelled, let self, self.session.phase == .success else { return }
