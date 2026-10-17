@@ -36,11 +36,16 @@ public struct AttemptResult: Hashable, Codable, Sendable {
     /// the screen's reading time (prompt to first key), since the gaps after that are
     /// the rhythm, not reading.
     public var responseTime: Double
+    /// The time is a pure in-line reading time, what habit is measured on: not the
+    /// screen's first note (that time includes taking in a new screen), not the same key
+    /// as the note before it, not on a rhythm-judged screen or a rhythm line (the gaps
+    /// are the rhythm), not an intro or a second read.
+    public var inLine: Bool
 
     public init(
         itemID: ItemID, lesson: LessonID, level: Int, wasIntro: Bool = false, firstTry: Bool,
         wrongPresses: Int = 0, almostPresses: Int = 0, stuckSteps: Int = 0, hints: HintLevel = .none,
-        responseTime: Double
+        responseTime: Double, inLine: Bool = false
     ) {
         self.itemID = itemID
         self.lesson = lesson
@@ -52,6 +57,7 @@ public struct AttemptResult: Hashable, Codable, Sendable {
         self.stuckSteps = stuckSteps
         self.hints = hints
         self.responseTime = responseTime
+        self.inLine = inLine
     }
 }
 
@@ -132,6 +138,7 @@ extension AttemptResult {
         stuckSteps = try c.value(.stuckSteps, or: 0)
         hints = try c.value(.hints, or: .none)
         responseTime = try c.value(.responseTime, or: 0)
+        inLine = try c.value(.inLine, or: false)
     }
 }
 

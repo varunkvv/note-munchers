@@ -101,8 +101,14 @@ import Testing
     @Test func finishingALevelStartsAnEmptyPath() {
         var engine = engine("1.5")
         solid(&engine)
-        for _ in 0..<40 where engine.lesson.level == 1 {
-            engine.play(engine.pool, reason: .normal)
+        // a drill lesson ends on habit, which takes two days
+        for day in 1...3 {
+            engine.beginSession(day: day)
+            for i in 0..<20 where engine.lesson.level == 1 {
+                // each note first now and then: the first note of a screen isn't in-line
+                let pool = engine.pool
+                engine.play(Array(pool[(i % pool.count)...] + pool[..<(i % pool.count)]), reason: .normal, size: engine.screenSize)
+            }
         }
         #expect(engine.lesson.id == "2.1")
         let path = engine.levelProgress

@@ -43,7 +43,13 @@ extension MasteryEngine {
         let rightFirst = min(1, Double(window.filter(\.firstTry).count) / needed)
         var parts: [(value: Double, weight: Double)]
         let newKeys = lesson.newKeys
-        if newKeys.isEmpty {
+        if lesson.isDrillLesson {
+            // a drill lesson: his notes becoming habit, or the days that let it end anyway
+            let notes = pool
+            let habit = notes.isEmpty ? 0 : notes.reduce(0.0) { $0 + self.habit($1).fraction } / Double(notes.count)
+            let days = min(1, Double(state.lessonDays.count) / Double(max(1, config.drillLessonMaxDays)))
+            parts = [(max(habit, days), 0.7), (screens, 0.15), (rightFirst, 0.15)]
+        } else if newKeys.isEmpty {
             // a practice lesson: every note is known already, so it's playing enough
             // screens and getting his last notes right
             parts = [(screens, 0.5), (rightFirst, 0.5)]

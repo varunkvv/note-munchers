@@ -95,7 +95,7 @@ final class AppModel {
         #endif
         let controller = PracticeController(
             engine: MasteryEngine(config: config, state: engine.state),
-            input: input, sounds: sounds, voice: voice, seed: seed
+            input: input, sounds: sounds, voice: voice, seed: seed, day: Self.today()
         )
         controller.onScreenDone = { [weak self] screen, state in
             self?.screenDone(screen, state: state)
@@ -163,6 +163,12 @@ final class AppModel {
         lastEndedByKid = false
         practice = nil
         screen = .sessionEnd
+    }
+
+    /// Today as a day number (days since the calendar's start, in his time zone), so
+    /// habit's "two different days" means two of his days, not two UTC dates.
+    static func today(_ date: Date = Date()) -> Int {
+        Calendar.current.ordinality(of: .day, in: .era, for: date) ?? Int(date.timeIntervalSinceReferenceDate / 86_400)
     }
 
     // MARK: song time

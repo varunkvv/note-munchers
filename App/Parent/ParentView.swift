@@ -463,7 +463,7 @@ struct LevelsView: View {
         let new = lesson.newKeys.map(\.pitch.name)
         var notes = new.isEmpty ? "practice" : "new: " + new.joined(separator: " ")
         if lesson.isDrillLesson {
-            notes = "patterns: \(lesson.drills.map(Self.drillName).joined(separator: ", "))"
+            notes = "patterns: \(lesson.drills.map(Self.drillName).joined(separator: ", ")), done when his notes are a habit on two days"
         }
         let key = lesson.keySignature == .gMajor ? ", G major" : ""
         return "\(focus)\(staff), \(sizes) notes a screen\(key), \(notes)"

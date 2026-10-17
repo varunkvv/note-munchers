@@ -64,11 +64,13 @@ final class PracticeController {
     /// The intro's sound and words wait until its muncher has hatched.
     @ObservationIgnored private var afterHatch: [Cue]?
 
-    init(engine: MasteryEngine, input: InputHub, sounds: Sounds, voice: Voice, seed: UInt64) {
+    /// `day`: today as a day number in his time zone (`AppModel.today`), so habit can
+    /// tell two days apart.
+    init(engine: MasteryEngine, input: InputHub, sounds: Sounds, voice: Voice, seed: UInt64, day: Int) {
         self.input = input
         self.sounds = sounds
         self.voice = voice
-        session = PracticeSession(engine: engine, seed: seed, pianoConnected: input.isConnected)
+        session = PracticeSession(engine: engine, seed: seed, pianoConnected: input.isConnected, day: day)
         let lesson = engine.lesson
         spec = StaffSpec(lesson: lesson, layout: lesson.staff(for: lesson.clefs[0]))
         keyboardRange = KeyboardRange.forLesson(lesson)

@@ -239,6 +239,8 @@ public struct PracticeSession: Sendable {
 
     private var config: NoteCoreConfig { engine.config }
     private var rng: SeededRandom
+    /// The day this session is on (habit wants two different days). nil: its own day.
+    private let day: Int?
     private var judge: AttemptJudge?
 
     // clock: active time = app time - start - paused total
@@ -293,8 +295,12 @@ public struct PracticeSession: Sendable {
     private var firstGo: (notes: [AttemptResult], rhythm: RhythmResult?)?
     private var isRhythmDemo = false
 
-    public init(engine: MasteryEngine, seed: UInt64, pianoConnected: Bool = true) {
+    /// `day`: the app's day number (days since some fixed date, in his time zone), so
+    /// habit can tell two days apart. nil counts every session as a day of its own
+    /// (tests, demos).
+    public init(engine: MasteryEngine, seed: UInt64, pianoConnected: Bool = true, day: Int? = nil) {
         self.engine = engine
+        self.day = day
         rng = SeededRandom(seed: seed)
         isPianoConnected = pianoConnected
         summary = SessionSummary(startLesson: engine.lesson.id)
@@ -331,6 +337,7 @@ public struct PracticeSession: Sendable {
     public mutating func start(at time: Double) -> [Cue] {
         guard phase == .notStarted else { return [] }
         startTime = time
+        engine.beginSession(day: day)
         warmUpLeft = engine.lesson.clefs.contains { !engine.strongestNotes($0).isEmpty } ? config.warmUpScreens : 0
         guard isPianoConnected else {
             pausedAt = time
@@ -755,11 +762,14 @@ public struct PracticeSession: Sendable {
             var notes: [AttemptResult] = []
             for (i, column) in item.notes.enumerated() {
                 let time = lesson.texture.isRhythm ? readingTime : correctTimes[i] - startTimes[i]
+                // habit's in-line time: reading from one note to the next, nothing else in it
+                let inLine = i > 0 && !isIntro && !lesson.texture.isRhythm && rhythmLine == nil && pickReason != .again
+                    && column.pitches != item.notes[i - 1].pitches
                 for key in column.keys {
                     notes.append(AttemptResult(
                         itemID: key.id, lesson: lesson.id, level: lesson.level, wasIntro: introNote == key || isLessonIntro,
                         firstTry: wrongs[i] == 0 && stucks[i] == 0 && !listened[i], wrongPresses: wrongs[i], almostPresses: almosts[i],
-                        stuckSteps: stucks[i], hints: hints[i], responseTime: max(0, time)
+                        stuckSteps: stucks[i], hints: hints[i], responseTime: max(0, time), inLine: inLine
                     ))
                 }
             }

@@ -72,6 +72,28 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// in it before it can finish, however fast he finds them.
     public var lessonMinNewPlays = 10
 
+    // MARK: habit (plans/2026-10-16-drills-and-habit.md section 4)
+    // knowing a note vs it being automatic. Starting values, to tune from his data: 6
+    // year olds are much slower than adults on speeded tasks (Kail 1991)
+
+    /// Habit looks at a note's last this many in-line plays...
+    public var habitWindow = 10
+    /// ...this many of them right first try (a wrong octave counts as not automatic)...
+    public var habitFirstTry = 9
+    /// ...with a median under this...
+    public var habitMedian: Double = 2
+    /// ...and steady: sd / mean of their times under this (automatic shows as this
+    /// dropping, not only the average: Segalowitz & Segalowitz 1993)...
+    public var habitCV = 0.4
+    /// ...and its first showing right first try in his last sessions on this many
+    /// different days (practice inside one session overstates learning: Schmidt & Bjork
+    /// 1992, Rohrer et al 2005).
+    public var habitDays = 2
+    /// A drill lesson finishes when his notes are habit, or once he has played it on
+    /// this many different days with the usual lesson rule met, so a steady but slow
+    /// reader never gets stuck at the end of a level.
+    public var drillLessonMaxDays = 5
+
     // MARK: session shape
 
     /// Easing: when this many of his last `easingWindow` notes in a session weren't
@@ -181,6 +203,12 @@ extension NoteCoreConfig {
         lessonWindow = try c.value(.lessonWindow, or: d.lessonWindow)
         lessonRate = try c.value(.lessonRate, or: d.lessonRate)
         lessonMinNewPlays = try c.value(.lessonMinNewPlays, or: d.lessonMinNewPlays)
+        habitWindow = try c.value(.habitWindow, or: d.habitWindow)
+        habitFirstTry = try c.value(.habitFirstTry, or: d.habitFirstTry)
+        habitMedian = try c.value(.habitMedian, or: d.habitMedian)
+        habitCV = try c.value(.habitCV, or: d.habitCV)
+        habitDays = try c.value(.habitDays, or: d.habitDays)
+        drillLessonMaxDays = try c.value(.drillLessonMaxDays, or: d.drillLessonMaxDays)
         easingTrigger = try c.value(.easingTrigger, or: d.easingTrigger)
         easingWindow = try c.value(.easingWindow, or: d.easingWindow)
         easingItems = try c.value(.easingItems, or: d.easingItems)

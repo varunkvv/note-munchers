@@ -6,12 +6,15 @@ func key(_ id: String) -> NoteKey { NoteKey(id: id)! }
 
 extension MasteryEngine {
     /// Records one normal screen of these notes, every one right (or every one wrong)
-    /// at `time` each.
+    /// at `time` each. Notes after the first are in-line (habit), as in a session, except
+    /// on rhythm lines.
     @discardableResult
     mutating func play(_ keys: [NoteKey], right: Bool = true, time: Double = 1.5, reason: PickReason = .normal,
                        rhythmOK: Bool? = nil, size: Int? = nil) -> MasteryUpdate {
-        let notes = keys.map {
-            AttemptResult(itemID: $0.id, lesson: lesson.id, level: lesson.level, firstTry: right, wrongPresses: right ? 0 : 1, responseTime: time)
+        let rhythmLine = lesson.texture.isRhythm
+        let notes = keys.enumerated().map { i, key in
+            AttemptResult(itemID: key.id, lesson: lesson.id, level: lesson.level, firstTry: right, wrongPresses: right ? 0 : 1, responseTime: time,
+                          inLine: i > 0 && !rhythmLine && key != keys[i - 1])
         }
         let rhythm = rhythmOK.map { ok in RhythmResult(verdicts: keys.map { _ in ok ? .ok : .tooShort }, beat: 0.6) }
         return record(ScreenResult(screenID: "test", lesson: lesson.id, reason: reason, notes: notes, rhythm: rhythm, size: size ?? keys.count))

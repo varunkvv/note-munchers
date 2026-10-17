@@ -1,10 +1,28 @@
 public struct AttemptSample: Hashable, Codable, Sendable {
     public var firstTry: Bool
     public var responseTime: Double
+    /// The session it was played in (`MasteryState.session`). 0 for samples saved before
+    /// the drills round.
+    public var session: Int
 
-    public init(firstTry: Bool, responseTime: Double) {
+    public init(firstTry: Bool, responseTime: Double, session: Int = 0) {
         self.firstTry = firstTry
         self.responseTime = responseTime
+        self.session = session
+    }
+}
+
+/// A note's first showing in one session: was it right first try (with no wrong
+/// octave). Habit needs this clean on two different days.
+public struct SessionFirst: Hashable, Codable, Sendable {
+    public var session: Int
+    public var day: Int
+    public var clean: Bool
+
+    public init(session: Int, day: Int, clean: Bool) {
+        self.session = session
+        self.day = day
+        self.clean = clean
     }
 }
 
@@ -19,6 +37,12 @@ public struct ItemStats: Hashable, Codable, Sendable {
     /// Highest fluency ever reached (0...1). Never goes down, so his muncher for this
     /// note never shrinks.
     public var peakFluency = 0.0
+    /// His last `habitWindow` in-line plays of it (not the first note of a screen, see
+    /// `AttemptResult.inLine`), first try meaning no wrong key, no stuck step and no wrong
+    /// octave. What habit is measured on.
+    public var inLine: [AttemptSample] = []
+    /// Its first showing in each of his last few sessions.
+    public var sessionFirsts: [SessionFirst] = []
 
     public init() {}
 
@@ -93,6 +117,14 @@ public struct MasteryState: Hashable, Codable, Sendable {
     public var lastFirstClef: Clef?
     /// The last drill screen's shape, so the next one is a different one.
     public var lastDrill: Drill?
+    /// Sessions started, counting from 1 (0 before the first). Samples carry it.
+    public var session = 0
+    /// The day the current session is on (the app's day number), for habit's "two
+    /// different days".
+    public var sessionDay = 0
+    /// Days with a session in the current lesson. Reset when the lesson changes. A drill
+    /// lesson finishes on habit, or after `drillLessonMaxDays` of these.
+    public var lessonDays: Set<Int> = []
     /// Per clef (`Clef.rawValue`): the note of its last intro. With `introGap` it makes
     /// the blocked screens that follow an intro.
     public var lastIntro: [String: ItemID] = [:]
@@ -374,8 +406,18 @@ public struct MasteryEngine: Sendable {
             state.introduced.insert(key.id) // met, whichever screen it was on
             guard !attempt.wasIntro else { continue }
             var s = stats(for: key)
-            let sample = AttemptSample(firstTry: attempt.firstTry, responseTime: max(0, attempt.responseTime))
+            let sample = AttemptSample(firstTry: attempt.firstTry, responseTime: max(0, attempt.responseTime), session: state.session)
             s.recent = Array((s.recent + [sample]).suffix(config.solidWindow))
+            // habit: in-line times, and the first showing each session (a wrong octave isn't automatic)
+            let automatic = attempt.firstTry && attempt.almostPresses == 0
+            if attempt.inLine {
+                let inLine = AttemptSample(firstTry: automatic, responseTime: max(0, attempt.responseTime), session: state.session)
+                s.inLine = Array((s.inLine + [inLine]).suffix(config.habitWindow))
+            }
+            if s.sessionFirsts.last?.session != state.session {
+                let first = SessionFirst(session: state.session, day: state.sessionDay, clean: automatic)
+                s.sessionFirsts = Array((s.sessionFirsts + [first]).suffix(6))
+            }
             // stuck isn't wrong: a hint from being stuck alone holds the box where it is
             if attempt.firstTry {
                 s.box = min(config.boxCount, s.box + 1)
@@ -489,6 +531,12 @@ public struct MasteryEngine: Sendable {
               !lesson.paced || lesson.newKeys.allSatisfy(hasMinPlays)
         else { return false }
         let window = state.lessonRecent.suffix(config.lessonWindow)
+        // a drill lesson: his notes habit (on two days), or enough days in it and the usual rule
+        if lesson.isDrillLesson {
+            let ready = drillLessonReady
+            if ready.habit { return !lesson.texture.isRhythm || isRhythmSolid }
+            guard ready.enoughDays else { return false }
+        }
         guard window.count >= config.lessonWindow,
               Double(window.filter(\.firstTry).count) / Double(window.count) >= config.lessonRate,
               median(window.map(\.responseTime)) < config.solidMedianResponse
@@ -510,6 +558,7 @@ public struct MasteryEngine: Sendable {
         state.newest = [:]
         state.sizeRecent = []
         state.lessonPeak = 0
+        state.lessonDays = state.session > 0 ? [state.sessionDay] : []
         return prepareLesson()
     }
 
@@ -628,6 +677,9 @@ extension MasteryState {
         lastFirstClef = try c.decodeIfPresent(Clef.self, forKey: .lastFirstClef)
         lastDrill = try? c.decodeIfPresent(Drill.self, forKey: .lastDrill)
         lastIntro = try c.value(.lastIntro, or: d.lastIntro)
+        session = try c.value(.session, or: d.session)
+        sessionDay = try c.value(.sessionDay, or: d.sessionDay)
+        lessonDays = try c.value(.lessonDays, or: d.lessonDays)
         dice = try c.value(.dice, or: d.dice)
     }
 }
@@ -641,5 +693,27 @@ extension ItemStats {
         attempts = try c.value(.attempts, or: d.attempts)
         firstTryCount = try c.value(.firstTryCount, or: d.firstTryCount)
         peakFluency = try c.value(.peakFluency, or: d.peakFluency)
+        inLine = try c.value(.inLine, or: d.inLine)
+        sessionFirsts = try c.value(.sessionFirsts, or: d.sessionFirsts)
+    }
+}
+
+// every saved note's `recent` is a list of these, so a sample saved before a field was
+// added must still decode (or his whole state wouldn't)
+extension AttemptSample {
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        firstTry = try c.value(.firstTry, or: false)
+        responseTime = try c.value(.responseTime, or: 0)
+        session = try c.value(.session, or: 0)
+    }
+}
+
+extension SessionFirst {
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        session = try c.value(.session, or: 0)
+        day = try c.value(.day, or: 0)
+        clean = try c.value(.clean, or: false)
     }
 }

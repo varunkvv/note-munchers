@@ -113,7 +113,8 @@ import Testing
         var engine = engine(in: "1.4")
         var rng = SeededRandom(seed: 4)
         var lessons: [LessonID] = []
-        for _ in 0..<400 where engine.lesson.level == 1 || lessons.last != engine.lesson.id {
+        for i in 0..<400 where engine.lesson.level == 1 || lessons.last != engine.lesson.id {
+            if i % 20 == 0 { engine.beginSession(day: i / 20 + 1) } // a session a day
             if lessons.last != engine.lesson.id { lessons.append(engine.lesson.id) }
             engine.playPick(engine.pickScreen(using: &rng))
             if engine.lesson.level == 2 { lessons.append(engine.lesson.id); break }

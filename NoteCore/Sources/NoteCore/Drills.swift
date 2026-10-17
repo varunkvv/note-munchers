@@ -65,9 +65,10 @@ extension MasteryEngine {
         return Array(Set(playable(clef)).union(met)).sorted()
     }
 
-    /// How much a note wants practice on a drill screen: low boxes more.
+    /// How much a note wants practice on a drill screen: low boxes more, and the further
+    /// a note is from habit the more (up to 10 times a note that's habit).
     func drillWeight(_ key: NoteKey) -> Double {
-        Double(config.boxCount + 1 - stats(for: key).box)
+        Double(config.boxCount + 1 - stats(for: key).box) * (1 + 9 * (1 - habit(key).fraction))
     }
 
     /// The key that can't come next (it was the last `maxRepeats` columns), if any.
@@ -122,9 +123,10 @@ extension MasteryEngine {
     mutating func drillPick(on clef: Clef, size: Int, using rng: inout some RandomNumberGenerator) -> Pick? {
         var options = lesson.drills.filter { $0 != state.lastDrill }
         if options.isEmpty { options = lesson.drills }
-        // a tune is a now-and-then surprise
+        // a tune is a now-and-then surprise. A repeat reads one note (nothing in-line for
+        // habit to measure), so it comes a bit less often than the others
         var order: [Drill] = []
-        var weights = options.map { $0 == .tune ? 0.35 : 1.0 }
+        var weights = options.map { $0 == .tune ? 0.35 : $0 == .repeatNote ? 0.6 : 1.0 }
         while !weights.allSatisfy({ $0 == 0 }) {
             let i = weightedIndex(weights, using: &rng)
             order.append(options[i])
@@ -190,12 +192,15 @@ extension MasteryEngine {
             let two = n >= 2 * beats && 2 * beats <= Self.maxNotes(meter)
             let candidates = inside.filter { $0.id != blockedColumn }
             guard !candidates.isEmpty else { return nil }
-            let first = candidates[weightedIndex(candidates.map(drillWeight), using: &rng)]
+            // any note alike: a repeated key has nothing in-line to measure, so leaning the
+            // repeats toward weak notes would only slow their habit down
+            let boxWeight = { (_: NoteKey) in 1.0 }
+            let first = candidates[weightedIndex(candidates.map(boxWeight), using: &rng)]
             var keys = Array(repeating: first, count: beats)
             if two {
                 let near = inside.filter { $0 != first && abs($0.pitch.diatonicIndex - first.pitch.diatonicIndex) <= 2 }
                 guard !near.isEmpty else { return single(keys, position, bars: [beats]) }
-                keys += Array(repeating: near[weightedIndex(near.map(drillWeight), using: &rng)], count: beats)
+                keys += Array(repeating: near[weightedIndex(near.map(boxWeight), using: &rng)], count: beats)
             }
             return single(keys, position, bars: two ? [beats, beats] : [beats])
         case .echo:
@@ -236,7 +241,10 @@ extension MasteryEngine {
     // MARK: shapes
 
     /// `n` notes stepping through `notes` (low to high), turning at each end. Next-door
-    /// letters when there's a stretch of 3 or more, otherwise every note in order.
+    /// letters when there's a stretch of 3 or more, otherwise every note in order. Where
+    /// it starts and which way it goes leans toward runs that read the notes needing it
+    /// most (a five-note run from G rarely gets to D otherwise), and toward starting at
+    /// an end, the way a five-finger run goes.
     func runKeys(_ n: Int, from notes: [NoteKey], using rng: inout some RandomNumberGenerator) -> [NoteKey]? {
         let sorted = notes.sorted()
         guard sorted.count >= 2, n >= 2 else { return nil }
@@ -246,28 +254,31 @@ extension MasteryEngine {
             if current.count > best.count { best = current }
         }
         let steps = best.count >= 3 ? best : sorted
-        var index: Int
-        var direction: Int
-        if unitInterval(&rng) < 0.7 {
-            // from an end, the way a five-finger run goes
-            let up = unitInterval(&rng) < 0.5
-            index = up ? 0 : steps.count - 1
-            direction = up ? 1 : -1
-        } else {
-            index = min(steps.count - 1, Int(unitInterval(&rng) * Double(steps.count)))
-            direction = unitInterval(&rng) < 0.5 ? 1 : -1
+        func walk(from start: Int, _ direction: Int) -> [NoteKey] {
+            var index = start, direction = direction
+            var out: [NoteKey] = []
+            for _ in 0..<n {
+                out.append(steps[index])
+                if !steps.indices.contains(index + direction) { direction = -direction }
+                index += direction
+            }
+            return out
         }
-        if steps[index].id == blockedColumn {
-            index = index == 0 ? steps.count - 1 : 0
-            direction = index == 0 ? 1 : -1
+        // every start and direction, weighted by what the notes after the first read
+        // (the first one's time includes taking in the screen), a little more from an end
+        var options: [[NoteKey]] = []
+        var weights: [Double] = []
+        for start in steps.indices {
+            for direction in [1, -1] where steps.indices.contains(start + direction) {
+                let keys = walk(from: start, direction)
+                guard keys[0].id != blockedColumn else { continue }
+                let end = start == 0 || start == steps.count - 1
+                options.append(keys)
+                weights.append(keys.dropFirst().reduce(0.0) { $0 + drillWeight($1) } * (end ? 1.3 : 1))
+            }
         }
-        var out: [NoteKey] = []
-        for _ in 0..<n {
-            out.append(steps[index])
-            if !steps.indices.contains(index + direction) { direction = -direction }
-            index += direction
-        }
-        return out
+        guard !options.isEmpty else { return walk(from: 0, 1) }
+        return options[weightedIndex(weights, using: &rng)]
     }
 
     /// A cell of `cell` notes, then the same cell a step away, turned around, or with one
@@ -313,7 +324,14 @@ extension MasteryEngine {
         let away = notes.filter { $0 != home }
         guard !away.isEmpty, n >= 3 else { return nil }
         let distance = { (k: NoteKey) in abs(k.pitch.diatonicIndex - home.pitch.diatonicIndex) }
-        var order = shuffled(away, using: &rng)
+        // the away notes it has room for, the ones needing it most first, then half the
+        // time put in order going out from home
+        var order: [NoteKey] = []
+        var left = away
+        while !left.isEmpty, order.count < max(1, n / 2) {
+            let i = weightedIndex(left.map(drillWeight), using: &rng)
+            order.append(left.remove(at: i))
+        }
         if unitInterval(&rng) < 0.5 {
             order.sort { distance($0) < distance($1) }
         }

@@ -258,7 +258,8 @@ import Testing
         var engine = MasteryEngine(state: MasteryState(seed: 2))
         var rng = SeededRandom(seed: 2)
         var lessons: [LessonID] = []
-        for _ in 0..<3000 where !engine.isCurriculumComplete {
+        for i in 0..<3000 where !engine.isCurriculumComplete {
+            if i % 20 == 0 { engine.beginSession(day: i / 20 + 1) } // a session a day: drill lessons end on habit, two days
             if lessons.last != engine.lesson.id { lessons.append(engine.lesson.id) }
             engine.playPick(engine.pickScreen(using: &rng))
         }
