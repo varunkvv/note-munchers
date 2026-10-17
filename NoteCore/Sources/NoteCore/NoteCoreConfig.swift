@@ -92,7 +92,7 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// A drill lesson finishes when his notes are habit, or once he has played it on
     /// this many different days with the usual lesson rule met, so a steady but slow
     /// reader never gets stuck at the end of a level.
-    public var drillLessonMaxDays = 5
+    public var drillLessonMaxDays = 4
 
     // MARK: session shape
 

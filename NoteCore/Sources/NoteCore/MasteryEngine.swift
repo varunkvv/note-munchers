@@ -125,6 +125,10 @@ public struct MasteryState: Hashable, Codable, Sendable {
     /// Days with a session in the current lesson. Reset when the lesson changes. A drill
     /// lesson finishes on habit, or after `drillLessonMaxDays` of these.
     public var lessonDays: Set<Int> = []
+    /// Notes that have been habit right after a play in the current lesson (habit is a
+    /// window, it can dip: once reached here, it counts for the lesson). Reset when the
+    /// lesson changes.
+    public var lessonHabit: Set<ItemID> = []
     /// Per clef (`Clef.rawValue`): the note of its last intro. With `introGap` it makes
     /// the blocked screens that follow an intro.
     public var lastIntro: [String: ItemID] = [:]
@@ -429,6 +433,7 @@ public struct MasteryEngine: Sendable {
             s.peakFluency = max(s.peakFluency, fluency(s))
             state.stats[key.id] = s
             state.lessonPlays[key.id, default: 0] += 1
+            if isHabit(key) { state.lessonHabit.insert(key.id) }
             state.lessonRecent = Array((state.lessonRecent + [sample]).suffix(max(config.lessonWindow, config.solidWindow)))
         }
         if !screen.wasIntro, !screen.wasLessonIntro {
@@ -559,6 +564,7 @@ public struct MasteryEngine: Sendable {
         state.sizeRecent = []
         state.lessonPeak = 0
         state.lessonDays = state.session > 0 ? [state.sessionDay] : []
+        state.lessonHabit = []
         return prepareLesson()
     }
 
@@ -680,6 +686,7 @@ extension MasteryState {
         session = try c.value(.session, or: d.session)
         sessionDay = try c.value(.sessionDay, or: d.sessionDay)
         lessonDays = try c.value(.lessonDays, or: d.lessonDays)
+        lessonHabit = try c.value(.lessonHabit, or: d.lessonHabit)
         dice = try c.value(.dice, or: d.dice)
     }
 }

@@ -7,7 +7,8 @@
 ///   screen), not a repeat of the key before, not on a rhythm-judged screen
 /// - the last `habitWindow` of them, `habitFirstTry` right first try (a wrong octave
 ///   isn't automatic, though the box holds)
-/// - median under `habitMedian`, and steady: sd / mean under `habitCV`
+/// - median under `habitMedian`, and steady: sd / mean under `habitCV`, both over the
+///   plays right first try
 /// - its first showing right first try in his last sessions on `habitDays` different days
 ///
 /// Used for: weighting drill screens toward notes that aren't habit yet, finishing each
@@ -17,8 +18,9 @@ public struct HabitProgress: Hashable, Sendable {
     /// In-line plays in the window, up to `habitWindow`.
     public let samples: Int
     public let firstTries: Int
+    /// Of the window's plays right first try.
     public let median: Double?
-    /// sd / mean of the window's times.
+    /// sd / mean of the window's times right first try.
     public let steadiness: Double?
     /// His last different days (up to `habitDays`, newest first) whose first showing of
     /// it was right first try, before one that wasn't.
@@ -32,7 +34,9 @@ extension MasteryEngine {
     public func habit(_ key: NoteKey) -> HabitProgress {
         let s = stats(for: key)
         let window = s.inLine.suffix(config.habitWindow)
-        let times = window.map(\.responseTime)
+        // speed and steadiness over the plays he got right first try, the way reaction
+        // time studies use correct trials: a miss's time is the miss plus the find
+        let times = window.filter(\.firstTry).map(\.responseTime)
         let firstTries = window.filter(\.firstTry).count
         let middle = times.isEmpty ? nil : NoteCore.median(times)
         var steadiness: Double?
@@ -75,9 +79,25 @@ extension MasteryEngine {
         state.lessonDays.insert(state.sessionDay)
     }
 
-    /// A drill lesson finishes when every note in it is habit, or after
-    /// `drillLessonMaxDays` days in it with the usual lesson rule met.
+    /// The notes a drill lesson waits on: the lesson's notes inside the hand positions
+    /// its drills use, both clefs (level 3's positions lesson never shows E5-G5, so they
+    /// can't hold it).
+    public var drillLessonNotes: [NoteKey] {
+        lesson.clefs.flatMap { clef in
+            let homes = lesson.home.map { home in HandPosition.standard(clef).filter { $0.contains(home) } } ?? []
+            let positions = drillPositionOptions(clef) + homes
+            return pool(clef).filter { key in positions.contains { $0.contains(key) } }
+        }
+    }
+
+    /// A drill lesson finishes when every one of its notes has reached habit in it, over
+    /// at least `habitDays` days in the lesson, or after `drillLessonMaxDays` days
+    /// in it with the usual lesson rule met. Every note habit at the same moment almost
+    /// never happens for a kid who is right 9 times in 10 (a seeded run: 7-8 of 10 at any
+    /// one time), so a note that got there in this lesson stays counted.
     var drillLessonReady: (habit: Bool, enoughDays: Bool) {
-        (pool.allSatisfy(isHabit), state.lessonDays.count >= config.drillLessonMaxDays)
+        let notes = drillLessonNotes
+        let habit = !notes.isEmpty && notes.allSatisfy { state.lessonHabit.contains($0.id) } && state.lessonDays.count >= config.habitDays
+        return (habit, state.lessonDays.count >= config.drillLessonMaxDays)
     }
 }

@@ -635,7 +635,9 @@ public struct PracticeSession: Sendable {
         let lengths = config.burstScreens
         let length = lengths.lowerBound + min(lengths.count - 1, Int(unitInterval(&rng) * Double(lengths.count)))
         let half = runs?.screens ?? total / 2
-        let first = 2...max(2, half - length), second = (half + 1)...max(half + 1, total - length - 1)
+        // early in the second run: a session that ends on time (rhythm screens take
+        // longer) can stop before its last screens
+        let first = 2...max(2, half - length), second = (half + 1)...max(half + 1, min(half + 4, total - length - 1))
         let range = unitInterval(&rng) < 0.5 ? first : second
         let at = range.lowerBound + min(range.count - 1, Int(unitInterval(&rng) * Double(range.count)))
         burst = (at, length)
