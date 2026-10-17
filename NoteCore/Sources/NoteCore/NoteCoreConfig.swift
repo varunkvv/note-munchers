@@ -167,16 +167,6 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// No key for this many seconds counts as one step up the hint ladder (stuck).
     /// Only climbs to the keyboard picture, never repeats on a clock after that.
     public var stuckAfter: Double = 15
-    /// The voice is rare (round 3): at most one earned line a session, never in the
-    /// first this many screens, at the end of a screen.
-    public var praiseAfterScreens = 8
-    /// "You looked carefully" can come after this many screens in a row all right first try...
-    public var praiseStreak = 6
-    /// ...when this roll comes up (otherwise the count starts again).
-    public var praiseChance = 0.6
-    /// Chance of "you kept trying and found it" after a screen where a note needed the
-    /// keyboard picture and he found it. Rolled on each such screen until one is said.
-    public var keptTryingChance = 0.5
     /// Beat (seconds) used when the app plays a new rhythm line to him first.
     public var demoBeat: Double = 0.75
 
@@ -243,10 +233,6 @@ extension NoteCoreConfig {
         blockedShare = try c.value(.blockedShare, or: d.blockedShare)
         maxExtraItems = try c.value(.maxExtraItems, or: d.maxExtraItems)
         stuckAfter = try c.value(.stuckAfter, or: d.stuckAfter)
-        praiseAfterScreens = try c.value(.praiseAfterScreens, or: d.praiseAfterScreens)
-        praiseStreak = try c.value(.praiseStreak, or: d.praiseStreak)
-        praiseChance = try c.value(.praiseChance, or: d.praiseChance)
-        keptTryingChance = try c.value(.keptTryingChance, or: d.keptTryingChance)
         demoBeat = try c.value(.demoBeat, or: d.demoBeat)
     }
 }

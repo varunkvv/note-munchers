@@ -302,7 +302,7 @@ import Testing
         let half = firstHalf(bench.session.item!, bench.session.rhythmLine!)!
         _ = play(&bench) { $0 == half ? 0.5 : 1 }
         bench.now += 0.5
-        #expect(bench.session.pianoDisconnected(at: bench.now) == [.paused, .say(.turnOnPiano)])
+        #expect(bench.session.pianoDisconnected(at: bench.now) == [.paused])
         bench.now += 2
         #expect(bench.session.replayFinished(at: bench.now).isEmpty, "the play back ended while paused")
         bench.now += 1

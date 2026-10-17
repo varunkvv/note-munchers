@@ -73,8 +73,10 @@ import Testing
                     if let drill = s.drill, s.pickReason != .again, s.pickReason != .warmUp {
                         drills += 1
                         log.patterns[drill, default: 0] += 1
-                        // a lesson with one drill (5.6) can't help it
-                        if drill == lastDrill, s.engine.lesson.drills.count > 1 { twice += 1 }
+                        // a lesson with one drill (5.6) can't help it. with two (4.5) the other
+                        // one can't always be made from his notes, and the picker falls back
+                        // to the last one by design
+                        if drill == lastDrill, s.engine.lesson.drills.count > 2 { twice += 1 }
                         lastDrill = drill
                         if level >= 4 { log.levelThreeNotes += s.item!.keys.filter(levelThree.contains).count }
                     } else if s.pickReason != .again {

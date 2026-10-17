@@ -55,87 +55,21 @@ import Testing
         #expect(notes.map(\.itemID) == bench.session.item!.notes.flatMap(\.keys).map(\.id))
     }
 
-    @Test func noLetterAfterRightKeys() {
-        var bench = twoNoteBench(seed: 3)
-        _ = bench.start()
-        for _ in 0..<30 {
-            let cues = bench.playScreen()
-            for speech in speeches(cues) {
-                #expect(speech == .lookedCarefully || speech == .keptTrying, "\(speech)")
-            }
-            _ = bench.next()
-        }
-    }
-
-    /// "You looked carefully" is earned: 6 screens in a row right first try, never in
-    /// the first 8 screens, at most once a session, at the end of a screen.
-    @Test func lookedCarefullyIsEarnedOnceASession() {
-        var sessionsWithIt = 0
+    /// Nothing is said in a session (varun: "no talking in the middle of the session"):
+    /// not after right keys, not after a long clean run, not after the keyboard picture,
+    /// not after the play button.
+    @Test func nothingIsSaidMidSession() {
         for seed: UInt64 in 1...20 {
             var bench = twoNoteBench(seed: seed, config: roomy())
-            _ = bench.start()
-            var said: [(screen: Int, speech: Speech)] = []
+            var said = speeches(bench.start())
             for screen in 1...40 {
-                said += speeches(bench.playScreen()).map { (screen, $0) }
-                #expect(speeches(bench.next()).isEmpty, "nothing when the next screen comes up")
-            }
-            #expect(said.count <= 1, "seed \(seed): \(said)")
-            #expect(said.allSatisfy { $0.speech == .lookedCarefully && $0.screen > 8 }, "seed \(seed): \(said)")
-            sessionsWithIt += said.isEmpty ? 0 : 1
-        }
-        #expect(sessionsWithIt > 10, "a long run all right first try usually earns it: \(sessionsWithIt) of 20")
-    }
-
-    @Test func lookedCarefullyNeedsSixCleanScreensInARow() {
-        for seed: UInt64 in 1...10 {
-            var bench = twoNoteBench(seed: seed, config: roomy())
-            _ = bench.start()
-            var said: [Speech] = []
-            for screen in 1...40 {
-                // a wrong key on every 5th screen: never 6 clean in a row
-                if screen % 5 == 0 { said += speeches(bench.press(bench.wrongKey)) }
+                if screen % 3 == 0 { for _ in 0..<3 { said += speeches(bench.press(bench.wrongKey)) } }
+                if screen % 7 == 0 {
+                    said += speeches(bench.session.listen(at: bench.now))
+                    bench.now += 3
+                }
                 said += speeches(bench.playScreen())
-                _ = bench.next()
-            }
-            #expect(!said.contains(.lookedCarefully), "seed \(seed)")
-            #expect(!said.contains(.keptTrying), "one wrong key isn't the keyboard picture")
-        }
-    }
-
-    /// "You kept trying and found it" after a screen where the hint ladder had to show
-    /// the keyboard picture: about half the time, from screen 9 on, once a session.
-    @Test func keptTryingAfterTheKeyboardPicture() {
-        var kept = 0
-        for seed: UInt64 in 1...40 {
-            var bench = twoNoteBench(seed: seed, config: roomy())
-            _ = bench.start()
-            // the first 8 screens: the picture, but too early for a line
-            var early: [Speech] = []
-            for _ in 0..<8 {
-                for _ in 0..<3 { early += speeches(bench.press(bench.wrongKey)) }
-                early += speeches(bench.playScreen())
-                _ = bench.next()
-            }
-            #expect(early.isEmpty, "never in the first 8 screens: \(early)")
-            for _ in 0..<3 { _ = bench.press(bench.wrongKey) }
-            #expect(bench.session.keyboardHint == bench.expected)
-            let said = speeches(bench.playScreen())
-            if said.contains(.keptTrying) { kept += 1 }
-            #expect(!said.contains(.lookedCarefully))
-        }
-        #expect(kept > 10 && kept < 30, "about half: \(kept) of 40")
-    }
-
-    @Test func thePlayButtonIsntKeptTrying() {
-        for seed: UInt64 in 1...20 {
-            var bench = twoNoteBench(seed: seed, config: roomy())
-            _ = bench.start()
-            var said: [Speech] = []
-            for _ in 0..<20 {
-                _ = bench.session.listen(at: bench.now)
-                bench.now += 3
-                said += speeches(bench.playScreen())
-                _ = bench.next()
+                said += speeches(bench.next())
             }
             #expect(said.isEmpty, "seed \(seed): \(said)")
         }
@@ -191,7 +125,7 @@ import Testing
         _ = bench.playCurrent()
         _ = bench.press(bench.wrongKey)
         bench.now += 1
-        #expect(bench.session.pianoDisconnected(at: bench.now) == [.paused, .say(.turnOnPiano)])
+        #expect(bench.session.pianoDisconnected(at: bench.now) == [.paused])
         #expect(bench.press(bench.expected[0]).isEmpty, "nothing counts while paused")
         bench.now += 30
         #expect(bench.session.pianoConnected(at: bench.now) == [.resumed])
@@ -204,7 +138,7 @@ import Testing
 
     @Test func startsPausedWhenThePianoIsOff() {
         var bench = Bench(engine(in: "1.2"), connected: false)
-        #expect(bench.start() == [.paused, .say(.turnOnPiano)])
+        #expect(bench.start() == [.paused])
         bench.now += 5
         let cues = bench.session.pianoConnected(at: bench.now)
         #expect(cues.prefix(2) == [.resumed, .showItem])

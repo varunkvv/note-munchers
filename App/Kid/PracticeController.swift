@@ -227,11 +227,8 @@ final class PracticeController {
                 }
                 gobbleCount += 1
             case .say(let speech):
-                let talking = voice.say(speech)
-                if speech == .keptTrying || speech == .lookedCarefully {
-                    // the next screen waits for the praise to finish
-                    celebrate = max(celebrate + 0.8, talking + 0.3)
-                }
+                // only the session's end says anything now
+                voice.say(speech)
             case .rhythmGlow(let note):
                 let length = glowLength(note)
                 effects.add(.glow, column: note, duration: length)
@@ -382,7 +379,6 @@ final class PracticeController {
             )
             c.session.celebrateLevelUp()
             c.onStateChanged?(c.session.engine.state)
-            c.voice.say(.levelUp)
             // a little "ta-da" up the G chord
             let notes = ["G4", "B4", "D5"].compactMap { Pitch($0) }
             for (i, p) in notes.enumerated() { c.later(0.14 * Double(i)) { $0.sounds.play([p], volume: Sounds.effectVolume) } }

@@ -297,11 +297,9 @@ import Testing
         config.newestShare = 0.31
         config.sizeWindow = 6
         config.lessonMinScreens = 12
-        config.keptTryingChance = 0.7
         config.lessonMinNewPlays = 12
         config.pacedNewestShare = 0.4
         config.introSpacing = 3
-        config.praiseStreak = 5
         let decoded = try JSONDecoder().decode(NoteCoreConfig.self, from: JSONEncoder().encode(config))
         #expect(decoded == config)
     }

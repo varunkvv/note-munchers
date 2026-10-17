@@ -36,15 +36,15 @@ public enum AlmostHint: String, CaseIterable, Codable, Hashable, Sendable {
 /// later into one of several recorded clips). Where a line names a note it's an
 /// associated value, so a clip bank needs one take per note name (A-G and F sharp).
 ///
-/// Voice is rare (plans/2026-10-16-round-3-feedback.md): nothing at the start of a
-/// screen, at most one earned line mid-session (`.keptTrying` / `.lookedCarefully`, at
-/// the end of a screen), one line at the end of the session (`.sessionDone`), and
-/// `.turnOnPiano`. NoteCore decides when to talk. Praise is process praise only - it
-/// names what he did (mueller & dweck), never "smart", "genius", "good boy".
+/// No voice in a session (varun, 2026-10-17: "no talking in the middle of the session
+/// ... he needs to be focused on the notes"). The one line is `.sessionDone`, when the
+/// session is over. Praise is process praise only - it names what he did (mueller &
+/// dweck), never "smart", "genius", "good boy".
 ///
-/// Since round 3 NoteCore no longer says `.hello`, `.meetNote`, `.listen`, `.twoAtOnce`,
-/// `.almost`, `.sharpHint`, `.hintListen`, `.hintShow`, `.hintLook`, `.oops`,
-/// `.holdLonger`, `.longOne`, `.shortOne` or `.keepGoing`. The sound, wobble, glow and
+/// NoteCore no longer says `.hello`, `.meetNote`, `.listen`, `.twoAtOnce`, `.almost`,
+/// `.sharpHint`, `.hintListen`, `.hintShow`, `.hintLook`, `.oops`, `.keptTrying`,
+/// `.lookedCarefully`, `.holdLonger`, `.longOne`, `.shortOne`, `.keepGoing` or
+/// `.turnOnPiano` (the paused screen has words). The sound, wobble, glow and
 /// keyboard picture that went with them stay. The cases (and their clips) are kept for
 /// the parent side or later rounds.
 public enum Speech: Hashable, Codable, Sendable {
@@ -260,10 +260,6 @@ public struct PracticeSession: Sendable {
     private var limitReached: SessionSummary.EndReason?
     /// The two runs, set up at the first one-clef screen.
     private var runs: (first: Clef, screens: Int, seconds: Double)?
-    /// The one earned line this session has been said.
-    private var praised = false
-    /// Screens in a row all right first try (intros don't count either way).
-    private var cleanRun = 0
     /// The session's one burst of drill screens: when it starts (screens played) and how
     /// many. Planned at the first screen, cleared once it starts.
     private var burst: (at: Int, length: Int)?
@@ -285,9 +281,6 @@ public struct PracticeSession: Sendable {
     private var hints: [HintLevel] = []
     /// Notes he hadn't played yet when he tapped play: he heard and saw them first.
     private var listened: [Bool] = []
-    /// Notes the hint ladder had to show on the keyboard picture (not the play button,
-    /// not an "almost").
-    private var pictured: [Bool] = []
     /// Steps up the hint ladder on the current note (wrong keys and stuck steps).
     private var ladder = 0
     private var onsets: [Double] = []
@@ -346,7 +339,7 @@ public struct PracticeSession: Sendable {
             pausedAt = time
             resumePhase = nil
             phase = .paused
-            return [.paused, .say(.turnOnPiano)]
+            return [.paused]
         }
         return showNext(at: 0)
     }
@@ -480,7 +473,7 @@ public struct PracticeSession: Sendable {
         phase = .paused
         judge?.reset()
         rhythmJudgeable = false // the timing of this line isn't his any more
-        return [.paused, .say(.turnOnPiano)]
+        return [.paused]
     }
 
     /// A MIDI source showed up. Picks up where it was.
@@ -570,7 +563,6 @@ public struct PracticeSession: Sendable {
         almosts = Array(repeating: 0, count: columns)
         hints = Array(repeating: .none, count: columns)
         listened = Array(repeating: false, count: columns)
-        pictured = Array(repeating: false, count: columns)
         ladder = 0
         onsets = []
         rhythmJudgeable = true
@@ -723,7 +715,6 @@ public struct PracticeSession: Sendable {
                played[0].midi == expected[0].midi - 1 {
                 let cues = climbLadder()
                 keyboardHint = expected
-                pictured[noteIndex] = true
                 return cues
             }
             return climbLadder()
@@ -749,7 +740,6 @@ public struct PracticeSession: Sendable {
         default:
             phase = .hint2
             hints[noteIndex] = .keyboard
-            pictured[noteIndex] = true
             if keyboardHint == expected {
                 cues.append(.playPitches(expected)) // picture already up: the sound again
             }
@@ -816,9 +806,6 @@ public struct PracticeSession: Sendable {
             // still a different value after the last go: that note glows, and on we go, kindly
             cues.append(.rhythmGlow(note: wrong))
         }
-        if let praise = earnedPraise(screen) {
-            cues.append(.say(praise))
-        }
         // now and then a clean screen comes once more: a second read (not inside a burst,
         // so the burst stays in its run)
         if screen.firstTry, retries == 0, !isIntro, burstLeft == 0, [.normal, .stretch, .drill].contains(pickReason), update.unlocked.isEmpty,
@@ -829,34 +816,6 @@ public struct PracticeSession: Sendable {
             cues.append(.unlocked(update.unlocked))
         }
         return cues
-    }
-
-    /// The one earned line a session can have, at the end of a screen that deserves it
-    /// (varun: "only the ones that REALLY deserve it", about 1 screen in 20 or fewer).
-    /// Never on the first `praiseAfterScreens` screens, never on an intro or a screen
-    /// that needed a rhythm retry, and only when a roll comes up:
-    /// - `.keptTrying` when a note needed the hint ladder's keyboard picture and he found it
-    /// - `.lookedCarefully` after `praiseStreak` screens in a row all right first try.
-    ///   A roll that doesn't come up starts the count again
-    private mutating func earnedPraise(_ screen: ScreenResult) -> Speech? {
-        guard !isIntro else { return nil }
-        cleanRun = screen.firstTry ? cleanRun + 1 : 0
-        guard !praised, retries == 0, summary.screensPlayed > config.praiseAfterScreens else { return nil }
-        let speech: Speech
-        let chance: Double
-        if pictured.contains(true) {
-            speech = .keptTrying
-            chance = config.keptTryingChance
-        } else if cleanRun >= config.praiseStreak {
-            speech = .lookedCarefully
-            chance = config.praiseChance
-            cleanRun = 0
-        } else {
-            return nil
-        }
-        guard unitInterval(&rng) < chance else { return nil }
-        praised = true
-        return speech
     }
 
     /// Easing: after `easingTrigger` of the last `easingWindow` notes weren't right first

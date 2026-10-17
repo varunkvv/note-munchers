@@ -1,8 +1,8 @@
 import Testing
 @testable import NoteCore
 
-/// The voice the way he hears it (plans/2026-10-16-round-3-feedback.md): nothing at
-/// the start of a screen, at most one earned line mid-session, one line at the end.
+/// The voice the way he hears it: nothing in a session (varun, 2026-10-17), one line
+/// at the end.
 /// Driven by a scripted kid through real level 1 sessions.
 @Suite struct QuietVoiceTests {
     /// What a scripted kid does on each note he reads (intros he plays right).
@@ -84,8 +84,8 @@ import Testing
         return all
     }
 
-    /// The test from the plan: a seeded level 1 session, the 65% kid. Nothing at a
-    /// screen's start, at most 2 lines in the whole session (1 mid + 1 end).
+    /// A seeded level 1 session, the 65% kid: nothing in the session, at most one line
+    /// at its end.
     @Test func aLevelOneSessionIsQuiet() {
         var report: [String] = []
         for kidSeed: UInt64 in 1...10 {
@@ -94,16 +94,15 @@ import Testing
                     report.append("kid 1 session \(i + 1): \(heard.screens) screens, \(heard.lines.count) lines (\(heard.atScreenStart) at screen starts): \(heard.lines)")
                 }
                 #expect(heard.atScreenStart == 0, "kid \(kidSeed) session \(i + 1): \(heard.lines)")
-                #expect(heard.lines.count <= 2, "kid \(kidSeed) session \(i + 1): \(heard.lines)")
-                #expect(heard.midSession.count <= 1, "kid \(kidSeed) session \(i + 1): \(heard.midSession)")
+                #expect(heard.lines.count <= 1, "kid \(kidSeed) session \(i + 1): \(heard.lines)")
+                #expect(heard.midSession.isEmpty, "kid \(kidSeed) session \(i + 1): \(heard.midSession)")
             }
         }
         print(report.joined(separator: "\n"))
     }
 
-    /// Across a long run, mid-session lines average 1 per 20 screens or fewer, for kids
-    /// doing well and kids finding it hard.
-    @Test func midSessionLinesAreRare() {
+    /// Across a long run, no mid-session lines, for kids doing well and kids finding it hard.
+    @Test func noMidSessionLines() {
         for kid in [Self.scripted, Self.steady, Self.struggling] {
             var screens = 0, mid = 0, sessionsWithOne = 0, total = 0
             for kidSeed: UInt64 in 1...4 {
@@ -116,7 +115,7 @@ import Testing
             }
             let rate = Double(mid) / Double(max(1, screens))
             print("\(kid.name): \(mid) mid-session lines in \(screens) screens (1 per \(mid == 0 ? "-" : String(screens / mid))), in \(sessionsWithOne) of \(total) sessions")
-            #expect(rate <= 1.0 / 20, "\(kid.name): \(mid) in \(screens)")
+            #expect(rate == 0, "\(kid.name): \(mid) in \(screens)")
         }
     }
 }
