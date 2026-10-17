@@ -161,12 +161,13 @@ import Testing
     @Test func aDyadCountsForBothNotes() {
         var bench = Bench(ready("4.1"), seed: 4)
         _ = bench.start()
-        while !bench.expected.indices.contains(1) {
-            _ = bench.playCurrent()
-            if bench.session.phase == .success { _ = bench.next() }
+        // playNote, not playCurrent: a rhythm-judged screen waits for the last key-up
+        while bench.session.isAwaitingRelease || !bench.expected.indices.contains(1) {
+            _ = bench.playNote()
+            if bench.session.phase == .success || bench.session.phase == .replaying { _ = bench.next() }
         }
         let dyad = bench.session.item!.notes[bench.session.noteIndex].keys
-        while bench.session.phase.isPlaying { _ = bench.playCurrent() }
+        _ = bench.playScreen()
         let recorded = bench.session.summary.screens.last!.notes.map(\.itemID)
         #expect(dyad.allSatisfy { recorded.contains($0.id) })
     }
@@ -174,9 +175,10 @@ import Testing
     @Test func dyadHintLooksAtBothKeys() {
         var bench = Bench(ready("4.1"), seed: 4)
         _ = bench.start()
-        while !bench.expected.indices.contains(1) {
-            _ = bench.playCurrent()
-            if bench.session.phase == .success { _ = bench.next() }
+        // playNote, not playCurrent: a rhythm-judged screen waits for the last key-up
+        while bench.session.isAwaitingRelease || !bench.expected.indices.contains(1) {
+            _ = bench.playNote()
+            if bench.session.phase == .success || bench.session.phase == .replaying { _ = bench.next() }
         }
         // a dyad is judged when its chord window closes: by the next key, or a tick
         let wrong = Pitch(midi: bench.expected[0].midi + 1)

@@ -15,6 +15,8 @@ public struct Pick: Hashable, Sendable {
     /// The hand position each column is played in (finger numbers come from it). Every
     /// note of one staff on a screen is in one position, except a drill's shift screen.
     public var positions: [HandPosition] = []
+    /// The drill's shape on a drill screen (and the warm-up's run), nil otherwise.
+    public var drill: Drill?
 }
 
 /// Screen picking: which clef, an intro or a generated screen, and the notes on it.
@@ -44,13 +46,31 @@ extension MasteryEngine {
                                     using rng: inout some RandomNumberGenerator) -> Pick {
         var style = style
         let wanted = lesson.layout == .alternating ? wanted : nil
-        if style == .strongest, wanted.map({ strongestNotes($0).isEmpty }) ?? lesson.clefs.allSatisfy({ strongestNotes($0).isEmpty }) {
+        if style == .strongest || style == .warmUp,
+           wanted.map({ strongestNotes($0).isEmpty }) ?? lesson.clefs.allSatisfy({ strongestNotes($0).isEmpty }) {
             // nothing played here yet: a normal screen, on the same clef
             style = .normal
         }
-        let clef = chooseClef(style, wanted: wanted, using: &rng)
+        let clef = chooseClef(style == .warmUp ? .strongest : style, wanted: wanted, using: &rng)
+        if style == .warmUp {
+            if let pick = warmUpPick(on: clef, using: &rng) { return remember(pick) }
+            style = .strongest
+        }
+        // a drill lesson is all drills: no new notes, no new texture to show
+        if style == .drill || (style == .normal && lesson.isDrillLesson && pendingIntros(clef).isEmpty) {
+            let n: Int
+            if lesson.isDrillLesson {
+                n = lesson.texture.isRhythm ? lesson.drillSizes.lowerBound : state.screenSize
+            } else {
+                // a burst: a bit longer than his screens, now and then two more
+                let base = lesson.texture.isRhythm ? lesson.drillSizes.lowerBound : state.screenSize + 1
+                n = min(max(base + (unitInterval(&rng) < 0.3 ? 1 : 0), lesson.drillSizes.lowerBound), lesson.drillSizes.upperBound)
+            }
+            if let pick = drillPick(on: clef, size: n, using: &rng) { return remember(pick) }
+            style = .normal
+        }
         // a lesson with a new texture opens by showing him one (two at once, a rhythm)
-        if style == .normal, lesson.texture != .single, !state.introduced.contains(lessonIntroID), !playable(clef).isEmpty {
+        if style == .normal, !lesson.isDrillLesson, lesson.texture != .single, !state.introduced.contains(lessonIntroID), !playable(clef).isEmpty {
             return remember(lessonIntro(on: clef, using: &rng))
         }
         if style == .normal || playable(clef).isEmpty, let intro = introDue(on: clef, using: &rng) {
@@ -190,7 +210,7 @@ extension MasteryEngine {
     /// when it holds one of `newest`. `boost`: how much to scale the newest share inside
     /// the position so the newest keep their share over all screens (1 / the chance of a
     /// position with a newest note, 1 when there's none).
-    func position(for notes: [NoteKey], newest: [NoteKey], on clef: Clef,
+    func position(for notes: [NoteKey], newest: [NoteKey], on clef: Clef, mustHoldNewest: Bool = false,
                   using rng: inout some RandomNumberGenerator) -> (position: HandPosition, notes: [NoteKey], boost: Double) {
         if let one = HandPosition.holding(notes, on: clef) { return (one, notes, 1) }
         let low = notes.map(\.pitch.diatonicIndex).min() ?? 0, high = notes.map(\.pitch.diatonicIndex).max() ?? 0
@@ -202,7 +222,7 @@ extension MasteryEngine {
         let held = options.map { position in notes.filter(position.contains) }
         let most = held.map(\.count).max() ?? 0
         let weights = zip(options, held).map { position, inside -> Double in
-            guard inside.count >= min(2, most) else { return 0 }
+            guard inside.count >= min(2, most), !mustHoldNewest || newest.contains(where: position.contains) else { return 0 }
             return Double(inside.count) * (newest.contains(where: position.contains) ? 3 : 1)
         }
         let i = weightedIndex(weights, using: &rng)
@@ -244,11 +264,19 @@ extension MasteryEngine {
             var j = i
             while j + 1 < rhythms.count, staves[j + 1] == staves[i] { j += 1 }
             let count = rhythms[i...j].reduce(0) { $0 + $1.count }
-            let (hand, all, boost) = position(for: notes(staves[i]), newest: withNewest ? split(staves[i], notes(staves[i])).newest : [],
-                                              on: staves[i], using: &rng)
-            let (newest, others) = split(staves[i], all)
+            // just after a new note's intro its screens are mostly that note (blocked, then mixed)
+            let blocked = withNewest ? blockedNote(staves[i]) : nil
+            let wanted = blocked.map { [$0] } ?? (withNewest ? split(staves[i], notes(staves[i])).newest : [])
+            let (hand, all, boost) = position(for: notes(staves[i]), newest: wanted, on: staves[i], mustHoldNewest: blocked != nil, using: &rng)
+            var (newest, others) = split(staves[i], all)
+            var share = min(0.6, (lesson.paced ? config.pacedNewestShare : config.newestShare) * boost)
+            if let blocked, all.contains(blocked) {
+                newest = [blocked]
+                others = all.count > 1 ? all.filter { $0 != blocked } : all
+                share = config.blockedShare
+            }
             let line = self.columns(count, on: staves[i], from: others, newest: withNewest ? newest : [], fallback: all, after: after,
-                                    boost: boost, using: &rng)
+                                    share: share, using: &rng)
             columns += line
             positions += Array(repeating: hand, count: line.count)
             after = (after + line.map(Self.columnID)).suffix(config.maxRepeats).map { $0 }
@@ -267,12 +295,12 @@ extension MasteryEngine {
 
     /// `count` columns in the lesson's texture, no rhythm yet.
     private func columns(_ count: Int, on clef: Clef, from pool: [NoteKey], newest: [NoteKey], fallback: [NoteKey],
-                         after: [ItemID], boost: Double = 1, using rng: inout some RandomNumberGenerator) -> [WrittenNote] {
+                         after: [ItemID], share: Double? = nil, using rng: inout some RandomNumberGenerator) -> [WrittenNote] {
         switch lesson.texture {
         case .single:
-            return line(count, from: pool, newest: newest, fallback: fallback, after: after, boost: boost, using: &rng).map { WrittenNote($0) }
+            return line(count, from: pool, newest: newest, fallback: fallback, after: after, share: share, using: &rng).map { WrittenNote($0) }
         case .dyads(let intervals):
-            var keys = line(count, from: pool, newest: newest, fallback: fallback, after: after, boost: boost, using: &rng)
+            var keys = line(count, from: pool, newest: newest, fallback: fallback, after: after, share: share, using: &rng)
             // a line along the top of the range has nothing to put above it: swap one
             // note for the nearest one that can carry a second note
             let carriers = fallback.filter { low in fallback.contains { intervals.contains($0.pitch.diatonicIndex - low.pitch.diatonicIndex) } }
@@ -362,21 +390,22 @@ extension MasteryEngine {
     /// drawn again starting on the newest). `after` is what came just before (column ids), so a run of
     /// the same key can't carry over from the last screen. `fallback` is used when the
     /// run rule leaves nothing to pick.
-    /// `boost` scales the newest share (a hand position picked for its newest note).
-    func line(_ count: Int, from pool: [NoteKey], newest: [NoteKey], fallback: [NoteKey], after: [ItemID], boost: Double = 1,
+    /// `share`: the newest share, when it isn't the lesson's (a hand position picked for
+    /// its newest note, the blocked screens after an intro).
+    func line(_ count: Int, from pool: [NoteKey], newest: [NoteKey], fallback: [NoteKey], after: [ItemID], share: Double? = nil,
               using rng: inout some RandomNumberGenerator) -> [NoteKey] {
-        let first = drawLine(count, from: pool, newest: newest, fallback: fallback, after: after, owing: false, boost: boost, using: &rng)
+        let first = drawLine(count, from: pool, newest: newest, fallback: fallback, after: after, owing: false, share: share, using: &rng)
         guard first.owed, count > 1 else { return first.keys }
-        return drawLine(count, from: pool, newest: newest, fallback: fallback, after: after, owing: true, boost: boost, using: &rng).keys
+        return drawLine(count, from: pool, newest: newest, fallback: fallback, after: after, owing: true, share: share, using: &rng).keys
     }
 
     /// `line`, once. `owing`: the first note is one of the newest. Returns whether the
     /// line ended still owing a newest note.
     private func drawLine(_ count: Int, from pool: [NoteKey], newest: [NoteKey], fallback: [NoteKey], after: [ItemID], owing: Bool,
-                          boost: Double, using rng: inout some RandomNumberGenerator) -> (keys: [NoteKey], owed: Bool) {
+                          share: Double?, using rng: inout some RandomNumberGenerator) -> (keys: [NoteKey], owed: Bool) {
         precondition(!pool.isEmpty)
         var out: [NoteKey] = []
-        let share = min(0.6, (lesson.paced ? config.pacedNewestShare : config.newestShare) * boost)
+        let share = share ?? (lesson.paced ? config.pacedNewestShare : config.newestShare)
         let widest = lesson.contour.widest
         // a newest slot that couldn't be reached within the widest move goes to the next note
         var owed = owing
@@ -443,12 +472,14 @@ extension MasteryEngine {
     }
 
     private mutating func remember(_ pick: Pick) -> Pick {
+        if let drill = pick.drill { state.lastDrill = drill }
         state.recentScreens = Array((state.recentScreens + [pick.item.id]).suffix(max(2, config.recentScreens)))
         let columns = pick.item.notes.map(Self.columnID)
         state.recentColumns = Array((state.recentColumns + columns).suffix(max(1, config.maxRepeats)))
         // screens on each clef since its last intro
         if let intro = pick.intro {
             state.introGap[intro.clef.rawValue] = 0
+            state.lastIntro[intro.clef.rawValue] = intro.id
         } else {
             for clef in pick.item.clefs {
                 if let gap = state.introGap[clef.rawValue] { state.introGap[clef.rawValue] = gap + 1 }

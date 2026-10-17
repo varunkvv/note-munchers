@@ -66,6 +66,10 @@ public enum PickReason: String, Codable, Hashable, Sendable {
     case extra
     /// Doing well: one note more than his current size, now and then.
     case stretch
+    /// One of the session's burst of drill screens.
+    case drill
+    /// The screen he just played clean, once more: a second read. Not counted in his stats.
+    case again
 }
 
 /// One finished screen.

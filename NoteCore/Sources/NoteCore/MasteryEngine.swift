@@ -91,6 +91,11 @@ public struct MasteryState: Hashable, Codable, Sendable {
     /// The clef his last session started on (its first run), so the next one starts on
     /// the other. nil before his first session.
     public var lastFirstClef: Clef?
+    /// The last drill screen's shape, so the next one is a different one.
+    public var lastDrill: Drill?
+    /// Per clef (`Clef.rawValue`): the note of its last intro. With `introGap` it makes
+    /// the blocked screens that follow an intro.
+    public var lastIntro: [String: ItemID] = [:]
     /// The engine's own dice for curriculum choices: which notes a lesson starts with
     /// and which come next. Seeded once per kid (the app seeds it at first launch),
     /// saved with everything else, so the same state always makes the same choice.
@@ -118,10 +123,15 @@ public enum PickStyle: String, Codable, Hashable, Sendable {
     /// Intros when one is due, otherwise his current size, weighted toward weak notes,
     /// with the newest notes as about 1 in 4 of the notes on their clef.
     case normal
-    /// Only his strongest notes (highest boxes among notes he has played). For the
-    /// warm-up, easing after misses, and the easy screens at the end. No intros. Falls
-    /// back to `normal` when he hasn't played anything in this lesson's pool yet.
+    /// Only his strongest notes (highest boxes among notes he has played). For easing
+    /// after misses and the easy screens at the end. No intros. Falls back to `normal`
+    /// when he hasn't played anything in this lesson's pool yet.
     case strongest
+    /// The session's opener: a run of his strongest notes (falls back to `strongest`).
+    case warmUp
+    /// A drill screen (a burst): one of the lesson's drills on notes he has met, in
+    /// any lesson up to this one. No intros.
+    case drill
 }
 
 public enum LessonStatus: String, Codable, Hashable, Sendable {
@@ -216,6 +226,15 @@ public struct MasteryEngine: Sendable {
     /// A paced lesson's new note that has had its `lessonMinNewPlays`.
     public func hasMinPlays(_ key: NoteKey) -> Bool {
         lesson.paced && lessonPlays(key) >= config.lessonMinNewPlays
+    }
+
+    /// The note just introduced on `clef` while its first `blockedScreens` screens on
+    /// that clef are still to come: those are mostly that note, then it mixes in (blocked,
+    /// then mixed: varun ok'd it, "this is for young kids").
+    public func blockedNote(_ clef: Clef) -> NoteKey? {
+        guard let id = state.lastIntro[clef.rawValue], let key = NoteKey(id: id), let gap = state.introGap[clef.rawValue],
+              gap < config.blockedScreens, playable(clef).contains(key) else { return nil }
+        return key
     }
 
     /// Does this note get its intro (keyboard picture up front, "this is D") next time?
@@ -345,6 +364,8 @@ public struct MasteryEngine: Sendable {
     @discardableResult
     public mutating func record(_ screen: ScreenResult) -> MasteryUpdate {
         var update = MasteryUpdate()
+        // a second read of the screen he just played: nothing counts, it's measured silently
+        guard screen.reason != .again else { return update }
         if screen.wasLessonIntro {
             state.introduced.insert(lessonIntroID)
         }
@@ -605,6 +626,8 @@ extension MasteryState {
         recentSongs = try c.value(.recentSongs, or: d.recentSongs)
         lessonPeak = try c.value(.lessonPeak, or: d.lessonPeak)
         lastFirstClef = try c.decodeIfPresent(Clef.self, forKey: .lastFirstClef)
+        lastDrill = try? c.decodeIfPresent(Drill.self, forKey: .lastDrill)
+        lastIntro = try c.value(.lastIntro, or: d.lastIntro)
         dice = try c.value(.dice, or: d.dice)
     }
 }

@@ -147,7 +147,9 @@ final class AppModel {
     private func screenDone(_ screen: ScreenResult, state: MasteryState) {
         engine = MasteryEngine(config: config, state: state)
         store.saveMastery(state, settings: ParentSettings(config))
-        // one row per note, so the dashboard's per-note trends work as before
+        // one row per note, so the dashboard's per-note trends work as before. A second
+        // read of the same screen isn't a reading of those notes, so it gets no rows
+        guard screen.reason != .again else { return }
         for (i, note) in screen.notes.enumerated() {
             store.addAttempt(note, commit: i == screen.notes.count - 1)
         }

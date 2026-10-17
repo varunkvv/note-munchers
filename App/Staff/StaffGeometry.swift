@@ -22,15 +22,18 @@ struct StaffSpec: Hashable {
 
     /// Room for the biggest screen a lesson can show, in either meter: its largest size
     /// plus a stretch note in the widest way the bars can be written, or its most bars
-    /// of the busiest rhythm.
+    /// of the busiest rhythm. Drill screens (a burst a session) are reading screens of
+    /// up to `drillSizes.upperBound` notes, in rhythm lessons too.
     init(lesson: Lesson, layout: StaffLayout) {
         var widest = 0.0
         for meter in Meter.allCases {
             if case .rhythm(let values, _) = lesson.texture {
                 let bars = layout == .grand ? 2 : lesson.sizes.upperBound
                 widest = max(widest, Double(bars) * Metrics.busiestBar(meter, values: values) + Metrics.barsExtra(bars))
-            } else {
-                let n = min(lesson.sizes.upperBound + 1, MasteryEngine.maxNotes(meter))
+            }
+            do {
+                let reading = lesson.texture.isRhythm ? lesson.drillSizes.upperBound : max(lesson.sizes.upperBound + 1, lesson.drillSizes.upperBound)
+                let n = min(reading, MasteryEngine.maxNotes(meter))
                 var splits: [[Int]] = n <= meter.beats ? [[n]] : []
                 for first in 1..<max(1, n) where first <= meter.beats && n - first <= meter.beats && n - first >= 1 {
                     splits.append([first, n - first])

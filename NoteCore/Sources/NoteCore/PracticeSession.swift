@@ -186,10 +186,16 @@ public struct SessionSummary: Hashable, Codable, Sendable {
 /// its own response time from when it became the next note.
 ///
 /// Shape of a session (learning principles in the plan):
-/// - opens with screens of his strongest notes (about 3 notes). Nothing is said
+/// - opens with one screen of his strongest notes, a run (start with success). Nothing is said
 /// - a new note is introduced i do / we do / you do: the app plays it and lights the
 ///   key (`.playPitches`, the app shows its letter on the lit key), he plays it with the
 ///   picture up, after that the picture only comes back as a hint
+/// - right after a new note's intro, its next few screens are mostly that note, then it
+///   mixes in (blocked, then mixed)
+/// - one burst of 3-4 drill screens (`Drill`) a session, inside one clef run, on notes
+///   he has met in any lesson so far. A drill lesson is all drill screens
+/// - now and then, after a screen all right first try, the same screen once more (a
+///   second read, `PickReason.again`). Nothing on screen says so, nothing is counted
 /// - after 3 of his last 5 notes weren't right first try, the next 2 screens are his strongest
 /// - when time or the screen count is up it ends after his next screen all right first
 ///   try (easy screens, at most `maxExtraItems` extra)
@@ -217,6 +223,10 @@ public struct PracticeSession: Sendable {
     public private(set) var rhythmLine: RhythmLine?
     /// Rhythm retries used on this screen.
     public private(set) var retries = 0
+    /// The drill on this screen (a burst, a drill lesson, the warm-up's run), nil otherwise.
+    public private(set) var drill: Drill?
+    /// The hand position each note of this screen is played in (finger numbers).
+    public private(set) var positions: [HandPosition] = []
     /// The clef this part of the session is on, in one-clef lessons (nil on the grand
     /// staff). A session is two runs: the first clef for half of it (2/3 for a lesson's
     /// focus clef), then the other clef for the rest, extras included. One switch.
@@ -249,6 +259,15 @@ public struct PracticeSession: Sendable {
     private var praised = false
     /// Screens in a row all right first try (intros don't count either way).
     private var cleanRun = 0
+    /// The session's one burst of drill screens: when it starts (screens played) and how
+    /// many. Planned at the first screen, cleared once it starts.
+    private var burst: (at: Int, length: Int)?
+    private var burstPlanned = false
+    private var burstLeft = 0
+    /// The last screen shown, and whether it comes once more.
+    private var lastPick: Pick?
+    private var againNext = false
+    private var agains = 0
 
     // the current screen, per column
     private var pickSize = 1
@@ -312,7 +331,7 @@ public struct PracticeSession: Sendable {
     public mutating func start(at time: Double) -> [Cue] {
         guard phase == .notStarted else { return [] }
         startTime = time
-        warmUpLeft = engine.lesson.clefs.contains { !engine.strongestNotes($0).isEmpty } ? config.warmUpCount : 0
+        warmUpLeft = engine.lesson.clefs.contains { !engine.strongestNotes($0).isEmpty } ? config.warmUpScreens : 0
         guard isPianoConnected else {
             pausedAt = time
             resumePhase = nil
@@ -473,21 +492,44 @@ public struct PracticeSession: Sendable {
     private mutating func showNext(at t: Double, reason forced: PickReason? = nil) -> [Cue] {
         var cues: [Cue] = []
         var reason = forced ?? .normal
+        var style = PickStyle.strongest
+        let clef = run(at: t)
+        planBurst()
         if forced == nil {
             if warmUpLeft > 0 {
+                warmUpLeft -= 1
                 reason = .warmUp
+                style = .warmUp
             } else if easingLeft > 0 {
                 easingLeft -= 1
                 reason = .easing
+                burstLeft = 0 // easy screens instead, and the burst doesn't come back
+            } else if againNext, lastPick != nil {
+                reason = .again
+            } else if burstLeft > 0 || startsBurst(on: clef) {
+                burstLeft -= 1
+                reason = .drill
+                style = .drill
+            } else {
+                style = .normal
             }
         }
-        let pick = engine.pickScreen(reason == .normal ? .normal : .strongest, clef: run(at: t), using: &rng)
-        if reason == .warmUp {
-            warmUpLeft -= pick.item.notes.count
+        againNext = false
+        var pick: Pick
+        if reason == .again, let last = lastPick {
+            agains += 1
+            pick = engine.again(last)
+        } else {
+            pick = engine.pickScreen(style, clef: clef, using: &rng)
         }
-        if !pick.usedStrongest {
-            reason = pick.isStretch ? .stretch : .normal
+        switch reason {
+        case .again: break
+        case .drill: if pick.drill == nil { reason = pick.isStretch ? .stretch : .normal }
+        default: if !pick.usedStrongest { reason = pick.isStretch ? .stretch : .normal }
         }
+        lastPick = pick
+        drill = pick.drill
+        positions = pick.positions
         let next = pick.item
         item = next
         pickReason = reason
@@ -565,6 +607,45 @@ public struct PracticeSession: Sendable {
         let switched = runClef == second || summary.screensPlayed >= runs.screens || t >= runs.seconds
         runClef = switched ? second : runs.first
         return runClef
+    }
+
+    /// Plans the session's burst at its first screen: 3 or 4 drill screens inside one of
+    /// the two clef runs (the first or the second at random), clear of the warm-up and
+    /// the last screens. None in a drill lesson (it's all drills) or a short session.
+    private mutating func planBurst() {
+        guard !burstPlanned else { return }
+        burstPlanned = true
+        let lesson = engine.lesson
+        let total = config.sessionMaxItems
+        guard !lesson.isDrillLesson, !lesson.drills.isEmpty, total >= config.burstMinSession else { return }
+        let lengths = config.burstScreens
+        let length = lengths.lowerBound + min(lengths.count - 1, Int(unitInterval(&rng) * Double(lengths.count)))
+        let half = runs?.screens ?? total / 2
+        let first = 2...max(2, half - length), second = (half + 1)...max(half + 1, total - length - 1)
+        let range = unitInterval(&rng) < 0.5 ? first : second
+        let at = range.lowerBound + min(range.count - 1, Int(unitInterval(&rng) * Double(range.count)))
+        burst = (at, length)
+    }
+
+    /// Whether the burst starts with this screen: its time has come, nothing is waiting
+    /// for its intro on this clef and no new note's blocked screens are running. It waits
+    /// a screen or two for those, and is dropped when there's no room left before the end.
+    private mutating func startsBurst(on clef: Clef?) -> Bool {
+        guard let burst, summary.screensPlayed >= burst.at, limitReached == nil else { return false }
+        guard summary.screensPlayed + burst.length <= config.sessionMaxItems else {
+            self.burst = nil
+            return false
+        }
+        if let runs, summary.screensPlayed < runs.screens, summary.screensPlayed + burst.length > runs.screens {
+            // waited too long to fit in the first run: early in the second one instead
+            self.burst = (runs.screens + 1, burst.length)
+            return false
+        }
+        let clefs = clef.map { [$0] } ?? engine.lesson.clefs
+        guard clefs.allSatisfy({ engine.pendingIntros($0).isEmpty && engine.blockedNote($0) == nil }) else { return false }
+        burstLeft = burst.length
+        self.burst = nil
+        return true
     }
 
     /// Back to the screen's first note for another go (a rhythm retry).
@@ -714,6 +795,12 @@ public struct PracticeSession: Sendable {
         if let praise = earnedPraise(screen) {
             cues.append(.say(praise))
         }
+        // now and then a clean screen comes once more: a second read (not inside a burst,
+        // so the burst stays in its run)
+        if screen.firstTry, retries == 0, !isIntro, burstLeft == 0, [.normal, .stretch, .drill].contains(pickReason), update.unlocked.isEmpty,
+           agains < config.againMax, unitInterval(&rng) < config.againChance {
+            againNext = true
+        }
         if !update.unlocked.isEmpty {
             cues.append(.unlocked(update.unlocked))
         }
@@ -763,6 +850,8 @@ public struct PracticeSession: Sendable {
     private mutating func noteSummary(_ screen: ScreenResult, update: MasteryUpdate, fluencyBefore: [ItemID: Double]) {
         summary.screensPlayed += 1
         summary.screens.append(screen)
+        // a second read is kept as a screen (its time against the first read's), not as notes
+        guard screen.reason != .again else { return }
         for note in screen.notes where !note.wasIntro {
             summary.notesPlayed += 1
             summary.firstTryNotes += note.firstTry ? 1 : 0

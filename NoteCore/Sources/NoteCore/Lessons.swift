@@ -108,12 +108,31 @@ public struct Lesson: Identifiable, Hashable, Sendable {
     /// their clef, and 2 notes on a clef already make 2-note screens. (Round 3 called
     /// this `drill`. Drill screens are something else: `Drill`.)
     public let paced: Bool
+    /// The drill screens this lesson can make (plans/2026-10-16-drills-and-habit.md): a
+    /// burst of 3-4 of them a session, or every screen in a drill lesson.
+    public let drills: [Drill]
+    /// Notes on a drill screen (single notes, or columns of two at once). Drill screens
+    /// in a rhythm lesson are reading screens, so this counts notes there too, except in
+    /// a rhythm drill lesson (bars).
+    public let drillSizes: ClosedRange<Int>
+    /// A level's last lesson (a new stone on the path): every screen is a drill, no new
+    /// notes, and it finishes once his notes are habit on two different days
+    /// (`isHabit`), or after `drillLessonMaxSessions` good sessions so he never gets stuck.
+    public let isDrillLesson: Bool
+    /// Hand positions this lesson's drill screens use (nil: the standard ones,
+    /// `HandPosition.standard`). Level 3's positions lesson adds D position.
+    public let drillPositions: [HandPosition]?
+    /// The home note of a home drill (every other note): nil for the G in the hand
+    /// position, middle C in level 3's positions lesson.
+    public let home: Pitch?
 
     public init(
         _ id: LessonID, level: Int, title: String, focus: Focus, layout: Layout = .alternating,
         treble: ClefNotes?, bass: ClefNotes?, sizes: ClosedRange<Int>, unlockBatch: Int = 1,
         octavePolicy: OctavePolicy, keySignature: KeySignature = .none, texture: Texture = .single,
-        contour: Contour = .mixed, rhythmCheck: RhythmCheck? = nil, paced: Bool = false
+        contour: Contour = .mixed, rhythmCheck: RhythmCheck? = nil, paced: Bool = false,
+        drills: [Drill]? = nil, drillSizes: ClosedRange<Int>? = nil, isDrillLesson: Bool = false,
+        drillPositions: [HandPosition]? = nil, home: Pitch? = nil
     ) {
         self.id = id
         self.level = level
@@ -130,6 +149,20 @@ public struct Lesson: Identifiable, Hashable, Sendable {
         self.contour = contour
         self.rhythmCheck = rhythmCheck ?? (level <= 2 ? .off : level == 3 ? .halves : .all)
         self.paced = paced
+        self.drills = drills ?? Self.defaultDrills(level: level, layout: layout)
+        self.drillSizes = drillSizes ?? (level == 1 ? 3...4 : 4...6)
+        self.isDrillLesson = isDrillLesson
+        self.drillPositions = drillPositions
+        self.home = home
+    }
+
+    /// Bursts in every lesson: runs, homes, repeats, motifs, now and then a bit of a
+    /// tune, and echoes on the grand staff.
+    static func defaultDrills(level: Int, layout: Layout) -> [Drill] {
+        var drills: [Drill] = [.run, .motif, .home, .repeatNote]
+        if layout == .grand { drills.append(.echo) }
+        if level != 3 { drills.append(.tune) } // tunes are in G position
+        return drills
     }
 
     public func notes(_ clef: Clef) -> ClefNotes? { clef == .treble ? treble : bass }

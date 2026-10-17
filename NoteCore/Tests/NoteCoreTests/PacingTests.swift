@@ -96,7 +96,9 @@ import Testing
         for log in logs.dropFirst() {
             #expect(log.firstTryRate > 0.75, "\(log.firstTryRate)")
         }
-        #expect(logs[4].treble >= 5 && logs[4].bass >= 5, "all of G position within 5 sessions")
+        // a burst of drill screens a session takes some screens from the newest note: G
+        // position by session 6 (5 before the drills round), level 2 still by session 8
+        #expect(logs[5].treble >= 5 && logs[5].bass >= 5, "all of G position within 6 sessions")
         #expect(logs[logs.count - 1].lesson.hasPrefix("2.") || logs[logs.count - 1].lesson.hasPrefix("3."), "past level 1 within 8 sessions")
         #expect(logs[logs.count - 1].size >= 3)
     }

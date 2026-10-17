@@ -365,7 +365,8 @@ import Testing
         var bench = Bench(MasteryEngine(state: state), seed: 4)
         _ = bench.start()
         var screens: [String] = []
-        while bench.session.phase != .done, screens.count < count {
+        // only this lesson's screens: a quick finish moves him on
+        while bench.session.phase != .done, screens.count < count, bench.session.engine.lesson.id == state.lesson {
             let keys = bench.session.item!.notes.flatMap(\.keys).map(\.id)
             screens.append(bench.session.isIntro ? "intro " + keys[0] : keys.joined(separator: " "))
             _ = bench.playScreen()

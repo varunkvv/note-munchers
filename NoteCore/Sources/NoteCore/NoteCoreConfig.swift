@@ -37,6 +37,11 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// After a new note's intro, at least this many screens on that clef before the
     /// next intro on it (unless there's nothing else to show).
     public var introSpacing = 2
+    /// Blocked, then mixed (varun ok'd it for young kids, Brady 2004): a new note's first
+    /// this many screens on its clef after its intro are mostly that note...
+    public var blockedScreens = 3
+    /// ...this share of the notes on its clef. Then it mixes in at the newest share.
+    public var blockedShare = 0.7
     /// Screens remembered so the same screen doesn't come back too soon. Fewer when the
     /// pool can't make that many different screens.
     public var recentScreens = 10
@@ -114,9 +119,18 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     public var sessionMaxDuration: Double = 300
     /// Screens before a session ends. (Kept the round-1 name: the app saves it.)
     public var sessionMaxItems = 20
-    /// A session opens with screens of his strongest notes until this many notes have
-    /// been shown (start with success).
-    public var warmUpCount = 3
+    /// A session opens with this many screens of his strongest notes, a run (start with success).
+    public var warmUpScreens = 1
+    /// Every lesson but a drill lesson gets one burst of this many drill screens a
+    /// session (3 or 4, rolled), inside one clef run, never a long string of them.
+    public var burstScreens = 3...4
+    /// Sessions shorter than this many screens skip the burst.
+    public var burstMinSession = 10
+    /// After a screen all right first try, the chance the same screen comes once more
+    /// (a second read, measured silently)...
+    public var againChance = 0.07
+    /// ...at most this many times a session.
+    public var againMax = 1
     /// When time or the screen count is up, the session ends after his next screen
     /// that was all right first try. At most this many extra (easy) screens.
     public var maxExtraItems = 3
@@ -182,7 +196,13 @@ extension NoteCoreConfig {
         rhythmDemoScreens = try c.value(.rhythmDemoScreens, or: d.rhythmDemoScreens)
         sessionMaxDuration = try c.value(.sessionMaxDuration, or: d.sessionMaxDuration)
         sessionMaxItems = try c.value(.sessionMaxItems, or: d.sessionMaxItems)
-        warmUpCount = try c.value(.warmUpCount, or: d.warmUpCount)
+        warmUpScreens = try c.value(.warmUpScreens, or: d.warmUpScreens)
+        burstScreens = try c.value(.burstScreens, or: d.burstScreens)
+        burstMinSession = try c.value(.burstMinSession, or: d.burstMinSession)
+        againChance = try c.value(.againChance, or: d.againChance)
+        againMax = try c.value(.againMax, or: d.againMax)
+        blockedScreens = try c.value(.blockedScreens, or: d.blockedScreens)
+        blockedShare = try c.value(.blockedShare, or: d.blockedShare)
         maxExtraItems = try c.value(.maxExtraItems, or: d.maxExtraItems)
         stuckAfter = try c.value(.stuckAfter, or: d.stuckAfter)
         praiseAfterScreens = try c.value(.praiseAfterScreens, or: d.praiseAfterScreens)
