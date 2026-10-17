@@ -16,7 +16,8 @@ import NoteCore
 ///                          picture comes up), the wrong octave, stuck past 15s now and then.
 ///                          Prints the clefs of the session (TTTBBB) at the end
 ///     -demoScreen <name>   open a screen directly: home, parent, parent#levels, parent#staff,
-///                          parent#history, levels (the level picker), monitor, gallery
+///                          parent#history, levels (the level picker), monitor, gallery,
+///                          note:<id> (a note's page, e.g. note:treble:G4, with its habit)
 ///                          (generated screens of -demoLesson)
 ///     -demoLesson <id>     start in lesson id (e.g. 2.3)
 ///     -demoLevel <n>       start in level n (its first lesson)
@@ -181,6 +182,10 @@ final class DemoRunner {
                 model.parentPage = "levels"
                 model.showParent = true
             case "parent":
+                model.showParent = true
+            case let page where page.hasPrefix("note:"):
+                // a note's page in the parent area: -demoScreen note:treble:G4
+                model.parentPage = String(page.dropFirst("note:".count))
                 model.showParent = true
             case let page where page.hasPrefix("parent#"):
                 model.parentPage = String(page.dropFirst("parent".count))

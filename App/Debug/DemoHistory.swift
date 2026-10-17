@@ -17,19 +17,21 @@ enum DemoHistory {
         for day in stride(from: days, through: 1, by: -1) {
             guard let start = calendar.date(byAdding: .day, value: -day, to: today)?.addingTimeInterval(17 * 3600) else { continue }
             let skill = 1 - Double(day) / Double(days)
+            engine.beginSession(day: AppModel.today(start))
             var summary = SessionSummary(startLesson: engine.lesson.id)
             var clock = 0.0
             for _ in 0..<12 {
                 let lesson = engine.lesson
                 let pick = engine.pickScreen(using: &rng)
                 var notes: [AttemptResult] = []
-                for key in pick.item.notes.flatMap(\.keys) {
+                let keys = pick.item.notes.flatMap(\.keys)
+                for (i, key) in keys.enumerated() {
                     let firstTry = pick.intro != nil || roll() < 0.6 + 0.37 * skill
                     let response = max(0.7, (4.4 - 3.3 * skill) * (0.7 + 0.6 * roll()))
                     notes.append(AttemptResult(
                         itemID: key.id, lesson: lesson.id, level: lesson.level, wasIntro: pick.intro == key,
                         firstTry: firstTry, wrongPresses: firstTry ? 0 : 1, hints: firstTry ? .none : .wobble,
-                        responseTime: response
+                        responseTime: response, inLine: i > 0 && pick.intro == nil && key != keys[i - 1]
                     ))
                     clock += response + 0.5
                 }

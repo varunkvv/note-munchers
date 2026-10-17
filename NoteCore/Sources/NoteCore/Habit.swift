@@ -67,8 +67,9 @@ extension MasteryEngine {
     public func isHabit(_ key: NoteKey) -> Bool { habit(key).isHabit }
 
     /// A session starts on `day` (the app's day number; nil: a day of its own, for tests
-    /// and demos). Counts toward the lesson's days.
-    mutating func beginSession(day: Int?) {
+    /// and demos). Counts toward the lesson's days. `PracticeSession.start` calls it; call
+    /// it yourself only when recording screens without a session (demo history).
+    public mutating func beginSession(day: Int?) {
         state.session += 1
         state.sessionDay = day ?? state.session
         state.lessonDays.insert(state.sessionDay)

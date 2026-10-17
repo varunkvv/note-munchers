@@ -82,7 +82,7 @@ struct ParentView: View {
                 } else if page == "levels" {
                     LevelsView(model: model)
                 } else if let item = trends.items[page] ?? emptyItem(page) {
-                    ItemDetailView(id: page, trend: item, progress: engine.progress(for: page))
+                    ItemDetailView(id: page, trend: item, progress: engine.progress(for: page), habit: NoteKey(id: page).map(engine.habit))
                 }
             }
             .toolbar {
@@ -119,6 +119,10 @@ struct ParentView: View {
     private var progressSection: some View {
         Section("This week") {
             LabeledContent("Notes in play", value: "\(engine.pool.count)")
+            let played = engine.allProgress.map(\.key)
+            if !played.isEmpty {
+                LabeledContent("Notes that are a habit", value: "\(played.filter(engine.isHabit).count) of \(played.count)")
+            }
             LabeledContent("Notes per screen", value: "\(engine.screenSize)")
             let week = sessions.filter { $0.startedAt > Date().addingTimeInterval(-7 * 86_400) }
             LabeledContent("Sessions", value: "\(week.count), \(Int((week.map(\.activeDuration).reduce(0, +) / 60).rounded())) min")
@@ -140,13 +144,13 @@ struct ParentView: View {
             }
             ForEach(engine.allProgress) { progress in
                 NavigationLink(value: progress.id) {
-                    NoteRow(progress: progress, trend: trends.items[progress.id])
+                    NoteRow(progress: progress, trend: trends.items[progress.id], isHabit: engine.isHabit(progress.key))
                 }
             }
         } header: {
             Text("Notes")
         } footer: {
-            Text("Box 1-5 goes up after a right-first-try answer and down after a miss. Right first try and time are over his last 8 tries. Solid means the next note can unlock.")
+            Text("Box 1-5 goes up after a right-first-try answer and down after a miss. Right first try and time are over his last 8 tries. Solid means the next note can unlock. Habit means it's automatic: quick and steady from one note to the next, right first try on two different days. Each level's last lesson waits for it.")
         }
     }
 
@@ -237,6 +241,7 @@ struct ParentView: View {
 struct NoteRow: View {
     let progress: NoteProgress
     let trend: Trends.Item?
+    var isHabit = false
 
     var body: some View {
         HStack(spacing: 14) {
@@ -245,6 +250,14 @@ struct NoteRow: View {
                     Text(ItemLabel.text(progress.id)).font(.body.monospaced().bold())
                     if progress.isSolid {
                         Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
+                    }
+                    if isHabit {
+                        Text("habit")
+                            .font(.caption.bold())
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.teal.opacity(0.18)))
+                            .foregroundStyle(.teal)
                     }
                 }
                 HStack(spacing: 10) {
@@ -318,6 +331,7 @@ struct ItemDetailView: View {
     let id: ItemID
     let trend: Trends.Item
     let progress: NoteProgress?
+    var habit: HabitProgress?
 
     var body: some View {
         Form {
@@ -341,6 +355,28 @@ struct ItemDetailView: View {
                     if let change = Trends.speedChange(trend) {
                         LabeledContent("Speed", value: change.text)
                     }
+                }
+            }
+            if let habit {
+                Section {
+                    let config = NoteCoreConfig.default
+                    LabeledContent("Habit", value: habit.isHabit ? "yes" : "not yet (\(Int((habit.fraction * 100).rounded()))% of the way)")
+                    LabeledContent("Plays mid-screen", value: "\(habit.samples) (needs \(config.habitWindow))")
+                    if habit.samples > 0 {
+                        LabeledContent("Right first try", value: "\(habit.firstTries) of \(habit.samples) (needs \(config.habitFirstTry) of \(config.habitWindow))")
+                    }
+                    if let median = habit.median {
+                        LabeledContent("Typical time from the note before", value: String(format: "%.1f s (under %.0f s)", median, config.habitMedian))
+                    }
+                    if let steadiness = habit.steadiness {
+                        let word = steadiness < config.habitCV ? "steady" : "still varies"
+                        LabeledContent("Steadiness", value: String(format: "%@ (%.2f, under %.1f)", word, steadiness, config.habitCV))
+                    }
+                    LabeledContent("Right first try at its first showing", value: "\(habit.cleanDays) of the last \(config.habitDays) days")
+                } header: {
+                    Text("Habit")
+                } footer: {
+                    Text("Knowing a note isn't the same as it being automatic. Habit looks at the times between notes in the middle of a screen, not the first note (that one includes taking in a new screen): fast, steady, right first try, and on two different days. Used to pick which notes the pattern screens practise and to finish each level's last lesson. It never holds back a new note.")
                 }
             }
             if trend.days.count > 0 {
