@@ -499,6 +499,32 @@ public struct MasteryEngine: Sendable {
         return unlocked
     }
 
+    /// Parent reset inside a level (plans/2026-10-17-reset-and-repetition.md): he starts
+    /// this lesson fresh, as if entering it for the first time (screens, recent window,
+    /// plays, habit-in-lesson, days and the stone's peak from zero), and it and every
+    /// later lesson of its level go back to not done. Works on the lesson he's in too.
+    /// What he knows stays: stats, boxes, habit samples, unlocked and introduced notes.
+    /// Never a level-up, and `celebratedLevels` stays. Returns the notes that unlocked.
+    @discardableResult
+    public mutating func restartLesson(_ id: LessonID) -> [ItemID] {
+        guard let target = curriculum.lesson(id), let level = curriculum.level(target.level) else { return [] }
+        state.completedLessons.subtract(level.lessons.drop(while: { $0.id != id }).map(\.id))
+        // a pending splash for the level he stays in is still his (he finished the one
+        // before). one for any other level would be odd, like a parent move
+        state.levelUps.removeAll { $0 != target.level }
+        let unlocked = enter(id)
+        // between sessions: his last session's day isn't a day in this lesson
+        state.lessonDays = []
+        return unlocked
+    }
+
+    /// Parent reset of a whole level: `restartLesson` on its first lesson.
+    @discardableResult
+    public mutating func restartLevel(_ number: Int) -> [ItemID] {
+        guard let first = curriculum.level(number)?.lessons.first else { return [] }
+        return restartLesson(first.id)
+    }
+
     /// A level he reached by finishing the one before, still to be celebrated.
     public var pendingLevelUp: Int? { state.levelUps.first }
 
