@@ -210,6 +210,8 @@ public struct SessionSummary: Hashable, Codable, Sendable {
 ///   mixes in (blocked, then mixed)
 /// - one burst of 3-4 drill screens (`Drill`) a session, inside one clef run, on notes
 ///   he has met in any lesson so far. A drill lesson is all drill screens
+/// - about 1 normal screen in 4 (1 in 5 from level 3) is a pattern screen: two even bars,
+///   bar 2 made from bar 1 (`PatternShape`), more of them right after a new note's intro
 /// - now and then, after a screen all right first try, the same screen once more (a
 ///   second read, `PickReason.again`). Nothing on screen says so, nothing is counted
 /// - after 3 of his last 5 notes weren't right first try, the next 2 screens are his strongest
@@ -246,6 +248,8 @@ public struct PracticeSession: Sendable {
     public private(set) var restarts = 0
     /// The drill on this screen (a burst, a drill lesson, the warm-up's run), nil otherwise.
     public private(set) var drill: Drill?
+    /// A pattern screen's shape (two bars, bar 2 made from bar 1), nil otherwise.
+    public private(set) var pattern: PatternShape?
     /// The hand position each note of this screen is played in (finger numbers).
     public private(set) var positions: [HandPosition] = []
     /// The clef this part of the session is on, in one-clef lessons (nil on the grand
@@ -254,9 +258,18 @@ public struct PracticeSession: Sendable {
     public private(set) var runClef: Clef?
     /// Waiting for the last note's key-up (its hold counts).
     public var isAwaitingRelease: Bool { awaitingRelease }
+    /// Notes of bar 2 he plays from memory: a twin, an answer or a new rhythm repeats bar
+    /// 1's note at the same spot. A moved bar is read (by its shape), a frame's are new.
+    public var recalledNotes: Set<Int> {
+        guard let item, pattern?.repeatsNotes == true else { return [] }
+        return Set(item.repeatedColumns)
+    }
     /// Demos and screenshots: the session opens on a drill screen of this shape (no
     /// warm-up). Set before `start`.
     public var openWithDrill: Drill?
+    /// Demos and screenshots: the session opens on a pattern screen of this shape (no
+    /// warm-up). Set before `start`.
+    public var openWithPattern: PatternShape?
 
     /// True while the current screen is an intro (a new note, or a new lesson texture).
     public var isIntro: Bool { introNote != nil || isLessonIntro }
@@ -369,7 +382,7 @@ public struct PracticeSession: Sendable {
         guard phase == .notStarted else { return [] }
         startTime = time
         engine.beginSession(day: day)
-        warmUpLeft = openWithDrill == nil && engine.lesson.clefs.contains { !engine.strongestNotes($0).isEmpty } ? config.warmUpScreens : 0
+        warmUpLeft = openWithDrill == nil && openWithPattern == nil && engine.lesson.clefs.contains { !engine.strongestNotes($0).isEmpty } ? config.warmUpScreens : 0
         guard isPianoConnected else {
             pausedAt = time
             resumePhase = nil
@@ -577,7 +590,8 @@ public struct PracticeSession: Sendable {
                 easingLeft -= 1
                 reason = .easing
                 burstLeft = 0 // easy screens instead, and the burst doesn't come back
-            } else if againNext, lastPick != nil {
+            } else if againNext, let last = lastPick, clef == nil || last.item.clefs.first == clef {
+                // a second read stays in its run: none across the switch to the other clef
                 reason = .again
             } else if burstLeft > 0 || startsBurst(on: clef) {
                 burstLeft -= 1
@@ -596,6 +610,10 @@ public struct PracticeSession: Sendable {
             openWithDrill = nil
             reason = .drill
             pick = opener
+        } else if let shape = openWithPattern, let opener = engine.pickPattern(shape, on: clef, using: &rng) {
+            openWithPattern = nil
+            reason = .normal
+            pick = opener
         } else {
             pick = engine.pickScreen(style, clef: clef, using: &rng)
         }
@@ -606,6 +624,7 @@ public struct PracticeSession: Sendable {
         }
         lastPick = pick
         drill = pick.drill
+        pattern = pick.pattern
         positions = pick.positions
         let next = pick.item
         item = next
@@ -922,17 +941,20 @@ public struct PracticeSession: Sendable {
         if firstGo == nil {
             // a rhythm line's gaps are the rhythm, not reading: every note gets the reading time
             let readingTime = correctTimes[0] - startTimes[0]
+            let recalled = recalledNotes
             var notes: [AttemptResult] = []
             for (i, column) in item.notes.enumerated() {
                 let time = lesson.texture.isRhythm ? readingTime : correctTimes[i] - startTimes[i]
                 // habit's in-line time: reading from one note to the next, nothing else in it
+                // (bar 2 of a twin or an answer is played from memory)
                 let inLine = i > 0 && !isIntro && !lesson.texture.isRhythm && rhythmLine == nil && pickReason != .again
-                    && column.pitches != item.notes[i - 1].pitches
+                    && column.pitches != item.notes[i - 1].pitches && !recalled.contains(i)
                 for key in column.keys {
                     notes.append(AttemptResult(
                         itemID: key.id, lesson: lesson.id, level: lesson.level, wasIntro: introNote == key || isLessonIntro,
                         firstTry: wrongs[i] == 0 && stucks[i] == 0 && !listened[i], wrongPresses: wrongs[i], almostPresses: almosts[i],
-                        stuckSteps: stucks[i], hints: hints[i], responseTime: max(0, time), inLine: inLine
+                        stuckSteps: stucks[i], hints: hints[i], responseTime: max(0, time), inLine: inLine,
+                        fromMemory: recalled.contains(i)
                     ))
                 }
             }
@@ -951,7 +973,7 @@ public struct PracticeSession: Sendable {
         let screen = ScreenResult(
             screenID: item.id, lesson: lesson.id, reason: pickReason, wasIntro: introNote != nil,
             wasLessonIntro: isLessonIntro, notes: go.notes, rhythm: go.rhythm, size: pickSize,
-            rhythmRetries: retries, wasRhythmDemo: isRhythmDemo, restarts: restarts
+            rhythmRetries: retries, wasRhythmDemo: isRhythmDemo, restarts: restarts, pattern: pattern
         )
         let before = Dictionary(item.keys.map { ($0.id, engine.stats(for: $0).peakFluency) }, uniquingKeysWith: { a, _ in a })
         let update = engine.record(screen)
@@ -966,8 +988,9 @@ public struct PracticeSession: Sendable {
             cues.append(.rhythmGlow(note: wrong))
         }
         // now and then a clean screen comes once more: a second read (not inside a burst,
-        // so the burst stays in its run)
-        if screen.firstTry, retries == 0, !isIntro, burstLeft == 0, [.normal, .stretch, .drill].contains(pickReason), update.unlocked.isEmpty,
+        // so the burst stays in its run, and not a pattern screen: a twin twice is four
+        // bars of the same)
+        if screen.firstTry, retries == 0, !isIntro, burstLeft == 0, pattern == nil, [.normal, .stretch, .drill].contains(pickReason), update.unlocked.isEmpty,
            agains < config.againMax, unitInterval(&rng) < config.againChance {
             againNext = true
         }

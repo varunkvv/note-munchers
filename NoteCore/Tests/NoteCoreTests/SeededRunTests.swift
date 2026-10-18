@@ -25,13 +25,25 @@ import Testing
         var habitAtEnd = 0
         var notesAtEnd = 0
         var missing: [String] = []
+        /// Normal screens in practice lessons (not intros, warm-ups, easing, extras, drills
+        /// or second reads), and how many were pattern screens, of which shapes.
+        var normalScreens = 0
+        var patternScreens = 0
+        var shapes: [PatternShape: Int] = [:]
+        /// The same, on a clef's 3 screens right after a new note's intro there.
+        var introWindowScreens = 0
+        var introWindowPatterns = 0
     }
 
-    static func run(_ kid: Kid, seed: UInt64, maxSessions: Int = 160) -> (levels: [Int: LevelLog], twiceRunning: Int, sessions: Int) {
+    static func run(_ kid: Kid, seed: UInt64, maxSessions: Int = 160) -> (levels: [Int: LevelLog], twiceRunning: Int, sessions: Int, shapeTwice: Int) {
         var engine = MasteryEngine(state: MasteryState(seed: seed))
         var dice = SeededRandom(seed: seed &+ 7)
         var levels: [Int: LevelLog] = [:]
         var twice = 0
+        var lastShape: PatternShape?
+        var shapeTwice = 0
+        // screens on each clef since a new note's intro there
+        var sinceIntro: [Clef: Int] = [:]
         let levelThree = Set(Curriculum.standard.level(3)!.lessons.flatMap(\.keys)).subtracting(Curriculum.standard.level(1)!.lessons.flatMap(\.keys))
         var sessions = 0
         while !engine.isCurriculumComplete, sessions < maxSessions {
@@ -64,6 +76,23 @@ import Testing
                     endedOnHabit = s.engine.state.lessonDays.count < s.engine.config.drillLessonMaxDays
                 }
                 // a rhythm retry is the same screen again, not a new one
+                if let intro = s.introNote, s.retries == 0 {
+                    sinceIntro[intro.clef] = 0
+                } else if s.retries == 0, s.restarts == 0, let clef = s.item?.clefs.first {
+                    let window = (sinceIntro[clef] ?? 99) < s.engine.config.blockedScreens
+                    sinceIntro[clef] = (sinceIntro[clef] ?? 99) + 1
+                    if !s.isIntro, !s.engine.lesson.isDrillLesson, [.normal, .stretch].contains(s.pickReason) {
+                        log.normalScreens += 1
+                        if window { log.introWindowScreens += 1 }
+                        if let shape = s.pattern {
+                            log.patternScreens += 1
+                            log.shapes[shape, default: 0] += 1
+                            if window { log.introWindowPatterns += 1 }
+                            if shape == lastShape { shapeTwice += 1 }
+                            lastShape = shape
+                        }
+                    }
+                }
                 if !s.isIntro, s.retries == 0 {
                     screens += 1
                     let drillLesson = s.engine.lesson.isDrillLesson
@@ -112,11 +141,12 @@ import Testing
             }
             levels[level] = log
         }
-        return (levels, twice, sessions)
+        return (levels, twice, sessions, shapeTwice)
     }
 
-    static func report(_ kid: Kid, seed: UInt64, _ result: (levels: [Int: LevelLog], twiceRunning: Int, sessions: Int)) -> String {
-        var lines = ["\(kid.name), seed \(seed): \(result.sessions) sessions for the whole curriculum, \(result.twiceRunning) drills twice running"]
+    static func report(_ kid: Kid, seed: UInt64, _ result: (levels: [Int: LevelLog], twiceRunning: Int, sessions: Int, shapeTwice: Int)) -> String {
+        var lines = ["\(kid.name), seed \(seed): \(result.sessions) sessions for the whole curriculum, \(result.twiceRunning) drills twice running, "
+            + "\(result.shapeTwice) pattern shapes twice running"]
         for level in result.levels.keys.sorted() {
             let log = result.levels[level]!
             let shares = log.burstShares
@@ -126,9 +156,16 @@ import Testing
             lines.append("  level \(level): \(log.sessions) sessions, \(log.screens) screens, drills \(log.drillScreens) "
                 + "(bursts \(Int((share * 100).rounded()))% of a practice lesson's screens), drill lesson \(log.drillLessonSessions) sessions, ended \(end)")
             lines.append("    patterns: \(mix)" + (level >= 4 ? "; level 3 notes on drill screens: \(log.levelThreeNotes)" : ""))
+            let shapes = log.shapes.sorted { $0.value > $1.value }.map { "\($0.key.rawValue) \($0.value)" }.joined(separator: ", ")
+            lines.append("    pattern screens \(percent(log.patternScreens, log.normalScreens)) of \(log.normalScreens) normal screens, "
+                + "\(percent(log.introWindowPatterns, log.introWindowScreens)) of \(log.introWindowScreens) right after an intro; shapes: \(shapes)")
             if !log.missing.isEmpty { lines.append("    not habit at the end (plays mid-screen/first try, median, cv, clean days): \(log.missing.joined(separator: "; "))") }
         }
         return lines.joined(separator: "\n")
+    }
+
+    static func percent(_ part: Int, _ whole: Int) -> String {
+        whole == 0 ? "-" : "\(Int((Double(part) / Double(whole) * 100).rounded()))%"
     }
 
     static let steady = Kid(name: "steady reader, 1.3s a note +-30%, 92% right first try", time: 1.3, jitter: 0.3, rightRate: 0.92)
@@ -149,6 +186,29 @@ import Testing
                 #expect(log.drillLessonEndedOnHabit != nil, "level \(level)'s drill lesson ends")
             }
             #expect(result.levels[4]!.levelThreeNotes > 0 && result.levels[5]!.levelThreeNotes > 0, "level 3's notes come back in levels 4-5")
+            // pattern screens: 1 in 4 normal screens in levels 1-2, 1 in 5 after, more right
+            // after an intro, never the same shape twice running
+            #expect(result.shapeTwice == 0)
+            var window = (screens: 0, patterns: 0), outside = (screens: 0, patterns: 0)
+            var shapes = Set<PatternShape>()
+            for (level, log) in result.levels {
+                let n = log.normalScreens - log.introWindowScreens
+                let patterns = log.patternScreens - log.introWindowPatterns
+                window = (window.screens + log.introWindowScreens, window.patterns + log.introWindowPatterns)
+                outside = (outside.screens + n, outside.patterns + patterns)
+                shapes.formUnion(log.shapes.keys)
+                guard n >= 15 else { continue }
+                let wanted = level <= 2 ? 0.25 : 0.2
+                let share = Double(patterns) / Double(n)
+                // three standard deviations of a share of n screens
+                #expect(abs(share - wanted) < 3 * (wanted * (1 - wanted) / Double(n)).squareRoot() + 0.02,
+                        "level \(level): pattern screens \(patterns) of \(n) normal screens outside an intro's")
+            }
+            let windowShare = Double(window.patterns) / Double(max(1, window.screens))
+            let outsideShare = Double(outside.patterns) / Double(max(1, outside.screens))
+            #expect(windowShare > outsideShare + 0.05, "right after an intro \(windowShare), else \(outsideShare)")
+            #expect(shapes == Set(PatternShape.allCases), "\(shapes)")
+
         }
     }
 

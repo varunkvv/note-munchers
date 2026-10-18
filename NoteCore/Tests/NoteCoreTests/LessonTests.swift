@@ -184,9 +184,16 @@ import Testing
         var rng = SeededRandom(seed: 2)
         var firstClefs = Set<Clef>()
         for _ in 0..<60 {
-            let item = engine.pickScreen(using: &rng).item
+            let pick = engine.pickScreen(using: &rng)
+            let item = pick.item
             #expect(item.layout == .grand)
             try #require(item.bars.count == 2, "\(item.id)")
+            // a pattern screen keeps both bars on one staff, so bar 2 reads like bar 1
+            if pick.pattern != nil {
+                #expect(item.clefs.count == 1, "\(item.id)")
+                engine.play(item.notes.flatMap(\.keys), time: 1)
+                continue
+            }
             let first = Array(item.notes.prefix(item.bars[0])), second = Array(item.notes.suffix(item.bars[1]))
             #expect(Set(first.map(\.clef)).count == 1 && Set(second.map(\.clef)).count == 1)
             #expect(first[0].clef != second[0].clef, "one bar on each staff: \(item.id)")

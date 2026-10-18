@@ -77,7 +77,8 @@ import Testing
                 let size = engine.screenSize
                 let pick = engine.pickScreen(using: &rng)
                 engine.playPick(pick, time: 1)
-                guard pick.intro == nil, !pick.isLessonIntro else { continue }
+                // pattern screens are two even bars (PatternTests)
+                guard pick.intro == nil, !pick.isLessonIntro, pick.pattern == nil else { continue }
                 let meter = pick.item.meter!
                 let wanted = size + (pick.isStretch ? 1 : 0)
                 #expect(pick.item.notes.count == min(wanted, MasteryEngine.maxNotes(meter)), "\(lesson.id) \(pick.item.id) at size \(size)")
@@ -93,7 +94,7 @@ import Testing
         var engine = MasteryEngine(state: MasteryState(seed: 11))
         var rng = SeededRandom(seed: 1)
         var meters = Set<Meter>()
-        for _ in 0..<14 {
+        for _ in 0..<40 {
             let pick = engine.pickScreen(using: &rng)
             if pick.intro != nil {
                 let item = pick.item

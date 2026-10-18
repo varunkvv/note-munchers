@@ -41,11 +41,15 @@ public struct AttemptResult: Hashable, Codable, Sendable {
     /// as the note before it, not on a rhythm-judged screen or a rhythm line (the gaps
     /// are the rhythm), not an intro or a second read.
     public var inLine: Bool
+    /// Bar 2 of a pattern screen played bar 1's note again at the same spot (a twin, an
+    /// answer, a new rhythm): from memory, not read. Not in-line for habit, and not one of a
+    /// paced lesson's plays of a new note.
+    public var fromMemory: Bool
 
     public init(
         itemID: ItemID, lesson: LessonID, level: Int, wasIntro: Bool = false, firstTry: Bool,
         wrongPresses: Int = 0, almostPresses: Int = 0, stuckSteps: Int = 0, hints: HintLevel = .none,
-        responseTime: Double, inLine: Bool = false
+        responseTime: Double, inLine: Bool = false, fromMemory: Bool = false
     ) {
         self.itemID = itemID
         self.lesson = lesson
@@ -58,6 +62,7 @@ public struct AttemptResult: Hashable, Codable, Sendable {
         self.hints = hints
         self.responseTime = responseTime
         self.inLine = inLine
+        self.fromMemory = fromMemory
     }
 }
 
@@ -103,11 +108,13 @@ public struct ScreenResult: Hashable, Codable, Sendable {
     /// Times the screen went back to its first note after a slip (at most
     /// `sequenceRestarts`). Each note's result is from the first go that reached it.
     public var restarts: Int
+    /// A pattern screen's shape (two bars, bar 2 made from bar 1), nil otherwise.
+    public var pattern: PatternShape?
 
     public init(
         screenID: ItemID, lesson: LessonID, reason: PickReason = .normal, wasIntro: Bool = false,
         wasLessonIntro: Bool = false, notes: [AttemptResult], rhythm: RhythmResult? = nil, size: Int? = nil,
-        rhythmRetries: Int = 0, wasRhythmDemo: Bool = false, restarts: Int = 0
+        rhythmRetries: Int = 0, wasRhythmDemo: Bool = false, restarts: Int = 0, pattern: PatternShape? = nil
     ) {
         self.screenID = screenID
         self.lesson = lesson
@@ -120,6 +127,7 @@ public struct ScreenResult: Hashable, Codable, Sendable {
         self.rhythmRetries = rhythmRetries
         self.wasRhythmDemo = wasRhythmDemo
         self.restarts = restarts
+        self.pattern = pattern
     }
 
     /// Every note right first try.
@@ -143,6 +151,7 @@ extension AttemptResult {
         hints = try c.value(.hints, or: .none)
         responseTime = try c.value(.responseTime, or: 0)
         inLine = try c.value(.inLine, or: false)
+        fromMemory = try c.value(.fromMemory, or: false)
     }
 }
 
@@ -160,5 +169,7 @@ extension ScreenResult {
         rhythmRetries = try c.value(.rhythmRetries, or: 0)
         wasRhythmDemo = try c.value(.wasRhythmDemo, or: false)
         restarts = try c.value(.restarts, or: 0)
+        // a shape a later build drops reads as no pattern
+        pattern = try? c.decodeIfPresent(PatternShape.self, forKey: .pattern)
     }
 }

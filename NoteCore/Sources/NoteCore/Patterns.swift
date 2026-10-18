@@ -146,10 +146,14 @@ extension MasteryEngine {
     func isRecentPattern(_ pick: Pick) -> Bool {
         guard let memo = patternMemo(pick), let hand = pick.positions.first else { return false }
         let inHand = Double(max(1, Set(playable(hand.clef).filter(hand.contains)).count))
-        var possible = 1.0
+        var possible = 1.0, screens = 1.0
         for _ in 0..<pick.item.bars[0] { possible = min(1e6, possible * inHand) }
+        for _ in 0..<pick.item.notes.count { screens = min(1e6, screens * inHand) }
         let window = min(config.recentScreens, max(1, Int(possible / 3)))
-        return state.recentPatterns.suffix(window).contains(memo)
+        // nor the same screen as a recent one of any kind (a frame can come out as a recent
+        // normal screen)
+        let screenWindow = min(config.recentScreens, max(1, Int(screens / 3)))
+        return state.recentPatterns.suffix(window).contains(memo) || state.recentScreens.suffix(screenWindow).contains(pick.item.id)
     }
 
     // MARK: building
@@ -177,10 +181,15 @@ extension MasteryEngine {
         }
         let oneKey: Bool = if case .rhythm(_, true) = lesson.texture { true } else { false }
         var bar1: [WrittenNote]
+        // a frame's two bars are one line, so the contour runs on across the bar line
+        var line: [WrittenNote] = []
         if shape == .oneNote {
             guard k >= 2, lesson.texture == .single else { return nil }
             let x = blocked ?? all[weightedIndex(all.map { Double(config.boxCount + 1 - stats(for: $0).box) }, using: &rng)]
             bar1 = Array(repeating: WrittenNote(x), count: k)
+        } else if shape == .frame, !oneKey {
+            line = columns(2 * k, on: clef, from: others, newest: newest, fallback: all, after: state.recentColumns, share: share, using: &rng)
+            bar1 = Array(line.prefix(k))
         } else {
             bar1 = columns(k, on: clef, from: others, newest: newest, fallback: all, after: state.recentColumns, share: share, using: &rng)
         }
@@ -190,13 +199,8 @@ extension MasteryEngine {
         var bar2: [WrittenNote]
         switch shape {
         case .frame:
-            if oneKey {
-                bar2 = bar1
-            } else {
-                let after = Array((state.recentColumns + bar1.map(Self.columnID)).suffix(config.maxRepeats))
-                bar2 = columns(k, on: clef, from: others, newest: newest, fallback: all, after: after, share: share, using: &rng)
-                guard bar2 != bar1 else { return nil }
-            }
+            bar2 = oneKey ? bar1 : Array(line.suffix(k))
+            guard oneKey || bar2 != bar1 else { return nil }
         case .moved:
             // a bar of one key moved is one note a bar
             guard Set(bar1).count >= 2 else { return nil }
@@ -224,6 +228,12 @@ extension MasteryEngine {
         // no key 3 times in a row on the screen. One note a bar is a shape of its own (G G |
         // A A, a bar that's one key), and a one-key rhythm lesson repeats on purpose
         if shape != .oneNote, !oneKey, maxRepeatRun((bar1 + bar2).map(Self.columnID)) > config.maxRepeats { return nil }
+        // never further than the contour allows from one note to the next (level 1: a
+        // third), across the bar line too (a moved bar starts a step off)
+        if let widest = lesson.contour.widest {
+            let lows = (bar1 + bar2).map { $0.pitches[0].diatonicIndex }
+            if zip(lows, lows.dropFirst()).contains(where: { abs($0 - $1) > widest }) { return nil }
+        }
         let rhythms = [first, second]
         if lesson.texture.isRhythm, !RhythmJudge.telling(Self.rhythmLine(rhythms)) { return nil }
         let written = Self.apply(rhythms, to: bar1 + bar2)

@@ -247,10 +247,12 @@ import Testing
         var engine = ready("5.5")
         var rng = SeededRandom(seed: 7)
         for _ in 0..<40 {
-            let item = engine.pickScreen(using: &rng).item
+            let pick = engine.pickScreen(using: &rng)
+            let item = pick.item
             #expect(item.layout == .grand)
             #expect(item.totalBeats == Double(2 * item.meter!.beats))
-            #expect(item.clefs.count == 2, "\(item.id)")
+            // a pattern screen keeps both bars on one staff
+            #expect(item.clefs.count == (pick.pattern == nil ? 2 : 1), "\(item.id)")
             #expect(item.barLinesAfter.count == 1)
             let split = item.barLinesAfter[0]
             #expect(Set(item.notes[...split].map(\.clef)).count == 1 && Set(item.notes[(split + 1)...].map(\.clef)).count == 1)

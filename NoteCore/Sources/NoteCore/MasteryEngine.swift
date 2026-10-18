@@ -453,7 +453,8 @@ public struct MasteryEngine: Sendable {
             s.firstTryCount += attempt.firstTry ? 1 : 0
             s.peakFluency = max(s.peakFluency, fluency(s))
             state.stats[key.id] = s
-            state.lessonPlays[key.id, default: 0] += 1
+            // a note played from memory (bar 2 of a twin) isn't a read of it
+            if !attempt.fromMemory { state.lessonPlays[key.id, default: 0] += 1 }
             if isHabit(key) { state.lessonHabit.insert(key.id) }
             state.lessonRecent = Array((state.lessonRecent + [sample]).suffix(max(config.lessonWindow, config.solidWindow)))
         }
@@ -467,7 +468,8 @@ public struct MasteryEngine: Sendable {
         if screen.wasRhythmDemo {
             state.rhythmDemos[String(lesson.level), default: 0] += 1
         }
-        if screen.reason == .normal, !screen.wasIntro, !screen.wasLessonIntro, screen.size == state.screenSize {
+        // a pattern screen's bar 2 comes from bar 1, so it doesn't say how many notes he can read
+        if screen.reason == .normal, !screen.wasIntro, !screen.wasLessonIntro, screen.size == state.screenSize, screen.pattern == nil {
             noteSize(screen, &update)
         }
         advance(&update)

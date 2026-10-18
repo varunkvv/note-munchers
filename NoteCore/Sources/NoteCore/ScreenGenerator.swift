@@ -38,6 +38,9 @@ public struct Pick: Hashable, Sendable {
 /// - one hand position per staff: when a clef's notes span more than five letters (level
 ///   3) the screen's notes on it stay inside one five-finger position (`HandPosition`)
 /// - no screen identical to one of the recent ones (fewer when the pool is small)
+/// - two bars holding as many notes get one rhythm half the time, and about 1 normal
+///   screen in 4 (1 in 5 from level 3) is a pattern screen: two even bars, bar 2 made from
+///   bar 1 (`PatternShape`, Patterns.swift)
 /// - doing well: now and then one note more (stretch)
 /// - every screen is whole bars of 3/4 or 4/4 (Bars.swift): the meter is rolled per
 ///   screen, the notes are written first, then each bar gets a rhythm that holds them
@@ -82,6 +85,11 @@ extension MasteryEngine {
             let item = PracticeItem([note], layout: lesson.staff(for: clef), keySignature: lesson.keySignature, meter: meter)
             return remember(Pick(item: item, intro: intro, isLessonIntro: false, usedStrongest: false, isStretch: false, size: 1,
                                  positions: [Self.position(holding: [intro], on: clef)]))
+        }
+        // now and then a pattern screen: two bars, bar 2 made from bar 1 (Patterns.swift)
+        if style == .normal, !lesson.isDrillLesson, unitInterval(&rng) < patternChance(on: clef),
+           let pick = patternPick(on: clef, using: &rng) {
+            return remember(pick)
         }
         return remember(generate(on: clef, strongest: style == .strongest, using: &rng))
     }

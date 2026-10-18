@@ -29,7 +29,8 @@ import Testing
             let pick = engine.pickScreen(using: &rng)
             let item = pick.item
             #expect(pick.intro == nil)
-            #expect(item.notes.count == engine.screenSize || pick.isStretch)
+            // a pattern screen in level 1 is 2+2 (PatternTests)
+            #expect(item.notes.count == (pick.pattern != nil ? 4 : engine.screenSize) || pick.isStretch)
             #expect(item.clefs.count == 1, "one clef per screen in an alternating lesson")
             #expect(item.layout == (item.clefs[0] == .treble ? .treble : .bass))
             #expect(item.keys.allSatisfy { engine.playable($0.clef).contains($0) })

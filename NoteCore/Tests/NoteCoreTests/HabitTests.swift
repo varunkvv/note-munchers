@@ -68,7 +68,8 @@ import Testing
     }
 
     /// In-line means reading from one note to the next: not a screen's first note, not
-    /// the same key again, not a rhythm-judged screen, not an intro or a second read.
+    /// the same key again, not a rhythm-judged screen, not an intro or a second read, not
+    /// bar 2 of a pattern screen played from memory.
     @Test func whatCountsAsInLine() {
         var bench = Bench(engine(in: "1.4"), seed: 2)
         _ = bench.start()
@@ -77,10 +78,12 @@ import Testing
             let item = bench.session.item!
             let reason = bench.session.pickReason
             _ = bench.playScreen()
+            let recalled = bench.session.recalledNotes
             let notes = bench.session.summary.screens.last!.notes
             for (i, note) in notes.enumerated() {
                 let repeated = i > 0 && item.notes[i].pitches == item.notes[i - 1].pitches
-                #expect(note.inLine == (i > 0 && !repeated && reason != .again && !note.wasIntro), "\(item.id) note \(i)")
+                #expect(note.inLine == (i > 0 && !repeated && reason != .again && !note.wasIntro && !recalled.contains(i)), "\(item.id) note \(i)")
+                #expect(note.fromMemory == recalled.contains(i))
                 checked += 1
             }
             _ = bench.next()

@@ -75,19 +75,22 @@ import Testing
 
     /// Round 3 (plans/2026-10-16-round-3-feedback.md): level 1 starts with G and A on
     /// each clef and adds one letter a lesson, each drilled. A quick kid doesn't race
-    /// through it: G and A for the first session, never more than one new letter a clef
-    /// in a session after that, 1.1-1.4 in about 6 sessions, then the drill lesson 1.5
-    /// until his notes reach habit on two days (2-3 sessions).
+    /// through it: G and A for the first session (B can unlock at its end), never more than
+    /// two new letters a clef in a session after that, 1.1-1.4 in about 5 sessions, then
+    /// the drill lesson 1.5 until his notes reach habit on two days (2-3 sessions).
+    /// Pattern screens (2026-10-17) made it about a session quicker for a kid who is always
+    /// right: 4-note screens, more of them right after a new note's intro, so its 10 plays
+    /// come sooner (was: G and A all of session 1, one letter a session, 7-10 sessions).
     @Test func quickKidIsDrilledThroughLevelOne() {
         for seed: UInt64 in 1...5 {
             let logs = Self.simulate(Self.quick, sessions: 12, seed: seed)
-            #expect(logs[0].treble == 2 && logs[0].bass == 2, "seed \(seed): session 1 is G and A")
+            #expect(logs[0].treble <= 3 && logs[0].bass <= 3, "seed \(seed): session 1 is G and A")
             for (a, b) in zip(logs, logs.dropFirst()) where b.lesson.hasPrefix("1.") {
-                #expect(b.treble - a.treble <= 1 && b.bass - a.bass <= 1, "seed \(seed): one new letter a session at most")
+                #expect(b.treble - a.treble <= 2 && b.bass - a.bass <= 2, "seed \(seed): two new letters a session at most")
             }
-            // 1.1-1.4 in about 6, then the drill lesson 1.5 for 2 more (habit on two days)
+            // 1.1-1.4 in about 5, then the drill lesson 1.5 for 2 more (habit on two days)
             let levelOne = logs.filter { $0.lesson.hasPrefix("1.") }.count
-            #expect((7...10).contains(levelOne), "seed \(seed): \(levelOne) sessions in level 1")
+            #expect((6...10).contains(levelOne), "seed \(seed): \(levelOne) sessions in level 1")
             if seed == 1 { print(Self.report(Self.quick, logs)) }
         }
     }

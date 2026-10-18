@@ -168,7 +168,9 @@ import Testing
         }
         let plain = share(flagged: false), more = share(flagged: true)
         print("come back: B4 is \(Int(plain * 100))% of treble notes, \(Int(more * 100))% while flagged")
-        #expect(more > plain * 1.25, "\(plain) -> \(more)")
+        // 1.2-1.35x over seeds 11-14 before pattern screens, 1.15-1.2x with them (a moved
+        // bar 2 is derived from bar 1, so a flagged note gets less of its boost there)
+        #expect(more > plain * 1.12, "\(plain) -> \(more)")
     }
 
     @Test func savedStatsWithoutTheFlagStillDecode() throws {
