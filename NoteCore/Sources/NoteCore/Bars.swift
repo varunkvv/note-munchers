@@ -72,9 +72,17 @@ extension MasteryEngine {
         return [first, n - first]
     }
 
-    /// A rhythm for each bar of a reading screen.
-    static func readingRhythms(_ sizes: [Int], meter: Meter, using rng: inout some RandomNumberGenerator) -> [BarRhythm] {
-        sizes.map { size in
+    /// A rhythm for each bar of a reading screen. `sameRhythm`: two bars holding as many
+    /// notes get one rhythm, so bar 2 looks like bar 1 before he reads a pitch (the stems,
+    /// open heads and rests line up: a piano teacher's review, 2026-10-17).
+    static func readingRhythms(_ sizes: [Int], meter: Meter, sameRhythm: Bool = false,
+                               using rng: inout some RandomNumberGenerator) -> [BarRhythm] {
+        if sameRhythm, sizes.count == 2, sizes[0] == sizes[1] {
+            let options = readingBars(notes: sizes[0], meter: meter)
+            let one = options[weightedIndex(options.map(\.weight), using: &rng)].rhythm
+            return [one, one]
+        }
+        return sizes.map { size in
             let options = readingBars(notes: size, meter: meter)
             return options[weightedIndex(options.map(\.weight), using: &rng)].rhythm
         }

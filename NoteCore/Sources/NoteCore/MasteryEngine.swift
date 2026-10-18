@@ -121,6 +121,14 @@ public struct MasteryState: Hashable, Codable, Sendable {
     public var lastFirstClef: Clef?
     /// The last drill screen's shape, so the next one is a different one.
     public var lastDrill: Drill?
+    /// The last pattern screen's shape, so the next one is a different one.
+    public var lastShape: PatternShape?
+    /// The last pattern screens' shape and bar 1 (`patternMemo`), oldest first, so a
+    /// pattern screen doesn't come back too soon.
+    public var recentPatterns: [String] = []
+    /// The bar rhythms of the last few pattern screens (`"4/4 q q h"`), oldest first, so
+    /// the next one has another while there are others.
+    public var recentCells: [String] = []
     /// Sessions started, counting from 1 (0 before the first). Samples carry it.
     public var session = 0
     /// The day the current session is on (the app's day number), for habit's "two
@@ -756,6 +764,9 @@ extension MasteryState {
         lessonPeak = try c.value(.lessonPeak, or: d.lessonPeak)
         lastFirstClef = try c.decodeIfPresent(Clef.self, forKey: .lastFirstClef)
         lastDrill = try? c.decodeIfPresent(Drill.self, forKey: .lastDrill)
+        lastShape = try? c.decodeIfPresent(PatternShape.self, forKey: .lastShape)
+        recentPatterns = (try? c.value(.recentPatterns, or: d.recentPatterns)) ?? d.recentPatterns
+        recentCells = (try? c.value(.recentCells, or: d.recentCells)) ?? d.recentCells
         lastIntro = try c.value(.lastIntro, or: d.lastIntro)
         session = try c.value(.session, or: d.session)
         sessionDay = try c.value(.sessionDay, or: d.sessionDay)

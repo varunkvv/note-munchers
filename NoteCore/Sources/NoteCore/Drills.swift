@@ -241,8 +241,7 @@ extension MasteryEngine {
         if let given = draft.rhythms {
             rhythms = given
         } else if draft.sameRhythm, draft.bars.count == 2, draft.bars[0] == draft.bars[1] {
-            let one = Self.readingRhythms([draft.bars[0]], meter: meter, using: &rng)[0]
-            rhythms = [one, one]
+            rhythms = Self.readingRhythms(draft.bars, meter: meter, sameRhythm: true, using: &rng)
         } else {
             rhythms = Self.readingRhythms(draft.bars, meter: meter, using: &rng)
         }
@@ -515,10 +514,10 @@ extension MasteryEngine {
     }
 }
 
-/// Longest run of the same key in a row.
-func maxRepeatRun(_ keys: [NoteKey]) -> Int {
+/// Longest run of the same key (or column) in a row.
+func maxRepeatRun<T: Equatable>(_ keys: [T]) -> Int {
     var best = 0, run = 0
-    var last: NoteKey?
+    var last: T?
     for key in keys {
         run = key == last ? run + 1 : 1
         last = key

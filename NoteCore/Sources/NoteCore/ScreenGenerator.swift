@@ -17,6 +17,8 @@ public struct Pick: Hashable, Sendable {
     public var positions: [HandPosition] = []
     /// The drill's shape on a drill screen (and the warm-up's run), nil otherwise.
     public var drill: Drill?
+    /// A pattern screen's shape (two bars, bar 2 made from bar 1), nil otherwise.
+    public var pattern: PatternShape?
 }
 
 /// Screen picking: which clef, an intro or a generated screen, and the notes on it.
@@ -198,7 +200,7 @@ extension MasteryEngine {
 
     /// This clef's newest notes among `notes`, and the rest. While every note is new (a
     /// lesson's start set) there's nothing to set apart: no newest, all the rest.
-    private func split(_ clef: Clef, _ notes: [NoteKey]) -> (newest: [NoteKey], others: [NoteKey]) {
+    func split(_ clef: Clef, _ notes: [NoteKey]) -> (newest: [NoteKey], others: [NoteKey]) {
         let newest = newestBatch(clef).filter(notes.contains)
         let others = notes.filter { !newest.contains($0) }
         return others.isEmpty ? ([], notes) : (newest, others)
@@ -252,7 +254,10 @@ extension MasteryEngine {
         if case .rhythm(let values, _) = lesson.texture {
             (meter, rhythms) = Self.rhythm(bars: twoStaves ? 2 : size, from: values, meter: meter, using: &rng)
         } else {
-            rhythms = Self.readingRhythms(Self.barSizes(size, meter: meter, twoBars: twoStaves, using: &rng), meter: meter, using: &rng)
+            // two bars holding as many notes: one rhythm for both, half the time
+            let sizes = Self.barSizes(size, meter: meter, twoBars: twoStaves, using: &rng)
+            let same = sizes.count == 2 && sizes[0] == sizes[1] && unitInterval(&rng) < config.sameRhythmShare
+            rhythms = Self.readingRhythms(sizes, meter: meter, sameRhythm: same, using: &rng)
         }
         let staves = twoStaves ? [clef, other] : Array(repeating: only, count: rhythms.count)
         // one line per staff, so the contour runs on across a bar line on the same staff
@@ -294,7 +299,7 @@ extension MasteryEngine {
     }
 
     /// `count` columns in the lesson's texture, no rhythm yet.
-    private func columns(_ count: Int, on clef: Clef, from pool: [NoteKey], newest: [NoteKey], fallback: [NoteKey],
+    func columns(_ count: Int, on clef: Clef, from pool: [NoteKey], newest: [NoteKey], fallback: [NoteKey],
                          after: [ItemID], share: Double? = nil, using rng: inout some RandomNumberGenerator) -> [WrittenNote] {
         switch lesson.texture {
         case .single:
@@ -471,8 +476,13 @@ extension MasteryEngine {
         }
     }
 
-    private mutating func remember(_ pick: Pick) -> Pick {
+    mutating func remember(_ pick: Pick) -> Pick {
         if let drill = pick.drill { state.lastDrill = drill }
+        if let shape = pick.pattern, let memo = patternMemo(pick) {
+            state.lastShape = shape
+            state.recentPatterns = Array((state.recentPatterns + [memo]).suffix(max(1, config.recentScreens)))
+            state.recentCells = Array((state.recentCells + Self.patternCellIDs(pick.item)).suffix(max(1, config.patternFreshCells)))
+        }
         state.recentScreens = Array((state.recentScreens + [pick.item.id]).suffix(max(2, config.recentScreens)))
         let columns = pick.item.notes.map(Self.columnID)
         state.recentColumns = Array((state.recentColumns + columns).suffix(max(1, config.maxRepeats)))

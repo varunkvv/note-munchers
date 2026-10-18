@@ -59,6 +59,27 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// time signature every time (plans/2026-10-15-real-bars.md).
     public var fourFourShare = 0.5
 
+    // MARK: repetition inside a screen (plans/2026-10-17-reset-and-repetition.md section 2)
+
+    /// A normal screen whose two bars hold as many notes gets one rhythm for both this
+    /// share of the time: the repeated rhythm is what tells him bar 2 is like bar 1 (a
+    /// piano teacher's review, 2026-10-17).
+    public var sameRhythmShare = 0.5
+    /// The chance a normal screen is a pattern screen (two bars, bar 2 made from bar 1:
+    /// `PatternShape`) in levels 1-2...
+    public var patternShare = 0.25
+    /// ...in levels 3-5...
+    public var patternShareLater = 0.2
+    /// ...and on a new note's blocked screens right after its intro: the new note in bar
+    /// 1, the shape brings it back in bar 2.
+    public var patternIntroShare = 0.5
+    /// An answer's last note is G (home), except this share of the time, so he learns to
+    /// check the end.
+    public var answerAwayChance = 0.25
+    /// A pattern screen's bar rhythm isn't one of the last this many pattern screens'
+    /// (while at least half of the rhythms that fit are left).
+    public var patternFreshCells = 5
+
     // MARK: lessons
 
     /// A lesson is done (with every note out and every gate open) after at least this
@@ -208,6 +229,12 @@ extension NoteCoreConfig {
         sizeDownRate = try c.value(.sizeDownRate, or: d.sizeDownRate)
         stretchChance = try c.value(.stretchChance, or: d.stretchChance)
         fourFourShare = try c.value(.fourFourShare, or: d.fourFourShare)
+        sameRhythmShare = try c.value(.sameRhythmShare, or: d.sameRhythmShare)
+        patternShare = try c.value(.patternShare, or: d.patternShare)
+        patternShareLater = try c.value(.patternShareLater, or: d.patternShareLater)
+        patternIntroShare = try c.value(.patternIntroShare, or: d.patternIntroShare)
+        answerAwayChance = try c.value(.answerAwayChance, or: d.answerAwayChance)
+        patternFreshCells = try c.value(.patternFreshCells, or: d.patternFreshCells)
         lessonMinScreens = try c.value(.lessonMinScreens, or: d.lessonMinScreens)
         lessonWindow = try c.value(.lessonWindow, or: d.lessonWindow)
         lessonRate = try c.value(.lessonRate, or: d.lessonRate)
