@@ -163,6 +163,11 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// The first this many rhythm-judged screens of a level that doesn't drill rhythm
     /// (3 and 4) are played to him before he reads them (sound before symbol).
     public var rhythmDemoScreens = 2
+    /// Level 3's halves check prefers screens whose two bars share a rhythm (bar 1 sets his
+    /// beat, so it starts with a success): those are always judged, others this share of
+    /// the time (none among the level's first, played-to-him screens), so judged screens
+    /// stay about 1 in 3 (a piano teacher's review, 2026-10-17).
+    public var halvesMixedShare = 0.75
 
     // MARK: session
 
@@ -260,6 +265,7 @@ extension NoteCoreConfig {
         rhythmPauseRatio = try c.value(.rhythmPauseRatio, or: d.rhythmPauseRatio)
         rhythmRetries = try c.value(.rhythmRetries, or: d.rhythmRetries)
         rhythmDemoScreens = try c.value(.rhythmDemoScreens, or: d.rhythmDemoScreens)
+        halvesMixedShare = try c.value(.halvesMixedShare, or: d.halvesMixedShare)
         sessionMaxDuration = try c.value(.sessionMaxDuration, or: d.sessionMaxDuration)
         sessionMaxItems = try c.value(.sessionMaxItems, or: d.sessionMaxItems)
         warmUpScreens = try c.value(.warmUpScreens, or: d.warmUpScreens)

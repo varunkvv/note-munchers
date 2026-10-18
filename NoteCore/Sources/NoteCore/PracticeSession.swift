@@ -631,6 +631,11 @@ public struct PracticeSession: Sendable {
         pickReason = reason
         let lesson = engine.lesson
         rhythmLine = pick.intro == nil ? next.rhythmLine(lesson.texture.isRhythm ? .all : lesson.rhythmCheck) : nil
+        if rhythmLine != nil, lesson.rhythmCheck == .halves, !lesson.texture.isRhythm, !next.hasSameRhythmBars,
+           engine.wantsRhythmDemo || unitInterval(&rng) >= config.halvesMixedShare {
+            // level 3's halves check prefers two bars in one rhythm: bar 1 sets his beat
+            rhythmLine = nil
+        }
         retries = 0
         restarts = 0
         slippedNote = nil
@@ -926,6 +931,14 @@ public struct PracticeSession: Sendable {
         return cues
     }
 
+    /// Level 2: his rhythm on a screen whose bars share one, measured silently when this
+    /// go was clean (no slip, hint or play button in it). Nothing is said or shown.
+    private var silentMeasure: RhythmMeasure? {
+        guard let item, engine.lesson.level == 2, engine.lesson.rhythmCheck == .off, rhythmLine == nil, rhythmJudgeable,
+              !isIntro, pickReason != .again, onsets.count == item.notes.count else { return nil }
+        return RhythmJudge(config: config).measure(item, onsets: onsets)
+    }
+
     private mutating func finishRhythm(release: Double) -> [Cue] {
         guard let item, let line = rhythmLine, onsets.count == item.notes.count else {
             return finish(at: release, rhythm: nil)
@@ -974,7 +987,8 @@ public struct PracticeSession: Sendable {
             screenID: item.id, lesson: lesson.id, reason: pickReason, wasIntro: introNote != nil,
             wasLessonIntro: isLessonIntro, notes: go.notes, rhythm: go.rhythm, size: pickSize,
             rhythmRetries: retries, wasRhythmDemo: isRhythmDemo, restarts: restarts, pattern: pattern,
-            secondBar: item.bars.count == 2 ? item.notes[item.barRanges[0]].reduce(0) { $0 + $1.keys.count } : nil
+            secondBar: item.bars.count == 2 ? item.notes[item.barRanges[0]].reduce(0) { $0 + $1.keys.count } : nil,
+            rhythmMeasure: silentMeasure
         )
         let before = Dictionary(item.keys.map { ($0.id, engine.stats(for: $0).peakFluency) }, uniquingKeysWith: { a, _ in a })
         let update = engine.record(screen)

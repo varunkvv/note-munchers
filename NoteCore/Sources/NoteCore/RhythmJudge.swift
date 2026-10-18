@@ -226,3 +226,57 @@ public struct RhythmJudge: Sendable {
         return sorted[(sorted.count - 1) / 2]
     }
 }
+
+/// Level 2 doesn't judge rhythm: it's drawn, he plays at his own pace, and with no voice
+/// a judged rhythm would be replays and retries (heavy for level 2). On a screen whose two
+/// bars share a rhythm it's measured silently for the parent dashboard (a piano teacher's
+/// review, 2026-10-17): were the halves held longer than the quarters, and did bar 2 go
+/// like bar 1. If he already does it, level 3's halves check is a non-event. From his
+/// key-downs only (the last note's length isn't known).
+public struct RhythmMeasure: Hashable, Codable, Sendable {
+    /// Seconds from each key-down to the next, every note but the last.
+    public var gaps: [Double]
+    /// No half played short against his quarters on the screen, the way level 3's check
+    /// reads it (a half and a quarter with nothing after them to compare). nil without both.
+    public var halvesLonger: Bool?
+    /// Each note of bar 2 took about as long as the same note of bar 1 (`barsMatchRange`).
+    /// nil when bar 2 has nothing to compare (one note a bar).
+    public var barsMatch: Bool?
+
+    public init(gaps: [Double], halvesLonger: Bool?, barsMatch: Bool?) {
+        self.gaps = gaps
+        self.halvesLonger = halvesLonger
+        self.barsMatch = barsMatch
+    }
+
+    /// Bar 2's note over bar 1's: inside this is "about as long".
+    public static let barsMatchRange = (1.0 / 1.5)...1.5
+}
+
+extension RhythmJudge {
+    /// The silent measure of a screen whose two bars share a rhythm, from his key-downs.
+    /// nil for any other screen.
+    public func measure(_ item: PracticeItem, onsets: [Double]) -> RhythmMeasure? {
+        guard item.hasSameRhythmBars, onsets.count == item.notes.count, onsets.count >= 3 else { return nil }
+        let gaps = zip(onsets, onsets.dropFirst()).map { $1 - $0 }
+        let last = item.notes.count - 1
+        // halves against his quarters, as level 3 reads them, the last note left out
+        let judged = item.notes.indices.map { i in
+            i != last && item.notes[i].restsAfter.isEmpty && (item.notes[i].value == .quarter || item.notes[i].value == .half)
+        }
+        var halvesLonger: Bool?
+        let halves = item.notes.indices.filter { judged[$0] && item.notes[$0].value == .half }
+        if !halves.isEmpty, item.notes.indices.contains(where: { judged[$0] && item.notes[$0].value == .quarter }) {
+            let line = RhythmLine(values: item.values, gaps: item.gapBeats, judged: judged, check: .halves)
+            let verdicts = judge(line, onsets: onsets, release: onsets[last]).verdicts
+            let read = halves.filter { verdicts[$0] != .pause }
+            halvesLonger = read.isEmpty ? nil : read.allSatisfy { verdicts[$0] != .tooShort }
+        }
+        // bar 2 against bar 1, note by note (bar 1's last gap crosses the bar line, bar 2's
+        // last note has none)
+        let k = item.bars[0]
+        let pairs = (0..<max(0, k - 1)).map { (gaps[$0], gaps[k + $0]) }
+        let barsMatch = pairs.isEmpty ? nil : pairs.allSatisfy { a, b in a > 0 && RhythmMeasure.barsMatchRange.contains(b / a) }
+        return RhythmMeasure(gaps: gaps, halvesLonger: halvesLonger, barsMatch: barsMatch)
+    }
+}
