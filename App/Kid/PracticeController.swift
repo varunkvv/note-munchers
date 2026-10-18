@@ -463,6 +463,11 @@ final class PracticeController {
         session.openWithDrill = drill
     }
 
+    /// Demo: the session opens on a pattern screen of this shape. Before `start`.
+    func demoOpen(pattern: PatternShape) {
+        session.openWithPattern = pattern
+    }
+
     /// Demo: move on from a held success state.
     func demoNext() {
         guard session.phase == .success else { return }

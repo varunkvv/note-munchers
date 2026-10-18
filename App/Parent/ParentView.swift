@@ -10,6 +10,7 @@ struct ParentView: View {
     @State private var trends = Trends(samples: [])
     @State private var sessions: [SessionRecord] = []
     @State private var celebrate = ""
+    @State private var patterns = PatternStats(summaries: [])
 
     @AppStorage(StaffStyle.Key.size) private var staffSize = StaffStyle().size
     @AppStorage(StaffStyle.Key.lineThickness) private var lineThickness = StaffStyle().lineThickness
@@ -35,6 +36,7 @@ struct ParentView: View {
                 progressSection
                 levelSection.id("levels")
                 notesSection
+                patternSection.id("patterns")
                 sessionSection.id("session")
                 staffSection.id("staff")
                 Section("Piano") {
@@ -107,6 +109,8 @@ struct ParentView: View {
         let records = model.store.attempts(since: Date().addingTimeInterval(-60 * 86_400))
         trends = Trends(records: records)
         sessions = model.store.sessions(limit: 30)
+        let decoder = JSONDecoder()
+        patterns = PatternStats(summaries: sessions.compactMap { try? decoder.decode(SessionSummary.self, from: $0.summaryData) })
         celebrate = Celebration.suggest(engine: engine, trends: trends, records: model.store.attempts(), sessions: sessions)
     }
 
@@ -151,6 +155,44 @@ struct ParentView: View {
             Text("Notes")
         } footer: {
             Text("Box 1-5 goes up after a right-first-try answer and down after a miss. Right first try and time are over his last 8 tries. Solid means the next note can unlock. Habit means it's automatic: quick and steady from one note to the next, right first try on two different days. Each level's last lesson waits for it.")
+        }
+    }
+
+    private var patternSection: some View {
+        Section {
+            if patterns.patterns.screens == 0 {
+                Text("No pattern screens yet.").foregroundStyle(.secondary)
+            } else {
+                LabeledContent("Pattern screens", value: "\(patterns.patterns.screens)")
+                LabeledContent("Time a note, bar 1 / bar 2", value: PatternStats.times(patterns.patterns))
+                if let one = patterns.patterns.bar1Rate, let two = patterns.patterns.bar2Rate {
+                    LabeledContent("Right first try, bar 1 / bar 2", value: "\(Self.percent(one)) / \(Self.percent(two))")
+                }
+                ForEach(PatternShape.allCases.filter { patterns.shapes[$0] != nil }, id: \.self) { shape in
+                    let bars = patterns.shapes[shape]!
+                    LabeledContent(PatternStats.name(shape), value: "\(PatternStats.times(bars)), \(bars.screens) screens")
+                        .font(.callout)
+                        .padding(.leading, 12)
+                }
+                if patterns.others.screens > 0 {
+                    LabeledContent("Other two-bar screens", value: "\(PatternStats.times(patterns.others)), \(patterns.others.screens) screens")
+                }
+            }
+            if patterns.measured > 0 || engine.lesson.level == 2 {
+                if patterns.halvesCompared > 0 {
+                    LabeledContent("Halves held longer than quarters", value: "\(patterns.halvesLonger) of \(patterns.halvesCompared) screens")
+                }
+                if patterns.barsCompared > 0 {
+                    LabeledContent("Bar 2 played like bar 1", value: "\(patterns.barsMatch) of \(patterns.barsCompared) screens")
+                }
+                if patterns.measured == 0 {
+                    Text("No level 2 rhythm measured yet.").foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Patterns and rhythm")
+        } footer: {
+            Text("About 1 screen in 4 (1 in 5 from level 3) is a pattern screen: two bars, the second made from the first (the same rhythm with new notes, moved a step, the same with a new last note, the same again). Over his last \(sessions.count) sessions. Bar 1 leaves out the first note, which includes taking in the screen. When bar 2 comes faster than bar 1 he's reading the pattern, not note by note. Rhythm isn't judged in levels 1-2. On level 2 screens whose bars share a rhythm it's measured quietly from his key presses, so you can see whether level 3's \"hold the half\" check will come easy.")
         }
     }
 

@@ -34,6 +34,10 @@ import NoteCore
 ///                          repeatNote, echo, shift, movedTwo, brokenTwo, rhythmMotif, tune), no
 ///                          warm-up. With -demoScript prompt it holds there, hint2 shows the
 ///                          finger on the lit key
+///     -demoPattern <name>  the session opens on a pattern screen of this shape (frame, moved,
+///                          answer, twin, oneNote, newRhythm), no warm-up. -demoScript prompt
+///                          holds there. With -demoProgress YES the made-up history starts in
+///                          -demoLesson / -demoLevel, so the dashboard's pattern section has data
 ///     -demoFirstClef <c>   treble|bass: the clef the session's first run is on (one-clef lessons
 ///                          without a focus clef)
 ///     -demoSeed <n>        fixed seed (screens and the kid's note draw), for repeatable screenshots
@@ -82,6 +86,7 @@ struct DemoOptions {
     var met = false
     var size: Int?
     var drill: Drill?
+    var pattern: PatternShape?
     var firstClef: Clef?
     var seed: UInt64?
     var slow = 1.0
@@ -114,6 +119,7 @@ struct DemoOptions {
         met = defaults.bool(forKey: "demoMet")
         size = defaults.string(forKey: "demoSize").flatMap(Int.init)
         drill = defaults.string(forKey: "demoDrill").flatMap(Drill.init(rawValue:))
+        pattern = defaults.string(forKey: "demoPattern").flatMap(PatternShape.init(rawValue:))
         firstClef = defaults.string(forKey: "demoFirstClef").flatMap(Clef.init(rawValue:))
         seed = defaults.string(forKey: "demoSeed").flatMap { UInt64($0) }
         slow = defaults.string(forKey: "demoSlow").flatMap(Double.init) ?? 1
@@ -164,7 +170,9 @@ final class DemoRunner {
 
         // in-memory store: start fresh. -demoPersist: keep what the real store loaded
         var engine = options.persist ? model.engine : MasteryEngine(state: MasteryState(seed: options.seed ?? 1))
-        if options.progress { engine = DemoHistory.seed(into: model.store) }
+        if options.progress {
+            engine = DemoHistory.seed(into: model.store, lesson: options.lesson ?? options.level.flatMap { engine.curriculum.level($0)?.lessons.first?.id })
+        }
         if let maxItems = options.maxItems { engine.config.sessionMaxItems = maxItems }
         if let level = options.level { engine.moveToLevel(level) }
         if let lesson = options.lesson { engine.moveToLesson(lesson) }
@@ -852,7 +860,7 @@ final class DemoRunner {
             return
         }
         let hint = c.session.keyboardHint.map(\.name).joined(separator: ",")
-        print("demo: \(message) | phase=\(c.phase.rawValue) lesson=\(c.session.engine.lesson.id) size=\(c.session.engine.screenSize) screen=\(c.item?.id ?? "-") drill=\(c.session.drill?.rawValue ?? "-") note=\(c.session.noteIndex) slipped=\(c.session.slippedNote.map(String.init) ?? "-") intro=\(c.session.isIntro) keyboard=[\(hint)] screens=\(c.session.summary.screensPlayed) unlocked=\(c.session.summary.unlocked)")
+        print("demo: \(message) | phase=\(c.phase.rawValue) lesson=\(c.session.engine.lesson.id) size=\(c.session.engine.screenSize) screen=\(c.item?.id ?? "-") drill=\(c.session.drill?.rawValue ?? "-") pattern=\(c.session.pattern?.rawValue ?? "-") note=\(c.session.noteIndex) slipped=\(c.session.slippedNote.map(String.init) ?? "-") intro=\(c.session.isIntro) keyboard=[\(hint)] screens=\(c.session.summary.screensPlayed) unlocked=\(c.session.summary.unlocked)")
     }
 }
 #endif

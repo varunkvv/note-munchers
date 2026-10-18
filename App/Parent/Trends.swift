@@ -145,3 +145,91 @@ enum Celebration {
         return "No practice this week, and that's fine. Nothing in the app shows a missed day."
     }
 }
+
+/// Pattern screens (two bars, bar 2 made from bar 1) and level 2's silent rhythm measure,
+/// from the saved sessions (plans/2026-10-17-reset-and-repetition.md section 2): does bar 2
+/// come faster than bar 1, and does he already hold halves longer than quarters.
+struct PatternStats {
+    /// Times and right-first-try per bar, per note. Bar 1 leaves out the screen's first
+    /// note (its time includes taking in a new screen).
+    struct Bars {
+        var screens = 0
+        var bar1: [Double] = []
+        var bar2: [Double] = []
+        var bar1Right = 0
+        var bar2Right = 0
+
+        var bar1Median: Double? { Trends.median(bar1) }
+        var bar2Median: Double? { Trends.median(bar2) }
+        var bar1Rate: Double? { bar1.isEmpty ? nil : Double(bar1Right) / Double(bar1.count) }
+        var bar2Rate: Double? { bar2.isEmpty ? nil : Double(bar2Right) / Double(bar2.count) }
+
+        mutating func add(_ screen: ScreenResult, split: Int) {
+            screens += 1
+            for note in screen.notes[1..<split] {
+                bar1.append(note.responseTime)
+                bar1Right += note.firstTry ? 1 : 0
+            }
+            for note in screen.notes[split...] {
+                bar2.append(note.responseTime)
+                bar2Right += note.firstTry ? 1 : 0
+            }
+        }
+    }
+
+    var shapes: [PatternShape: Bars] = [:]
+    /// Every pattern screen.
+    var patterns = Bars()
+    /// Other two-bar screens, to compare against: bar 2 there is just more reading.
+    var others = Bars()
+    /// Level 2 screens whose bars share a rhythm, played clean.
+    var measured = 0
+    var halvesCompared = 0
+    var halvesLonger = 0
+    var barsCompared = 0
+    var barsMatch = 0
+
+    init(summaries: [SessionSummary]) {
+        for screen in summaries.flatMap(\.screens) where screen.reason != .again && !screen.wasIntro && !screen.wasLessonIntro {
+            if let measure = screen.rhythmMeasure {
+                measured += 1
+                if let longer = measure.halvesLonger {
+                    halvesCompared += 1
+                    halvesLonger += longer ? 1 : 0
+                }
+                if let match = measure.barsMatch {
+                    barsCompared += 1
+                    barsMatch += match ? 1 : 0
+                }
+            }
+            // rhythm lessons give every note the screen's reading time: no bar to compare
+            guard let split = screen.secondBar, split > 1, split < screen.notes.count,
+                  Curriculum.standard.lesson(screen.lesson)?.texture.isRhythm == false else { continue }
+            if let shape = screen.pattern {
+                shapes[shape, default: Bars()].add(screen, split: split)
+                patterns.add(screen, split: split)
+            } else if [.normal, .stretch].contains(screen.reason) {
+                others.add(screen, split: split)
+            }
+        }
+    }
+
+    /// Parent-facing names.
+    static func name(_ shape: PatternShape) -> String {
+        switch shape {
+        case .frame: "same rhythm, new notes"
+        case .moved: "moved a step"
+        case .answer: "same, new last note"
+        case .twin: "the same again"
+        case .oneNote: "one note a bar"
+        case .newRhythm: "same notes, new rhythm"
+        }
+    }
+
+    /// "1.4 s / 0.9 s"
+    static func times(_ bars: Bars) -> String {
+        let one = bars.bar1Median.map { String(format: "%.1f s", $0) } ?? "-"
+        let two = bars.bar2Median.map { String(format: "%.1f s", $0) } ?? "-"
+        return "\(one) / \(two)"
+    }
+}
