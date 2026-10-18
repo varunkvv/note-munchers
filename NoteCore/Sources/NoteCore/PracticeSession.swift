@@ -973,7 +973,8 @@ public struct PracticeSession: Sendable {
         let screen = ScreenResult(
             screenID: item.id, lesson: lesson.id, reason: pickReason, wasIntro: introNote != nil,
             wasLessonIntro: isLessonIntro, notes: go.notes, rhythm: go.rhythm, size: pickSize,
-            rhythmRetries: retries, wasRhythmDemo: isRhythmDemo, restarts: restarts, pattern: pattern
+            rhythmRetries: retries, wasRhythmDemo: isRhythmDemo, restarts: restarts, pattern: pattern,
+            secondBar: item.bars.count == 2 ? item.notes[item.barRanges[0]].reduce(0) { $0 + $1.keys.count } : nil
         )
         let before = Dictionary(item.keys.map { ($0.id, engine.stats(for: $0).peakFluency) }, uniquingKeysWith: { a, _ in a })
         let update = engine.record(screen)

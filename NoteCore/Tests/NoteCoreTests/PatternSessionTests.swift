@@ -76,8 +76,66 @@ import Testing
         json["pattern"] = "turnedAround"
         #expect(try JSONDecoder().decode(ScreenResult.self, from: JSONSerialization.data(withJSONObject: json)).pattern == nil)
         json["pattern"] = nil
+        json["secondBar"] = nil
         let old = try JSONDecoder().decode(ScreenResult.self, from: JSONSerialization.data(withJSONObject: json))
-        #expect(old.pattern == nil && old.lesson == "1.3")
+        #expect(old.pattern == nil && old.secondBar == nil && old.lesson == "1.3")
+        let split = ScreenResult(screenID: "t", lesson: "1.3", notes: [], secondBar: 2)
+        #expect(try JSONDecoder().decode(ScreenResult.self, from: JSONEncoder().encode(split)).secondBar == 2)
+    }
+
+    /// Plays one pattern screen of `shape` (the session opens on it), all right, and
+    /// returns what was recorded.
+    static func playOne(_ shape: PatternShape, in id: LessonID, seed: UInt64 = 1) -> (item: PracticeItem, screen: ScreenResult, engine: MasteryEngine)? {
+        var bench = Bench(engine(in: id, seed: seed), seed: seed)
+        bench.session.openWithPattern = shape
+        _ = bench.start()
+        guard bench.session.pattern == shape, let item = bench.session.item else { return nil }
+        _ = bench.playScreen(after: 1)
+        return (item, bench.session.summary.screens.last!, bench.session.engine)
+    }
+
+    /// Habit: bar 2 of a twin, an answer or a new rhythm is bar 1 again from memory, so it
+    /// isn't in-line (and isn't one of a paced lesson's plays of a note). A moved bar is
+    /// read by its shape, a frame's notes are new, an answer's last note is read.
+    @Test func barTwoFromMemoryIsntInLine() throws {
+        for seed: UInt64 in 1...6 {
+            for shape in PatternShape.allCases {
+                let id = shape == .oneNote ? "1.3" : "2.1"
+                guard let (item, screen, _) = Self.playOne(shape, in: id, seed: seed) else { continue }
+                let bar2 = item.barRanges[1]
+                #expect(screen.pattern == shape && screen.secondBar == item.bars[0])
+                for (i, note) in screen.notes.enumerated() {
+                    let repeatedKey = i > 0 && item.notes[i].pitches == item.notes[i - 1].pitches
+                    let memory = shape.repeatsNotes && bar2.contains(i) && item.notes[i].pitches == item.notes[i - bar2.lowerBound].pitches
+                    #expect(note.fromMemory == memory, "\(shape) \(item.id) note \(i)")
+                    #expect(note.inLine == (i > 0 && !repeatedKey && !memory), "\(shape) \(item.id) note \(i)")
+                }
+                switch shape {
+                case .twin, .newRhythm: #expect(screen.notes[bar2].allSatisfy { $0.fromMemory })
+                case .answer:
+                    #expect(screen.notes[bar2].dropLast().allSatisfy { $0.fromMemory } && !screen.notes[bar2.upperBound - 1].fromMemory)
+                case .moved, .frame, .oneNote: #expect(!screen.notes.contains { $0.fromMemory })
+                }
+            }
+        }
+    }
+
+    /// A paced lesson's 10 plays of a new note count reads: a twin's bar 2 isn't one.
+    @Test func memoryIsntAPlay() throws {
+        let (item, _, engine) = try #require(Self.playOne(.twin, in: "1.3", seed: 2))
+        for key in Set(item.notes.flatMap(\.keys)) {
+            let inBarOne = item.notes[item.barRanges[0]].filter { $0.keys.contains(key) }.count
+            #expect(engine.lessonPlays(key) == inBarOne, "\(key.id) in \(item.id)")
+        }
+    }
+
+    /// Two at once: bar 2 starts after both keys of every column of bar 1.
+    @Test func secondBarCountsKeys() throws {
+        for seed: UInt64 in 1...8 {
+            guard let (item, screen, _) = Self.playOne(.moved, in: "4.3", seed: seed) else { continue }
+            #expect(screen.secondBar == item.notes[item.barRanges[0]].flatMap(\.keys).count)
+            #expect(screen.notes.count == item.notes.flatMap(\.keys).count)
+        }
     }
 
     /// The new note's blocked screens right after its intro lean on pattern screens.

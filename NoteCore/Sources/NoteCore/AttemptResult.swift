@@ -110,11 +110,15 @@ public struct ScreenResult: Hashable, Codable, Sendable {
     public var restarts: Int
     /// A pattern screen's shape (two bars, bar 2 made from bar 1), nil otherwise.
     public var pattern: PatternShape?
+    /// On a two-bar screen, where bar 2 starts in `notes` (a two at once is two of them),
+    /// so bar 1 and bar 2 can be compared later (does bar 2 come faster). nil on one bar.
+    public var secondBar: Int?
 
     public init(
         screenID: ItemID, lesson: LessonID, reason: PickReason = .normal, wasIntro: Bool = false,
         wasLessonIntro: Bool = false, notes: [AttemptResult], rhythm: RhythmResult? = nil, size: Int? = nil,
-        rhythmRetries: Int = 0, wasRhythmDemo: Bool = false, restarts: Int = 0, pattern: PatternShape? = nil
+        rhythmRetries: Int = 0, wasRhythmDemo: Bool = false, restarts: Int = 0, pattern: PatternShape? = nil,
+        secondBar: Int? = nil
     ) {
         self.screenID = screenID
         self.lesson = lesson
@@ -128,6 +132,7 @@ public struct ScreenResult: Hashable, Codable, Sendable {
         self.wasRhythmDemo = wasRhythmDemo
         self.restarts = restarts
         self.pattern = pattern
+        self.secondBar = secondBar
     }
 
     /// Every note right first try.
@@ -171,5 +176,6 @@ extension ScreenResult {
         restarts = try c.value(.restarts, or: 0)
         // a shape a later build drops reads as no pattern
         pattern = try? c.decodeIfPresent(PatternShape.self, forKey: .pattern)
+        secondBar = try c.decodeIfPresent(Int.self, forKey: .secondBar)
     }
 }

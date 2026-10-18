@@ -33,6 +33,10 @@ import Testing
         /// The same, on a clef's 3 screens right after a new note's intro there.
         var introWindowScreens = 0
         var introWindowPatterns = 0
+        /// Notes he read on every screen but intros, and how many of them were bar 2 of a
+        /// pattern screen played from memory.
+        var notes = 0
+        var fromMemory = 0
     }
 
     static func run(_ kid: Kid, seed: UInt64, maxSessions: Int = 160) -> (levels: [Int: LevelLog], twiceRunning: Int, sessions: Int, shapeTwice: Int) {
@@ -92,6 +96,10 @@ import Testing
                             lastShape = shape
                         }
                     }
+                }
+                if !s.isIntro, s.retries == 0, s.restarts == 0, let item = s.item {
+                    log.notes += item.notes.count
+                    log.fromMemory += s.recalledNotes.count
                 }
                 if !s.isIntro, s.retries == 0 {
                     screens += 1
@@ -158,7 +166,8 @@ import Testing
             lines.append("    patterns: \(mix)" + (level >= 4 ? "; level 3 notes on drill screens: \(log.levelThreeNotes)" : ""))
             let shapes = log.shapes.sorted { $0.value > $1.value }.map { "\($0.key.rawValue) \($0.value)" }.joined(separator: ", ")
             lines.append("    pattern screens \(percent(log.patternScreens, log.normalScreens)) of \(log.normalScreens) normal screens, "
-                + "\(percent(log.introWindowPatterns, log.introWindowScreens)) of \(log.introWindowScreens) right after an intro; shapes: \(shapes)")
+                + "\(percent(log.introWindowPatterns, log.introWindowScreens)) of \(log.introWindowScreens) right after an intro; shapes: \(shapes); "
+                + "fresh notes \(percent(log.notes - log.fromMemory, log.notes)) of \(log.notes)")
             if !log.missing.isEmpty { lines.append("    not habit at the end (plays mid-screen/first try, median, cv, clean days): \(log.missing.joined(separator: "; "))") }
         }
         return lines.joined(separator: "\n")
@@ -208,6 +217,11 @@ import Testing
             let outsideShare = Double(outside.patterns) / Double(max(1, outside.screens))
             #expect(windowShare > outsideShare + 0.05, "right after an intro \(windowShare), else \(outsideShare)")
             #expect(shapes == Set(PatternShape.allCases), "\(shapes)")
+            // bar 1 is always fresh: notes played from memory stay a small part of his reading
+            for (level, log) in result.levels {
+                let fresh = Double(log.notes - log.fromMemory) / Double(max(1, log.notes))
+                #expect(fresh > 0.9, "level \(level): \(fresh) of notes fresh")
+            }
 
         }
     }
