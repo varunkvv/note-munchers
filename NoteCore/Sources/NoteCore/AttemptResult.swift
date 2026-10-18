@@ -100,11 +100,14 @@ public struct ScreenResult: Hashable, Codable, Sendable {
     public var rhythmRetries: Int
     /// One of a level's first rhythm screens, played to him before he read it.
     public var wasRhythmDemo: Bool
+    /// Times the screen went back to its first note after a slip (at most
+    /// `sequenceRestarts`). Each note's result is from the first go that reached it.
+    public var restarts: Int
 
     public init(
         screenID: ItemID, lesson: LessonID, reason: PickReason = .normal, wasIntro: Bool = false,
         wasLessonIntro: Bool = false, notes: [AttemptResult], rhythm: RhythmResult? = nil, size: Int? = nil,
-        rhythmRetries: Int = 0, wasRhythmDemo: Bool = false
+        rhythmRetries: Int = 0, wasRhythmDemo: Bool = false, restarts: Int = 0
     ) {
         self.screenID = screenID
         self.lesson = lesson
@@ -116,6 +119,7 @@ public struct ScreenResult: Hashable, Codable, Sendable {
         self.size = size ?? notes.count
         self.rhythmRetries = rhythmRetries
         self.wasRhythmDemo = wasRhythmDemo
+        self.restarts = restarts
     }
 
     /// Every note right first try.
@@ -155,5 +159,6 @@ extension ScreenResult {
         size = try c.value(.size, or: notes.count)
         rhythmRetries = try c.value(.rhythmRetries, or: 0)
         wasRhythmDemo = try c.value(.wasRhythmDemo, or: false)
+        restarts = try c.value(.restarts, or: 0)
     }
 }

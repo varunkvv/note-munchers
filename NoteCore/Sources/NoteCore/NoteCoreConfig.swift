@@ -164,6 +164,17 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// When time or the screen count is up, the session ends after his next screen
     /// that was all right first try. At most this many extra (easy) screens.
     public var maxExtraItems = 3
+    /// A screen of 2+ notes counts only when he plays it all right in one go (varun,
+    /// 2026-10-17). After a slip past its first note, the screen goes back to its first
+    /// note once he pauses: no key down for this many seconds and nothing held...
+    public var restartPause: Double = 1.2
+    /// ...a key held this long after it went down stops holding the reset back (a lost
+    /// key-up, or a hand resting on a key), so it always comes.
+    public var restartHoldLimit: Double = 4
+    /// Starts over a screen can have (so at most this many + 1 goes). After that a slip
+    /// works note by note again: he stays on the note with the hint ladder and finishes
+    /// from there, so a screen can always be finished. 0 = note by note from the start.
+    public var sequenceRestarts = 2
     /// No key for this many seconds counts as one step up the hint ladder (stuck).
     /// Only climbs to the keyboard picture, never repeats on a clock after that.
     public var stuckAfter: Double = 15
@@ -232,6 +243,9 @@ extension NoteCoreConfig {
         blockedScreens = try c.value(.blockedScreens, or: d.blockedScreens)
         blockedShare = try c.value(.blockedShare, or: d.blockedShare)
         maxExtraItems = try c.value(.maxExtraItems, or: d.maxExtraItems)
+        restartPause = try c.value(.restartPause, or: d.restartPause)
+        restartHoldLimit = try c.value(.restartHoldLimit, or: d.restartHoldLimit)
+        sequenceRestarts = try c.value(.sequenceRestarts, or: d.sequenceRestarts)
         stuckAfter = try c.value(.stuckAfter, or: d.stuckAfter)
         demoBeat = try c.value(.demoBeat, or: d.demoBeat)
     }

@@ -173,7 +173,9 @@ import Testing
     }
 
     @Test func dyadHintLooksAtBothKeys() {
-        var bench = Bench(ready("4.1"), seed: 4)
+        var engine = ready("4.1")
+        engine.config.sequenceRestarts = 0 // the ladder note by note
+        var bench = Bench(engine, seed: 4)
         _ = bench.start()
         // playNote, not playCurrent: a rhythm-judged screen waits for the last key-up
         while bench.session.isAwaitingRelease || !bench.expected.indices.contains(1) {

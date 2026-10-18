@@ -54,10 +54,23 @@ extension MasteryEngine {
     }
 }
 
+extension NoteCoreConfig {
+    /// Every slip works note by note (no start over), as before 2026-10-17: for tests of
+    /// the hint ladder itself, which a screen still uses once its start overs are used up.
+    static var noteByNote: NoteCoreConfig {
+        var config = NoteCoreConfig()
+        config.sequenceRestarts = 0
+        return config
+    }
+}
+
 /// Drives a session with a moving clock.
 struct Bench {
     var session: PracticeSession
     var now = 0.0
+    /// Keys pressed and not let go yet. `playCurrent` lets go of them first, like a hand
+    /// moving to the next key.
+    var held: [Pitch] = []
 
     init(_ engine: MasteryEngine, seed: UInt64 = 1, connected: Bool = true) {
         session = PracticeSession(engine: engine, seed: seed, pianoConnected: connected)
@@ -72,19 +85,44 @@ struct Bench {
 
     mutating func press(_ pitch: Pitch, after dt: Double = 0.5) -> [Cue] {
         now += dt
+        held.append(pitch)
         return session.handle(.on(pitch, at: now))
     }
 
     mutating func release(_ pitch: Pitch, after dt: Double = 0) -> [Cue] {
         now += dt
+        held.removeAll { $0 == pitch }
         return session.handle(.off(pitch, at: now))
     }
 
-    /// Presses every key of the current note at once (well, 10ms apart).
-    mutating func playCurrent(after dt: Double = 0.5) -> [Cue] {
+    /// Lets go of every key still down.
+    mutating func releaseAll(after dt: Double = 0) -> [Cue] {
+        now += dt
         var cues: [Cue] = []
+        for pitch in held { cues += release(pitch) }
+        return cues
+    }
+
+    /// After a slip past the first note: he lets go, waits for the screen to start over
+    /// (`restartPause`), and is back on its first note.
+    mutating func startOver() -> [Cue] {
+        var cues = releaseAll()
+        if session.slippedNote != nil, let deadline = session.nextDeadline {
+            cues += tick(at: max(now, deadline))
+        }
+        return cues
+    }
+
+    /// Presses every key of the current note at once (well, 10ms apart), after letting
+    /// go of the keys still down. After a slip past the first note he waits for the
+    /// screen to start over first, then plays its first note.
+    mutating func playCurrent(after dt: Double = 0.5) -> [Cue] {
+        now += dt
+        var cues = releaseAll()
+        if session.slippedNote != nil { cues += startOver() }
+        guard session.phase.isPlaying else { return cues }
         for (i, pitch) in expected.enumerated() {
-            cues += press(pitch, after: i == 0 ? dt : 0.01)
+            cues += press(pitch, after: i == 0 ? 0 : 0.01)
         }
         return cues
     }

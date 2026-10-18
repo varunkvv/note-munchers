@@ -63,7 +63,8 @@ import Testing
                     // fewer can only be habit (read before the last screen, so not `drillLessonReady`)
                     endedOnHabit = s.engine.state.lessonDays.count < s.engine.config.drillLessonMaxDays
                 }
-                if !s.isIntro {
+                // a rhythm retry is the same screen again, not a new one
+                if !s.isIntro, s.retries == 0 {
                     screens += 1
                     let drillLesson = s.engine.lesson.isDrillLesson
                     if !drillLesson {

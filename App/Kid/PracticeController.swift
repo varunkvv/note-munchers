@@ -190,6 +190,9 @@ final class PracticeController {
             soundDelay = 1.0
         } else if phrase, cues.contains(.showItem) {
             soundDelay = 0.6
+        } else if cues.contains(where: { if case .correct = $0 { true } else { false } }) {
+            // a note he slipped on twice: its pitch once he's back on it, after his own key
+            soundDelay = 0.45
         }
         for cue in cues {
             switch cue {
@@ -245,6 +248,9 @@ final class PracticeController {
                 }
             case .again:
                 // the same screen from its first note (a rhythm retry): every note fresh
+                effects.clear()
+            case .startOver:
+                // he slipped and paused: back to the first note, drawn fresh from state
                 effects.clear()
             case .unlocked:
                 break // each new note hatches when its intro comes up

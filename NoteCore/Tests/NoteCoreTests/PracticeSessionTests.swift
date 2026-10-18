@@ -16,8 +16,10 @@ import Testing
         #expect(bench.next().isEmpty, "next does nothing until he plays")
     }
 
+    /// Note by note (what a slip past the first note does once the screen's start overs
+    /// are used up, SequenceTests).
     @Test func hintLadderIsPerNote() {
-        var bench = twoNoteBench()
+        var bench = twoNoteBench(config: .noteByNote)
         _ = bench.start()
         let first = bench.expected
         #expect(bench.press(bench.wrongKey) == [.wobble(note: 0)])
@@ -120,7 +122,7 @@ import Testing
     }
 
     @Test func pianoDropsMidScreenAndPicksUpWhereItWas() {
-        var bench = twoNoteBench()
+        var bench = twoNoteBench(config: .noteByNote)
         _ = bench.start()
         _ = bench.playCurrent()
         _ = bench.press(bench.wrongKey)
@@ -208,7 +210,9 @@ import Testing
     }
 
     @Test func threeMissedNotesInFiveBringTwoStrongScreens() {
-        var engine = engine(in: "1.4")
+        // note by note, so every wrong key below is a missed note (with start overs a slip
+        // on a note he has already missed doesn't miss it again)
+        var engine = engine(in: "1.4", config: .noteByNote)
         for k in engine.pool { for _ in 0..<2 { engine.play(k, time: 1) } }
         var bench = Bench(engine, seed: 6)
         _ = bench.start()

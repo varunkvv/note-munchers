@@ -120,6 +120,11 @@ public enum Cue: Hashable, Sendable {
     case showAndPlay(beat: Double)
     /// The same screen again from its first note: a rhythm retry. Draw every note fresh.
     case again
+    /// He slipped past the first note and then paused: the screen goes back to its first
+    /// note for another go (a screen counts when it's all played right in one go). The
+    /// `played` notes he had played this go fade back onto the staff, the first note glows
+    /// lightly. Silent. Draw from state (`noteIndex` is 0 again).
+    case startOver(played: Int)
     /// New notes unlocked. Each gets an intro (and a new muncher) when it comes up.
     case unlocked([ItemID])
     /// Show the "turn on the piano" screen.
@@ -182,8 +187,19 @@ public struct SessionSummary: Hashable, Codable, Sendable {
 /// (it closes chord windows, steps up the hint ladder when he's stuck, and stops
 /// waiting for the last key-up of a rhythm line).
 ///
-/// Each note on a screen is judged on its own: its own hint ladder, its own first try,
-/// its own response time from when it became the next note.
+/// A screen of 2+ notes counts when he plays it all right in one go (varun, 2026-10-17:
+/// "he has to play the whole sequence correctly ... gently start over"). A slip on the
+/// first note works note by note: wobble, he tries again. A slip past it (a wrong key,
+/// the wrong octave, a wrong two at once) wobbles softly and nothing else: keys after it
+/// don't count, and once he pauses (`restartPause`, nothing held) the screen goes back to
+/// its first note (`.startOver`). At most `sequenceRestarts` times, then a slip works note
+/// by note again, so a screen can always be finished. Not on intros (guided) or a rhythm
+/// retry (already counted).
+///
+/// Each note keeps its own hint ladder across goes (a slip is a rung: the wobble, then
+/// its pitch when he gets back to it, then the keyboard picture when he gets back to it),
+/// and its result is from the first go that reached it: first try, wrong keys, stuck
+/// steps, its response time from when it became the next note until he played it right.
 ///
 /// Shape of a session (learning principles in the plan):
 /// - opens with one screen of his strongest notes, a run (start with success). Nothing is said
@@ -223,6 +239,11 @@ public struct PracticeSession: Sendable {
     public private(set) var rhythmLine: RhythmLine?
     /// Rhythm retries used on this screen.
     public private(set) var retries = 0
+    /// He slipped on this note (past the first): keys don't count until he pauses, then
+    /// the screen starts over (at `nextDeadline`, call `tick`). nil the rest of the time.
+    public private(set) var slippedNote: Int?
+    /// Times this screen started over after a slip.
+    public private(set) var restarts = 0
     /// The drill on this screen (a burst, a drill lesson, the warm-up's run), nil otherwise.
     public private(set) var drill: Drill?
     /// The hand position each note of this screen is played in (finger numbers).
@@ -281,8 +302,20 @@ public struct PracticeSession: Sendable {
     private var hints: [HintLevel] = []
     /// Notes he hadn't played yet when he tapped play: he heard and saw them first.
     private var listened: [Bool] = []
-    /// Steps up the hint ladder on the current note (wrong keys and stuck steps).
-    private var ladder = 0
+    /// Steps up the hint ladder per note (wrong keys, stuck steps, slips). Kept across goes.
+    private var rungs: [Int] = []
+    /// Notes he has played right (in any go). Their result doesn't change after that.
+    private var playedRight: [Bool] = []
+    /// A slip took the note to the ladder's second rung: its pitch plays when he gets back to it.
+    private var soundOnReach: [Bool] = []
+    /// A slip on the wrong octave or the natural next to a sharp: the keyboard picture
+    /// lights the key when he gets back to it (as it does straight away note by note).
+    private var pictureOnReach: [Bool] = []
+    /// Keys down now and when they went down (active time), for the pause after a slip.
+    private var held: [Pitch: Double] = [:]
+    private var lastKeyDown = 0.0
+    /// Steps up the hint ladder on the current note.
+    private var ladder: Int { rungs.indices.contains(noteIndex) ? rungs[noteIndex] : 0 }
     private var onsets: [Double] = []
     private var rhythmJudgeable = true
     private var awaitingRelease = false
@@ -313,9 +346,11 @@ public struct PracticeSession: Sendable {
 
     /// When the app should call `tick(at:)` next, on the app clock. nil when nothing is pending.
     public var nextDeadline: Double? {
-        guard phase.isPlaying, let item else { return nil }
+        guard phase.isPlaying, item != nil else { return nil }
         var deadlines: [Double] = []
-        if awaitingRelease, let line = rhythmLine {
+        if slippedNote != nil {
+            deadlines.append(restartTime)
+        } else if awaitingRelease, let line = rhythmLine {
             deadlines.append(RhythmJudge(config: config).settleTime(line, onsets: onsets))
         } else {
             if let window = judge?.windowDeadline {
@@ -345,16 +380,35 @@ public struct PracticeSession: Sendable {
     }
 
     public mutating func handle(_ event: NoteEvent) -> [Cue] {
-        guard phase.isPlaying, let item else { return [] }
         let t = activeTime(at: event.time)
+        // the pause after a slip had already come (a late tick) before this key went down
+        let pauseWasOver = slippedNote != nil && t >= restartTime
+        switch event.kind {
+        case .on: held[event.pitch] = t
+        case .off: held[event.pitch] = nil
+        }
+        guard phase.isPlaying, let item else { return [] }
         var cues: [Cue] = []
         switch event.kind {
         case .off:
-            if awaitingRelease, item.notes[item.notes.count - 1].pitches.contains(event.pitch) {
+            if slippedNote != nil {
+                // he let go: the screen starts over if he has paused long enough
+                if t >= restartTime { cues += startOver(at: t) }
+            } else if awaitingRelease, item.notes[item.notes.count - 1].pitches.contains(event.pitch) {
                 cues += finishRhythm(release: t)
             }
         case .on:
-            guard !awaitingRelease, var judge else { return [] }
+            if slippedNote != nil {
+                guard pauseWasOver else {
+                    // after a slip keys don't count (no wobble), they only put the pause off
+                    lastKeyDown = t
+                    lastActivity = t
+                    return []
+                }
+                // start over, then this key is his first note
+                cues += startOver(at: t)
+            }
+            guard !awaitingRelease, var judge else { return cues }
             lastActivity = t // any key down means he's not stuck
             let verdict = judge.noteOn(event.pitch, at: t)
             self.judge = judge
@@ -367,8 +421,12 @@ public struct PracticeSession: Sendable {
 
     /// Call at `nextDeadline`. Safe to call any time.
     public mutating func tick(at time: Double) -> [Cue] {
-        guard phase.isPlaying, let item else { return [] }
+        guard phase.isPlaying, item != nil else { return [] }
         let t = activeTime(at: time)
+        if slippedNote != nil {
+            // he slipped and has paused: back to the first note. no stuck steps meanwhile
+            return t >= restartTime ? startOver(at: t) : []
+        }
         if awaitingRelease, let line = rhythmLine {
             if t >= RhythmJudge(config: config).settleTime(line, onsets: onsets) {
                 return finishRhythm(release: t)
@@ -381,8 +439,9 @@ public struct PracticeSession: Sendable {
             cues += apply(verdict, at: t)
         }
         if phase.isPlaying, !awaitingRelease, ladder < 3, t >= lastActivity + config.stuckAfter {
-            // stuck: one step up the ladder, same as a wrong try but not a wrong press
-            stucks[noteIndex] += 1
+            // stuck: one step up the ladder, same as a wrong try but not a wrong press. never
+            // a start over
+            if !playedRight[noteIndex] { stucks[noteIndex] += 1 }
             lastActivity = t
             cues += climbLadder()
         }
@@ -437,16 +496,21 @@ public struct PracticeSession: Sendable {
     public mutating func listen(at time: Double) -> [Cue] {
         guard phase.isPlaying, let item, !awaitingRelease else { return [] }
         let t = activeTime(at: time)
-        for i in noteIndex..<item.notes.count {
+        var cues: [Cue] = []
+        if slippedNote != nil {
+            // after a slip: he hears all of it, then plays it from its first note
+            cues += startOver(at: t)
+        }
+        for i in noteIndex..<item.notes.count where !playedRight[i] {
             listened[i] = true
             hints[i] = .keyboard
         }
         if !onsets.isEmpty { rhythmJudgeable = false }
         let beat = config.demoBeat
         let over = t + item.totalBeats * beat
-        startTimes[noteIndex] = over
+        if !playedRight[noteIndex] { startTimes[noteIndex] = over }
         lastActivity = over
-        return [.showAndPlay(beat: beat)]
+        return cues + [.showAndPlay(beat: beat)]
     }
 
     /// The play back after a wrong value is over: he plays the screen again from its
@@ -472,6 +536,7 @@ public struct PracticeSession: Sendable {
         resumePhase = phase
         phase = .paused
         judge?.reset()
+        held = [:] // their key-ups won't come
         rhythmJudgeable = false // the timing of this line isn't his any more
         return [.paused]
     }
@@ -548,6 +613,8 @@ public struct PracticeSession: Sendable {
         let lesson = engine.lesson
         rhythmLine = pick.intro == nil ? next.rhythmLine(lesson.texture.isRhythm ? .all : lesson.rhythmCheck) : nil
         retries = 0
+        restarts = 0
+        slippedNote = nil
         firstGo = nil
         isRhythmDemo = false
         pickSize = pick.size
@@ -563,7 +630,10 @@ public struct PracticeSession: Sendable {
         almosts = Array(repeating: 0, count: columns)
         hints = Array(repeating: .none, count: columns)
         listened = Array(repeating: false, count: columns)
-        ladder = 0
+        rungs = Array(repeating: 0, count: columns)
+        playedRight = Array(repeating: false, count: columns)
+        soundOnReach = Array(repeating: false, count: columns)
+        pictureOnReach = Array(repeating: false, count: columns)
         onsets = []
         rhythmJudgeable = true
         awaitingRelease = false
@@ -666,7 +736,9 @@ public struct PracticeSession: Sendable {
         guard let item else { return }
         noteIndex = 0
         onsets = []
-        ladder = 0
+        rungs = rungs.map { _ in 0 }
+        soundOnReach = soundOnReach.map { _ in false }
+        pictureOnReach = pictureOnReach.map { _ in false }
         rhythmJudgeable = true
         awaitingRelease = false
         keyboardHint = []
@@ -674,23 +746,108 @@ public struct PracticeSession: Sendable {
         judge?.expect(item.notes[0].pitches)
     }
 
+    /// When the screen starts over after a slip, in active time: `restartPause` after his
+    /// last key down, once nothing is held (a key holds it back for at most
+    /// `restartHoldLimit` after it went down, so it always comes).
+    private var restartTime: Double {
+        let pause = lastKeyDown + config.restartPause
+        guard let latest = held.values.max() else { return pause }
+        return max(pause, latest + config.restartHoldLimit)
+    }
+
+    /// A slip here starts the screen over: past its first note, not an intro (the picture
+    /// is up, it's guided), not a rhythm retry (the notes already counted), and a start
+    /// over left.
+    private var canStartOver: Bool {
+        noteIndex > 0 && !isIntro && retries == 0 && restarts < config.sequenceRestarts
+    }
+
+    /// A slip past the first note: that note wobbles softly and nothing else happens yet.
+    /// It's a miss (an almost isn't), and a rung of that note's ladder, shown when he gets
+    /// back to it. The screen starts over once he pauses.
+    private mutating func slip(at t: Double, almost: Bool = false, sharpNatural: Bool = false) -> [Cue] {
+        let i = noteIndex
+        if !playedRight[i] {
+            if almost { almosts[i] += 1 } else { wrongs[i] += 1 }
+        }
+        if !almost {
+            rungs[i] += 1
+            if !playedRight[i] { hints[i] = max(hints[i], Self.hint(rung: rungs[i])) }
+            if rungs[i] == 2 { soundOnReach[i] = true }
+            phase = Self.phase(rung: rungs[i])
+        }
+        if almost || sharpNatural { pictureOnReach[i] = true }
+        slippedNote = i
+        lastKeyDown = t
+        lastActivity = t
+        rhythmJudgeable = false
+        return [.wobble(note: i)]
+    }
+
+    /// He slipped and paused: back to the first note for another go. Silent: the app fades
+    /// the played notes back and lights the first one softly.
+    private mutating func startOver(at t: Double) -> [Cue] {
+        guard let slipped = slippedNote else { return [] }
+        slippedNote = nil
+        restarts += 1
+        noteIndex = 0
+        onsets = []
+        rhythmJudgeable = true
+        awaitingRelease = false
+        lastActivity = t
+        judge?.reset()
+        return [.startOver(played: slipped)] + reach(at: t)
+    }
+
+    /// He's on `noteIndex` now: a note he hasn't played right yet starts its clock, and a
+    /// note the ladder climbed on in an earlier go shows its help again (its pitch once,
+    /// the keyboard picture every time).
+    private mutating func reach(at t: Double) -> [Cue] {
+        guard let item else { return [] }
+        let i = noteIndex
+        let pitches = item.notes[i].pitches
+        if !playedRight[i] { startTimes[i] = t }
+        phase = Self.phase(rung: rungs[i])
+        judge?.expect(pitches)
+        keyboardHint = isIntro || rungs[i] >= 3 || pictureOnReach[i] ? pitches : []
+        guard soundOnReach[i] else { return [] }
+        soundOnReach[i] = false
+        return [.playPitches(pitches)]
+    }
+
+    private static func phase(rung: Int) -> SessionPhase {
+        switch rung {
+        case 0: .prompt
+        case 1: .waiting
+        case 2: .hint1
+        default: .hint2
+        }
+    }
+
+    private static func hint(rung: Int) -> HintLevel {
+        switch rung {
+        case 0: .none
+        case 1: .wobble
+        case 2: .playedPitch
+        default: .keyboard
+        }
+    }
+
     private mutating func apply(_ verdict: PitchVerdict, at t: Double) -> [Cue] {
         guard let item else { return [] }
         let expected = item.notes[noteIndex].pitches
         switch verdict {
         case .correct:
-            let cues: [Cue] = [.correct(note: noteIndex)]
+            var cues: [Cue] = [.correct(note: noteIndex)]
             onsets.append(t)
             lastActivity = t
-            correctTimes[noteIndex] = t
+            if !playedRight[noteIndex] {
+                playedRight[noteIndex] = true
+                correctTimes[noteIndex] = t
+            }
             if noteIndex < item.notes.count - 1 {
                 noteIndex += 1
-                startTimes[noteIndex] = t
-                ladder = 0
-                phase = .prompt
-                let nextPitches = item.notes[noteIndex].pitches
-                judge?.expect(nextPitches)
-                keyboardHint = isIntro ? nextPitches : []
+                cues += reach(at: t)
                 return cues
             }
             if let line = rhythmLine, rhythmJudgeable {
@@ -703,16 +860,20 @@ public struct PracticeSession: Sendable {
             return cues + finish(at: t, rhythm: nil)
 
         case .almost:
+            if canStartOver { return slip(at: t, almost: true) }
             // right letter, wrong octave: the keyboard picture shows where. no words
-            almosts[noteIndex] += 1
+            if !playedRight[noteIndex] { almosts[noteIndex] += 1 }
             keyboardHint = expected
             return []
 
         case .wrong(let played):
-            wrongs[noteIndex] += 1
-            // the natural next to a sharp (F on an F# note): show the black key straight away
-            if expected.count == 1, played.count == 1, !expected[0].isWhiteKey,
-               played[0].midi == expected[0].midi - 1 {
+            // the natural next to a sharp (F on an F# note)
+            let sharpNatural = expected.count == 1 && played.count == 1 && !expected[0].isWhiteKey
+                && played[0].midi == expected[0].midi - 1
+            if canStartOver { return slip(at: t, sharpNatural: sharpNatural) }
+            if !playedRight[noteIndex] { wrongs[noteIndex] += 1 }
+            // the natural next to a sharp: show the black key straight away
+            if sharpNatural {
                 let cues = climbLadder()
                 keyboardHint = expected
                 return cues
@@ -726,20 +887,18 @@ public struct PracticeSession: Sendable {
     private mutating func climbLadder() -> [Cue] {
         guard let item else { return [] }
         let expected = item.notes[noteIndex].pitches
-        ladder += 1
+        rungs[noteIndex] += 1
+        let rung = rungs[noteIndex]
         rhythmJudgeable = false
         var cues: [Cue] = [.wobble(note: noteIndex)]
-        switch ladder {
+        phase = Self.phase(rung: rung)
+        if !playedRight[noteIndex] { hints[noteIndex] = max(hints[noteIndex], Self.hint(rung: rung)) }
+        switch rung {
         case 1:
-            phase = .waiting
-            hints[noteIndex] = max(hints[noteIndex], .wobble)
+            break
         case 2:
-            phase = .hint1
-            hints[noteIndex] = max(hints[noteIndex], .playedPitch)
             cues.append(.playPitches(expected))
         default:
-            phase = .hint2
-            hints[noteIndex] = .keyboard
             if keyboardHint == expected {
                 cues.append(.playPitches(expected)) // picture already up: the sound again
             }
@@ -792,7 +951,7 @@ public struct PracticeSession: Sendable {
         let screen = ScreenResult(
             screenID: item.id, lesson: lesson.id, reason: pickReason, wasIntro: introNote != nil,
             wasLessonIntro: isLessonIntro, notes: go.notes, rhythm: go.rhythm, size: pickSize,
-            rhythmRetries: retries, wasRhythmDemo: isRhythmDemo
+            rhythmRetries: retries, wasRhythmDemo: isRhythmDemo, restarts: restarts
         )
         let before = Dictionary(item.keys.map { ($0.id, engine.stats(for: $0).peakFluency) }, uniquingKeysWith: { a, _ in a })
         let update = engine.record(screen)

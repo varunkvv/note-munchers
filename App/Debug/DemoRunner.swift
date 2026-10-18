@@ -557,9 +557,11 @@ final class DemoRunner {
         log("intros done", c)
     }
 
-    /// The right key(s) for the note he's on.
+    /// The right key(s) for the note he's on. After a slip past the first note he waits
+    /// for the screen to start over (his pause), then plays from the first note.
     private func right(_ c: PracticeController) async {
         await waitUntil(seconds: 30) { !c.isHatching }
+        await waitUntil(seconds: 10) { c.session.slippedNote == nil }
         guard let item = c.item, c.phase.isPlaying else { return }
         let pitches = item.notes[c.session.noteIndex].pitches
         let label = "\(item.id)\(c.session.isIntro ? " (intro)" : "")"
