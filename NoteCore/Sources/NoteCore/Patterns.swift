@@ -60,7 +60,8 @@ extension MasteryEngine {
 
     /// The shapes this lesson's pattern screens use and how often: the most (1), often
     /// (0.7), now and then (0.45), rarely (0.15). `introWindow`: right after a new note's
-    /// intro, where a twin brings the new note back exactly and level 1 gets one note a bar.
+    /// intro, where a twin brings the new note back exactly (more of them) and level 1 gets
+    /// one note a bar.
     func patternShapes(introWindow: Bool) -> [(shape: PatternShape, weight: Double)] {
         // one key all through (5.1, 5.2): only the rhythm can repeat or change
         if case .rhythm(_, true) = lesson.texture { return [(.frame, 1), (.newRhythm, 0.4)] }
@@ -68,7 +69,9 @@ extension MasteryEngine {
         var shapes: [(shape: PatternShape, weight: Double)] = [(.frame, 1)]
         if level <= 4 { shapes.append((.moved, 1)) }
         if level >= 2 { shapes.append((.answer, 0.7)) }
-        shapes.append((.twin, introWindow ? 1 : level == 1 ? 0.45 : 0.15))
+        // right after an intro a twin brings the new note back exactly: the most in level 1,
+        // now and then after (it's "sparingly" there, and level 3 has many intros)
+        shapes.append((.twin, level == 1 ? (introWindow ? 1 : 0.45) : introWindow ? 0.45 : 0.15))
         if level == 1, introWindow { shapes.append((.oneNote, 0.6)) }
         shapes.append((.newRhythm, level <= 2 ? 0.15 : 0.4))
         return shapes
