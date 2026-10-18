@@ -249,9 +249,17 @@ final class PracticeController {
             case .again:
                 // the same screen from its first note (a rhythm retry): every note fresh
                 effects.clear()
-            case .startOver:
-                // he slipped and paused: back to the first note, drawn fresh from state
+            case .startOver(let played):
+                // he slipped and paused: the notes he had played ease back onto the staff
+                // and the first one lights up softly. No sound, no words
                 effects.clear()
+                for column in 0..<played {
+                    effects.add(.fadeBack, column: column, duration: Self.fadeBackLength)
+                }
+                // the play button after a slip plays it all with its own highlight instead
+                if !phrase {
+                    effects.add(.startHere, column: 0, duration: Self.startHereLength)
+                }
             case .unlocked:
                 break // each new note hatches when its intro comes up
             case .paused, .resumed:
@@ -279,6 +287,11 @@ final class PracticeController {
         }
         scheduleTick()
     }
+
+    /// A start over: played notes go from grey back to ink in this long...
+    static let fadeBackLength = 0.4
+    /// ...and the first note's soft light comes up as they finish, and fades in this long.
+    static let startHereLength = 2.0
 
     /// How long the rhythm glow lasts: that note's written length at his own beat.
     private func glowLength(_ note: Int) -> Double {
@@ -465,6 +478,8 @@ final class PracticeController {
             gobbleCount += 1
         case .glow: effects.add(.glow, column: column, duration: glowLength(column))
         case .follow, .followRest: effects.add(kind, column: column, duration: 1)
+        case .fadeBack: effects.add(.fadeBack, column: column, duration: Self.fadeBackLength)
+        case .startHere: effects.add(.startHere, column: column, duration: Self.startHereLength)
         }
     }
 

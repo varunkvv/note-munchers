@@ -15,6 +15,13 @@ import NoteCore
 ///                          65% right first try, wrong keys (now and then three, so the keyboard
 ///                          picture comes up), the wrong octave, stuck past 15s now and then.
 ///                          Prints the clefs of the session (TTTBBB) at the end
+///                          slip: on a screen of 3+ notes, a wrong key on the third note (a soft
+///                          wobble), the right key straight after (doesn't count), his pause,
+///                          then the screen eases back to its first note and he plays it all.
+///                          Holds on the success. slipCap slips there three times: the second
+///                          time its pitch plays once he's back on it, the third time (the last
+///                          go) the keyboard picture lights it and he finishes from there.
+///                          Use -demoLesson 2.1 -demoMet YES for a 3-4 note screen
 ///     -demoScreen <name>   open a screen directly: home, parent, parent#levels, parent#staff,
 ///                          parent#history, levels (the level picker), monitor, gallery,
 ///                          note:<id> (a note's page, e.g. note:treble:G4, with its habit)
@@ -435,6 +442,8 @@ final class DemoRunner {
             logClefs(c)
         case "kid":
             await kid(c)
+        case "slip", "slipCap":
+            await slip(c, cap: script == "slipCap")
         case "levelUp":
             // right screens until the splash is up, a long look at it, then "Let's go!"
             await skipIntros(c)
@@ -495,6 +504,56 @@ final class DemoRunner {
         }
         log("kid finished after \(round) rounds", c)
         logClefs(c)
+    }
+
+    /// A slip and a gentle start over (`-demoScript slip`), or three slips on one note
+    /// (`slipCap`): the ladder across goes, then note by note.
+    private func slip(_ c: PracticeController, cap: Bool) async {
+        await skipIntros(c)
+        for _ in 0..<40 {
+            guard let item = c.item, c.phase.isPlaying else { break }
+            if !c.session.isIntro, item.notes.count >= 3, c.session.rhythmLine == nil { break }
+            let shown = c.itemsShown
+            await playItem(c)
+            await waitForNext(c, after: shown)
+        }
+        c.timeScale = options.slow
+        guard let item = c.item, c.phase.isPlaying else { return }
+        let at = min(2, item.notes.count - 1)
+        log("slip screen \(item.id), slipping on note \(at + 1)", c)
+        await sleep(1.2 * options.slow)
+        for go in 1...(cap ? 3 : 1) {
+            while c.session.noteIndex < at, c.phase.isPlaying {
+                await right(c)
+                await sleep(0.75 * options.slow)
+            }
+            await wrong(c)
+            log("slip on note \(at + 1), go \(go)", c)
+            if go == 1 {
+                // the right key straight after: it doesn't count (not scaled, so it stays
+                // inside his pause)
+                await sleep(0.3)
+                await press(item.notes[at].pitches)
+                log("self-correction (doesn't count)", c)
+            }
+            if go < 3 {
+                // his pause, then the screen eases back to its first note
+                await waitUntil(seconds: 10) { c.session.slippedNote == nil }
+                log("start over", c)
+                await sleep(1.6 * options.slow)
+            }
+        }
+        if cap {
+            // a look at the lit key before he plays it
+            await sleep(1.5 * options.slow)
+        }
+        c.holdAfterSuccess = true
+        let shown = c.itemsShown
+        while c.phase.isPlaying, c.itemsShown == shown {
+            await right(c)
+            await sleep(0.75 * options.slow)
+        }
+        log("screen done: start overs \(c.session.summary.screens.last?.restarts ?? -1)", c)
     }
 
     /// The session's clefs, one letter a screen (lower case for a new note's intro), e.g.
@@ -793,7 +852,7 @@ final class DemoRunner {
             return
         }
         let hint = c.session.keyboardHint.map(\.name).joined(separator: ",")
-        print("demo: \(message) | phase=\(c.phase.rawValue) lesson=\(c.session.engine.lesson.id) size=\(c.session.engine.screenSize) screen=\(c.item?.id ?? "-") drill=\(c.session.drill?.rawValue ?? "-") note=\(c.session.noteIndex) intro=\(c.session.isIntro) keyboard=[\(hint)] screens=\(c.session.summary.screensPlayed) unlocked=\(c.session.summary.unlocked)")
+        print("demo: \(message) | phase=\(c.phase.rawValue) lesson=\(c.session.engine.lesson.id) size=\(c.session.engine.screenSize) screen=\(c.item?.id ?? "-") drill=\(c.session.drill?.rawValue ?? "-") note=\(c.session.noteIndex) slipped=\(c.session.slippedNote.map(String.init) ?? "-") intro=\(c.session.isIntro) keyboard=[\(hint)] screens=\(c.session.summary.screensPlayed) unlocked=\(c.session.summary.unlocked)")
     }
 }
 #endif

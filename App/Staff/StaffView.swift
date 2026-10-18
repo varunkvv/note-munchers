@@ -254,8 +254,7 @@ struct StaffPainter {
             if let follow = effects.last(where: { $0.kind == .followRest && $0.column == r }) {
                 drawFollow(&context, at: CGPoint(x: rest.x, y: geo.y(4, on: rest.clef)), effect: follow)
             }
-            let color = rest.note < doneCount ? Theme.doneInk : style.ink
-            drawRest(&context, rest.value, clef: rest.clef, x: rest.x, color: color)
+            drawRest(&context, rest.value, clef: rest.clef, x: rest.x, color: ink(rest.note, done: rest.note < doneCount))
         }
         guard geo.spec.clefs.count > 1 else { return }
         for (b, range) in item.barRanges.enumerated() where b < layout.bars.count {
@@ -263,7 +262,7 @@ struct StaffPainter {
             for clef in geo.spec.clefs where !used.contains(clef) {
                 let span = layout.bars[b]
                 let done = range.upperBound <= doneCount
-                drawRest(&context, .whole, clef: clef, x: (span.lowerBound + span.upperBound) / 2, color: done ? Theme.doneInk : style.ink)
+                drawRest(&context, .whole, clef: clef, x: (span.lowerBound + span.upperBound) / 2, color: ink(range.upperBound - 1, done: done))
             }
         }
     }
@@ -317,7 +316,7 @@ struct StaffPainter {
         var stems = item.notes.indices.map { stem(item: item, index: $0, x: xs[$0], up: ups[$0]) }
         let width = CGFloat(Metrics.stemWidth) * g
         let thickness = CGFloat(Metrics.beamThickness) * g
-        func color(_ i: Int) -> Color { i < doneCount ? Theme.doneInk : style.ink }
+        func color(_ i: Int) -> Color { ink(i, done: i < doneCount) }
 
         // beams: one per eighth pair. sloped a little with the notes, never steeply,
         // and moved out so neither stem gets shorter than the normal length
@@ -336,7 +335,7 @@ struct StaffPainter {
             beam.addLine(to: CGPoint(x: stems[j].x + width / 2, y: stems[j].tipY + inward))
             beam.addLine(to: CGPoint(x: stems[i].x - width / 2, y: stems[i].tipY + inward))
             beam.closeSubpath()
-            context.fill(beam, with: .color(j < doneCount ? Theme.doneInk : style.ink))
+            context.fill(beam, with: .color(color(j)))
         }
 
         let beamed = Set(pairs + pairs.map { $0 + 1 })
@@ -442,9 +441,12 @@ struct StaffPainter {
         if let follow = effects.last(where: { $0.kind == .follow && $0.column == index }) {
             for (center, _) in heads { drawFollow(&context, at: center, effect: follow) }
         }
+        if let start = effects.last(where: { $0.kind == .startHere && $0.column == index }) {
+            for (center, _) in heads { drawStartHere(&context, at: center, effect: start) }
+        }
 
         // a glowing (rhythm nudge) note stays in full ink so it stands out from the played ones
-        let color = done && glow == nil ? Theme.doneInk : style.ink
+        let color = glow == nil ? ink(index, done: done) : style.ink
         if value?.isDotted == true {
             for (center, position) in heads {
                 drawDot(&context, head: center, position: position, color: color)
@@ -547,6 +549,25 @@ struct StaffPainter {
 
     /// Soft sky blue, unlike the yellow rhythm glow and the gold sparkle.
     static let followColor = Color(red: 0.66, green: 0.84, blue: 1.0)
+
+    /// A played note is grey. After a start over a played note eases back from grey to
+    /// ink (no movement, so reduce motion keeps it).
+    func ink(_ column: Int, done: Bool) -> Color {
+        if done { return Theme.doneInk }
+        guard let fade = effects.last(where: { $0.kind == .fadeBack && $0.column == column }) else { return style.ink }
+        let p = fade.progress(at: now)
+        return Theme.doneInk.mix(with: style.ink, by: p * p * (3 - 2 * p))
+    }
+
+    /// After a start over: a soft light behind the note to start from. It comes up as the
+    /// played notes finish fading back, stays a moment, and fades. No pulse.
+    private func drawStartHere(_ context: inout GraphicsContext, at center: CGPoint, effect: StaffEffects.Effect) {
+        let p = effect.progress(at: now)
+        let alpha = min(1, max(0, (p - 0.15) / 0.2)) * min(1, (1 - p) / 0.45)
+        guard alpha > 0 else { return }
+        let rect = CGRect(x: center.x - g * 1.35, y: center.y - g * 1.15, width: g * 2.7, height: g * 2.3)
+        context.fill(Path(ellipseIn: rect), with: .color(StaffPainter.followColor.opacity(0.6 * alpha)))
+    }
 
     private func drawSparkle(_ context: inout GraphicsContext, at centers: [CGPoint], progress p: Double) {
         let ease = 1 - pow(1 - p, 3)

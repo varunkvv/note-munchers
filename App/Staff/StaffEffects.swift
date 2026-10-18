@@ -2,8 +2,9 @@ import Foundation
 import Observation
 
 /// Short-lived drawing effects on the staff: wobble (wrong key), sparkle (right key),
-/// glow (rhythm nudge), follow (the note or rest sounding while the screen is played). The staff view animates only while one is live, so the Canvas
-/// isn't redrawn every frame the rest of the time.
+/// glow (rhythm nudge), follow (the note or rest sounding while the screen is played),
+/// fade back and start here (a start over after a slip). The staff view animates only
+/// while one is live, so the Canvas isn't redrawn every frame the rest of the time.
 @MainActor @Observable
 final class StaffEffects {
     enum Kind: Equatable {
@@ -14,6 +15,10 @@ final class StaffEffects {
         case follow
         /// the rest at index `column` of the screen's rests (left to right) is sounding
         case followRest
+        /// a note he had played (grey) going back to ink: the screen started over
+        case fadeBack
+        /// a soft light on the note to start from, after a start over
+        case startHere
     }
 
     struct Effect: Identifiable, Equatable {
