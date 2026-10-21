@@ -18,9 +18,10 @@ import NoteCore
 ///                          slip: on a screen of 3+ notes, a wrong key on the third note (a soft
 ///                          wobble), the right key straight after (doesn't count), his pause,
 ///                          then the screen eases back to its first note and he plays it all.
-///                          Holds on the success. slipCap slips there three times: the second
-///                          time its pitch plays once he's back on it, the third time (the last
-///                          go) the keyboard picture lights it and he finishes from there.
+///                          Holds on the success. slipCap slips there three times, each one
+///                          starts over: the second time its pitch plays once he's back on it,
+///                          after the third the keyboard picture lights it when he's back on
+///                          it, and he finishes on the fourth go.
 ///                          Use -demoLesson 2.1 -demoMet YES for a 3-4 note screen
 ///     -demoScreen <name>   open a screen directly: home, parent, parent#levels, parent#staff,
 ///                          parent#history, levels (the level picker), monitor, gallery,
@@ -515,7 +516,7 @@ final class DemoRunner {
     }
 
     /// A slip and a gentle start over (`-demoScript slip`), or three slips on one note
-    /// (`slipCap`): the ladder across goes, then note by note.
+    /// (`slipCap`, named when there was a cap): the ladder across goes, the key lit on the fourth.
     private func slip(_ c: PracticeController, cap: Bool) async {
         await skipIntros(c)
         for _ in 0..<40 {
@@ -544,15 +545,18 @@ final class DemoRunner {
                 await press(item.notes[at].pitches)
                 log("self-correction (doesn't count)", c)
             }
-            if go < 3 {
-                // his pause, then the screen eases back to its first note
-                await waitUntil(seconds: 10) { c.session.slippedNote == nil }
-                log("start over", c)
-                await sleep(1.6 * options.slow)
-            }
+            // his pause, then the screen eases back to its first note
+            await waitUntil(seconds: 10) { c.session.slippedNote == nil }
+            log("start over", c)
+            await sleep(1.6 * options.slow)
         }
         if cap {
-            // a look at the lit key before he plays it
+            // back on it in the fourth go: a look at the lit key before he plays it
+            while c.session.noteIndex < at, c.phase.isPlaying {
+                await right(c)
+                await sleep(0.75 * options.slow)
+            }
+            log("back on note \(at + 1), go 4", c)
             await sleep(1.5 * options.slow)
         }
         c.holdAfterSuccess = true

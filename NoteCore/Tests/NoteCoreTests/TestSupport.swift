@@ -56,7 +56,7 @@ extension MasteryEngine {
 
 extension NoteCoreConfig {
     /// Every slip works note by note (no start over), as before 2026-10-17: for tests of
-    /// the hint ladder itself, which a screen still uses once its start overs are used up.
+    /// the hint ladder itself, which a screen still climbs on its first note.
     static var noteByNote: NoteCoreConfig {
         var config = NoteCoreConfig()
         config.sequenceRestarts = 0

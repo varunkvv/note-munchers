@@ -105,8 +105,8 @@ public struct ScreenResult: Hashable, Codable, Sendable {
     public var rhythmRetries: Int
     /// One of a level's first rhythm screens, played to him before he read it.
     public var wasRhythmDemo: Bool
-    /// Times the screen went back to its first note after a slip (at most
-    /// `sequenceRestarts`). Each note's result is from the first go that reached it.
+    /// Times the screen went back to its first note after a slip (no cap). Each note's
+    /// result is from the first go that reached it.
     public var restarts: Int
     /// A pattern screen's shape (two bars, bar 2 made from bar 1), nil otherwise.
     public var pattern: PatternShape?

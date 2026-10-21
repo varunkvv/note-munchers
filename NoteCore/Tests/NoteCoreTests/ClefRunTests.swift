@@ -114,9 +114,10 @@ import Testing
             var seen: [(PickReason, Clef, Clef?)] = []
             for n in 0..<24 where bench.session.phase != .done {
                 seen.append((bench.session.pickReason, bench.session.item!.clefs[0], bench.session.runClef))
-                // a wrong key before every note for two screens brings easing
+                // a wrong key before every note for two screens brings easing. not on a lit
+                // key: every slip starts the screen over, so he'd never finish
                 while (8...9).contains(n), bench.session.phase.isPlaying {
-                    _ = bench.press(bench.wrongKey)
+                    if bench.session.keyboardHint.isEmpty { _ = bench.press(bench.wrongKey) }
                     _ = bench.playCurrent()
                 }
                 _ = bench.playScreen()

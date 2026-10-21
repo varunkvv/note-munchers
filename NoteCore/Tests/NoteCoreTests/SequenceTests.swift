@@ -2,7 +2,8 @@ import Testing
 @testable import NoteCore
 
 /// A screen counts only when he plays the whole thing right in one go, and a slip gently
-/// starts it over at his next pause (plans/2026-10-17-whole-sequence.md).
+/// starts it over at his next pause, every time (plans/2026-10-17-whole-sequence.md,
+/// plans/2026-10-20-no-start-over-cap.md).
 @Suite struct SequenceTests {
     /// A session on a screen of at least `notes` notes (2.1: 3-4 a screen, lenient
     /// octaves), nothing played on it yet.
@@ -175,8 +176,9 @@ import Testing
     }
 
     /// Each slip on a note is a rung of its ladder: the wobble, then its pitch when he gets
-    /// back to it. At most 3 goes, then a slip works note by note and he finishes from there.
-    @Test func theLadderCarriesOverAndTheCapHandsOverToNoteByNote() throws {
+    /// back to it, then the keyboard picture every time he gets back to it. No cap: every
+    /// slip starts the screen over, and it's done only on a clean go.
+    @Test func theLadderCarriesOverAndEverySlipStartsOver() throws {
         var b = bench()
         let slipped = b.session.item!.notes[1].pitches
         _ = b.playNote()
@@ -189,19 +191,22 @@ import Testing
         let reach = b.playNote()
         #expect(reach == [.correct(note: 0), .playPitches(slipped)], "second slip: its pitch plays once he's back on it")
         #expect(b.session.phase == .hint1)
-        // the third go is the last: a slip now stays on the note with the ladder
-        #expect(tap(&b, wrong(b)) == [.wobble(note: 1)])
-        #expect(b.session.slippedNote == nil && b.session.noteIndex == 1)
-        #expect(b.session.keyboardHint == slipped, "third rung: the keyboard picture")
+        for slip in 3...5 {
+            #expect(tap(&b, wrong(b)) == [.wobble(note: 1)])
+            #expect(b.session.slippedNote == 1, "slip \(slip) starts over too")
+            #expect(b.startOver() == [.startOver(played: 1)])
+            _ = b.playNote()
+            #expect(b.session.keyboardHint == slipped, "slip \(slip): the picture is up when he's back on it")
+        }
         _ = b.playScreen()
-        #expect(b.session.phase == .success, "he can always finish")
-        #expect(b.session.summary.screens.last!.restarts == 2)
+        #expect(b.session.phase == .success, "done on the clean go")
+        let screen = b.session.summary.screens.last!
+        #expect(screen.restarts == 5 && !screen.firstTry)
+        #expect(screen.notes[1].wrongPresses == 5 && screen.notes[1].hints == .keyboard)
     }
 
     @Test func aThirdSlipLightsTheKeyWhenHeGetsBackToIt() throws {
-        var config = NoteCoreConfig()
-        config.sequenceRestarts = 3
-        var b = bench(config: config)
+        var b = bench()
         let slipped = b.session.item!.notes[1].pitches
         for _ in 0..<3 {
             _ = b.playNote()
@@ -333,15 +338,50 @@ import Testing
         #expect(b.tick(at: deadline + 0.0005) == [.startOver(played: 1)])
     }
 
-    @Test func introsDontStartOver() {
-        // a rhythm lesson's intro is a bar of notes with the picture up: guided
+    @Test func aLessonIntroStartsOverToo() throws {
+        // a rhythm lesson's intro: a bar of notes with the picture up
         var b = Bench(engine(in: "5.1"), seed: 1)
         _ = b.start()
         #expect(b.session.isLessonIntro)
-        guard b.session.item!.notes.count > 1 else { return }
+        try #require(b.session.item!.notes.count > 1)
+        let first = b.session.item!.notes[0].pitches
         _ = b.playNote()
         #expect(tap(&b, wrong(b)) == [.wobble(note: 1)])
-        #expect(b.session.slippedNote == nil, "note by note on an intro")
+        #expect(b.session.slippedNote == 1)
+        #expect(b.startOver() == [.startOver(played: 1)])
+        #expect(b.session.keyboardHint == first, "the picture stays up, on the first note")
+        _ = b.playScreen()
+        #expect(b.session.phase == .success)
+        let screen = b.session.summary.screens.last!
+        #expect(screen.wasLessonIntro && screen.restarts == 1)
+    }
+
+    @Test func aOneNoteIntroCantStartOver() throws {
+        var b = Bench(MasteryEngine(state: MasteryState(seed: 2)))
+        _ = b.start()
+        try #require(b.session.introNote != nil && b.session.item!.notes.count == 1)
+        #expect(tap(&b, wrong(b)) == [.wobble(note: 0)])
+        #expect(b.session.slippedNote == nil, "he's already on its first note")
+    }
+
+    /// A pitch slip during a rhythm retry starts the retry over. Pitch still counts from the
+    /// first go.
+    @Test func aSlipDuringARhythmRetryStartsOver() throws {
+        let rhythm = RhythmPacingTests()
+        var b = rhythm.onJudged("3.1") { rhythm.firstHalf($0, $1) != nil }
+        let half = try #require(rhythm.firstHalf(b.session.item!, b.session.rhythmLine!))
+        _ = rhythm.play(&b) { $0 == half ? 0.5 : 1 }
+        #expect(b.session.phase == .replaying)
+        #expect(b.next() == [.again])
+        _ = b.playNote()
+        #expect(tap(&b, wrong(b)) == [.wobble(note: 1)])
+        #expect(b.session.slippedNote == 1)
+        #expect(b.startOver() == [.startOver(played: 1)])
+        _ = rhythm.play(&b)
+        #expect(b.session.phase == .success)
+        let screen = b.session.summary.screens.last!
+        #expect(screen.rhythmRetries == 1 && screen.restarts == 1)
+        #expect(screen.notes.allSatisfy { $0.firstTry && $0.wrongPresses == 0 })
     }
 
     // MARK: the seeded level 1 sim
@@ -356,18 +396,27 @@ import Testing
         var firstTry = 0.0
         var done = false
         var maxRestarts = 0
+        /// Screens he finished with a slip past the first note in their last go.
+        var slipInLastGo = 0
     }
 
     /// One session of QuietVoiceTests' scripted kid (65% right first try, a wrong key now and
     /// then, the wrong octave, stuck now and then). After a slip he stops, the screen starts
-    /// over at his pause and he plays it again from the start (Bench).
+    /// over at his pause and he plays it again from the start (Bench). A key lit in the
+    /// keyboard picture he plays right, as a real kid can (with no cap, a kid who ignores it
+    /// started one level 1 screen over 13 times).
     static func session(_ kid: QuietVoiceTests.Kid, _ engine: MasteryEngine, seed: UInt64) -> (SimLog, MasteryEngine) {
         var bench = Bench(engine, seed: seed)
         var dice = SeededRandom(seed: seed &+ 0xD1CE)
         var log = SimLog()
+        var slipped = false // a slip past the first note in this go
         func hear(_ cues: [Cue]) {
             for cue in cues {
-                if case .startOver = cue { log.restarts += 1 }
+                if case .startOver = cue {
+                    log.restarts += 1
+                    slipped = false
+                }
+                if cue == .again { slipped = false }
                 if case .say(let s) = cue {
                     log.lines.append(s)
                     if !cues.contains(.done) { log.midSession.append(s) }
@@ -385,21 +434,29 @@ import Testing
                 while bench.session.phase.isPlaying, presses < 200 {
                     presses += 1
                     let roll = unitInterval(&dice)
-                    if roll < kid.right {
-                        // right first try
+                    let past = bench.session.noteIndex > 0
+                    var miss: [Cue]?
+                    if roll < kid.right || !bench.session.keyboardHint.isEmpty {
+                        // right first try, or the key is lit
                     } else if roll < kid.right + kid.wrong {
-                        hear(bench.press(bench.wrongKey, after: 1.5))
+                        miss = bench.press(bench.wrongKey, after: 1.5)
                     } else if roll < kid.right + kid.wrong + kid.octave {
-                        hear(bench.press(Pitch(midi: bench.expected[0].midi + 12), after: 1.5))
+                        miss = bench.press(Pitch(midi: bench.expected[0].midi + 12), after: 1.5)
                     } else {
                         let rungs = 1 + Int(unitInterval(&dice) * 3)
                         for _ in 0..<rungs {
                             if let deadline = bench.session.nextDeadline { hear(bench.tick(at: deadline)) }
                         }
                     }
+                    if let miss {
+                        hear(miss)
+                        if past, !miss.contains(where: { if case .correct = $0 { true } else { false } }) { slipped = true }
+                    }
                     hear(bench.playNote(after: 1.5))
                 }
                 #expect(presses < 200, "a screen he couldn't finish")
+                if slipped { log.slipInLastGo += 1 }
+                slipped = false
             }
             hear(bench.next(after: 1.2))
         }
@@ -425,10 +482,13 @@ import Testing
     }
 
     /// The 65% kid in level 1: how often a screen starts over, every screen finished,
-    /// nothing said until the end. Before (note by note) next to after, same seeds.
+    /// nothing said until the end, and no screen done with a slip in its last go. Note by
+    /// note and the old cap of 2 start overs next to no cap, same seeds.
     @Test func theSeededLevelOneKid() {
+        var capTwo = NoteCoreConfig()
+        capTwo.sequenceRestarts = 2
         var report: [String] = []
-        for (name, config) in [("note by note", NoteCoreConfig.noteByNote), ("whole screen", NoteCoreConfig())] {
+        for (name, config) in [("note by note", NoteCoreConfig.noteByNote), ("cap 2", capTwo), ("no cap", NoteCoreConfig())] {
             var all: [SimLog] = []
             for kidSeed: UInt64 in 1...10 {
                 let logs = Self.sessions(QuietVoiceTests.scripted, 3, kidSeed: kidSeed, config: config)
@@ -437,6 +497,9 @@ import Testing
                     #expect(log.midSession.isEmpty, "kid \(kidSeed) session \(i + 1): \(log.midSession)")
                     #expect(log.lines.count <= 1)
                     #expect(log.maxRestarts <= config.sequenceRestarts)
+                    if name == "no cap" {
+                        #expect(log.slipInLastGo == 0, "kid \(kidSeed) session \(i + 1): a screen done with a slip in it")
+                    }
                     if kidSeed == 1 {
                         report.append("\(name), kid 1 session \(i + 1): \(log.screens) screens, \(log.restarts) start overs on \(log.screensStartedOver) screens, "
                             + "\(String(format: "%.1f", log.minutes)) min, \(Int((log.firstTry * 100).rounded()))% notes first try, lines \(log.lines)")
@@ -452,7 +515,7 @@ import Testing
             let firstTry = all.map(\.firstTry).reduce(0, +) / n
             report.append("\(name), 10 kids x 3 sessions: \(String(format: "%.1f", restarts)) start overs a session on \(String(format: "%.1f", over)) screens, "
                 + "\(String(format: "%.1f", screens)) screens, \(String(format: "%.1f", minutes)) min, \(Int((firstTry * 100).rounded()))% notes first try, "
-                + "max \(all.map(\.maxRestarts).max() ?? 0) on one screen")
+                + "max \(all.map(\.maxRestarts).max() ?? 0) on one screen, \(all.map(\.slipInLastGo).reduce(0, +)) screens done with a slip in the last go")
         }
         print(report.joined(separator: "\n"))
     }

@@ -192,14 +192,14 @@ public struct SessionSummary: Hashable, Codable, Sendable {
 /// first note works note by note: wobble, he tries again. A slip past it (a wrong key,
 /// the wrong octave, a wrong two at once) wobbles softly and nothing else: keys after it
 /// don't count, and once he pauses (`restartPause`, nothing held) the screen goes back to
-/// its first note (`.startOver`). At most `sequenceRestarts` times, then a slip works note
-/// by note again, so a screen can always be finished. Not on intros (guided) or a rhythm
-/// retry (already counted).
+/// its first note (`.startOver`). Every time, no cap (varun, 2026-10-20), a lesson's intro
+/// and a rhythm retry too.
 ///
 /// Each note keeps its own hint ladder across goes (a slip is a rung: the wobble, then
-/// its pitch when he gets back to it, then the keyboard picture when he gets back to it),
-/// and its result is from the first go that reached it: first try, wrong keys, stuck
-/// steps, its response time from when it became the next note until he played it right.
+/// its pitch when he gets back to it, then the keyboard picture every time he gets back
+/// to it, so he can always finish), and its result is from the first go that reached it:
+/// first try, wrong keys, stuck steps, its response time from when it became the next
+/// note until he played it right.
 ///
 /// Shape of a session (learning principles in the plan):
 /// - opens with one screen of his strongest notes, a run (start with success). Nothing is said
@@ -779,11 +779,10 @@ public struct PracticeSession: Sendable {
         return max(pause, latest + config.restartHoldLimit)
     }
 
-    /// A slip here starts the screen over: past its first note, not an intro (the picture
-    /// is up, it's guided), not a rhythm retry (the notes already counted), and a start
-    /// over left.
+    /// A slip here starts the screen over: past its first note and a start over left (no
+    /// cap by default). Lesson intros and rhythm retries too.
     private var canStartOver: Bool {
-        noteIndex > 0 && !isIntro && retries == 0 && restarts < config.sequenceRestarts
+        noteIndex > 0 && restarts < config.sequenceRestarts
     }
 
     /// A slip past the first note: that note wobbles softly and nothing else happens yet.

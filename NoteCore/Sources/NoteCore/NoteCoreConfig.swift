@@ -197,10 +197,10 @@ public struct NoteCoreConfig: Hashable, Codable, Sendable {
     /// ...a key held this long after it went down stops holding the reset back (a lost
     /// key-up, or a hand resting on a key), so it always comes.
     public var restartHoldLimit: Double = 4
-    /// Starts over a screen can have (so at most this many + 1 goes). After that a slip
-    /// works note by note again: he stays on the note with the hint ladder and finishes
-    /// from there, so a screen can always be finished. 0 = note by note from the start.
-    public var sequenceRestarts = 2
+    /// Starts over a screen can have, then a slip works note by note. No cap (varun,
+    /// 2026-10-20: he plays the whole screen right to go on): the ladder's keyboard picture
+    /// and the play button keep him from being stuck. 0 = note by note from the start.
+    public var sequenceRestarts = Int.max
     /// No key for this many seconds counts as one step up the hint ladder (stuck).
     /// Only climbs to the keyboard picture, never repeats on a clock after that.
     public var stuckAfter: Double = 15
